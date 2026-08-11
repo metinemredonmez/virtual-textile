@@ -17,6 +17,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.0.1",
+    "@vt/adapters": "workspace:*",
     "@vt/config": "workspace:*",
     "@vt/contracts": "workspace:*",
     "@vt/db": "workspace:*",
@@ -29,6 +30,7 @@
     "rate-limiter-flexible": "^5.0.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.35.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

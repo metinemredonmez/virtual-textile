@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../auth/auth.guard.js';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { RedisService } from '../../infra/redis.service.js';
 
@@ -16,6 +17,13 @@ interface DependencyStatus {
  *                      tüm sunucuları havuzdan düşürür.
  *  GET /health/deep  → izleme servisi için. Bağımlılıkları gerçekten yoklar.
  */
+/**
+ * ⚠️ @Public() ZORUNLU.
+ * Kimlik doğrulama varsayılan olarak açıktır; bu dekoratör olmadan sağlık ucu
+ * 401 döner. Sonucu ağırdır: yük dengeleyici ve systemd servisi ölü sayar ve
+ * yeniden başlatma döngüsüne sokar. Sağlık ucu hiçbir zaman token istemez.
+ */
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(
