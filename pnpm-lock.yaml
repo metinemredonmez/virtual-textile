@@ -7,6 +7,7 @@ settings:
 overrides:
   vite: ^6.4.3
   esbuild: ^0.25.0
+  uuid: ^11.1.1
 
 importers:
   .:
@@ -101,9 +102,6 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
-      uuid:
-        specifier: ^11.0.5
-        version: 11.1.1
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -5557,13 +5555,6 @@ packages:
         integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==,
       }
 
-  uuid@11.0.3:
-    resolution:
-      {
-        integrity: sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg==,
-      }
-    hasBin: true
-
   uuid@11.1.1:
     resolution:
       {
@@ -6310,7 +6301,7 @@ snapshots:
       '@nestjs/common': 11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.29(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.29)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cron: 3.2.1
-      uuid: 11.0.3
+      uuid: 11.1.1
 
   '@nestjs/schematics@11.1.0(chokidar@4.0.3)(prettier@3.9.6)(typescript@5.9.3)':
     dependencies:
@@ -9130,8 +9121,6 @@ snapshots:
       punycode: 2.3.1
 
   util-deprecate@1.0.2: {}
-
-  uuid@11.0.3: {}
 
   uuid@11.1.1: {}
 
