@@ -72,16 +72,28 @@ const ANAHTARSIZ = {
   ANTHROPIC_MODEL: 'claude-sonnet-5',
 } as const;
 
-/** ⚠️ Sahte de olsa "anahtar gibi görünen" değerler: log sızıntısı testi bunları arıyor. */
+/**
+ * Log sızıntısı testinin aradığı yer tutucular.
+ *
+ * ⚠️ Bilerek gerçek anahtar BİÇİMİNDE DEĞİLLER. Önceki hâlleri (`iyz-secret-…`,
+ * `sk-ant-…`) gitleaks'in `generic-api-key` kuralına takılıp CI'ın güvenlik
+ * işini düşürüyordu. Tarayıcı sahte ile gerçeği ayırt edemez; bu yüzden çözüm
+ * baskılama kuralı eklemek değil, fixture'ı tarayıcının eşleşemeyeceği kadar
+ * açık biçimde sahte yazmaktır — böylece gerçek bir sızıntı olduğunda alarm
+ * hâlâ anlamlı kalır.
+ *
+ * Testin gerektirdiği tek şey bu değerlerin BENZERSİZ olması: log çıktısında
+ * aranıp bulunmamaları gerekiyor.
+ */
 const GIZLI = {
-  iyzicoApi: 'iyz-api-GIZLI-1',
-  iyzicoSecret: 'iyz-secret-GIZLI-2',
-  iyzicoWebhook: 'iyz-webhook-GIZLI-3',
-  r2Access: 'r2-access-GIZLI-4',
-  r2Secret: 'r2-secret-GIZLI-5',
-  fal: 'fal-GIZLI-6',
-  google: 'google-GIZLI-7',
-  anthropic: 'sk-ant-GIZLI-8',
+  iyzicoApi: 'PLACEHOLDER-NOT-A-SECRET-01',
+  iyzicoSecret: 'PLACEHOLDER-NOT-A-SECRET-02',
+  iyzicoWebhook: 'PLACEHOLDER-NOT-A-SECRET-03',
+  r2Access: 'PLACEHOLDER-NOT-A-SECRET-04',
+  r2Secret: 'PLACEHOLDER-NOT-A-SECRET-05',
+  fal: 'PLACEHOLDER-NOT-A-SECRET-06',
+  google: 'PLACEHOLDER-NOT-A-SECRET-07',
+  anthropic: 'PLACEHOLDER-NOT-A-SECRET-08',
 } as const;
 
 const env = (overrides: Partial<Record<keyof typeof ANAHTARSIZ, string>> = {}): Env =>
