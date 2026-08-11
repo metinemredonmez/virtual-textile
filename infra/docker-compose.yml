@@ -1,0 +1,78 @@
+name: virtual-textile
+
+services:
+  postgres:
+    # pgvector + pg_trgm + Türkçe FTS için hazır imaj
+    image: pgvector/pgvector:pg17
+    container_name: vt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vt
+      POSTGRES_PASSWORD: vt
+      POSTGRES_DB: virtual_textile
+      # Türkçe sıralama/karşılaştırma
+      LANG: tr_TR.utf8
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vt -d virtual_textile']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: vt-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Yerel geliştirmede Cloudflare R2 yerine S3 uyumlu MinIO
+  minio:
+    image: minio/minio:latest
+    container_name: vt-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: vtminio
+      MINIO_ROOT_PASSWORD: vtminio123
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kuyruk gözlemi (BullMQ) — sadece geliştirme
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vt-redis-ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles: ['tools']
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

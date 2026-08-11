@@ -1,0 +1,57 @@
+# ── Gizli / ticari dokümanlar — ASLA commit edilmez ──────────────────────
+*.pdf
+*.docx
+*.doc
+*.xlsx
+/sozlesme/
+/contracts-legal/
+MVP_UYGULAMA_PLANI.md
+Ekran*.png
+
+# ── Secrets ───────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+gcp-*.json
+
+# ── Bağımlılıklar & build ────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+coverage/
+.nyc_output/
+
+# ── Prisma ───────────────────────────────────────────────────────────────
+packages/db/generated/
+prisma/*.db
+prisma/*.db-journal
+
+# ── Test / araç çıktıları ────────────────────────────────────────────────
+playwright-report/
+test-results/
+.vitest/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Editör & OS ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# ── Yerel geliştirme ─────────────────────────────────────────────────────
+/tmp/
+/uploads/
+.pgdata/
+.redisdata/
