@@ -227,9 +227,10 @@ server {
 }
 ```
 
-> ⚠️ `X-Forwarded-For` güvenilir olması için uygulamada `trust proxy` ayarlanmalıdır;
-> aksi hâlde hız limiti tüm istekleri tek IP (proxy) olarak sayar.
-> Bu ayar henüz eklenmedi — canlıya çıkmadan önce yapılmalı.
+> Uygulamada `app.set('trust proxy', 1)` ayarlı — yalnızca **bir** proxy'ye güvenilir.
+> `true` demek istemcinin gönderdiği `X-Forwarded-For` zincirine güvenmek olurdu ve
+> saldırgan başlığı uydurup hız limitini atlatabilirdi. Proxy sayısı değişirse bu
+> sayı da güncellenmelidir.
 
 ---
 
@@ -268,7 +269,6 @@ En az şunlar kurulmalı:
 - [ ] TLS + HSTS aktif
 - [ ] Yedekleme çalışıyor ve **geri yükleme denendi**
 - [ ] Sentry ve uptime izleme bağlı
-- [ ] `trust proxy` ayarlandı (hız limiti doğru IP'yi görsün)
 - [ ] Kullanıcı fotoğrafı kovasında **sürümleme kapalı** (bkz. [privacy.md](privacy.md))
 - [ ] Fotoğraf silme cron'u çalışıyor ve **çalışmazsa alarm veriyor**
 - [ ] Log rotasyonu kurulu (`/var/log/virtual-textile`)

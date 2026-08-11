@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env, loadEnv } from '@vt/config';
 import { AppModule } from './app.module.js';
 import { createLogger } from './common/logger.js';
@@ -17,11 +19,20 @@ async function bootstrap(): Promise<void> {
     service: 'api',
   });
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Nest'in kendi renkli logger'ı yerine yapılandırılmış JSON log
     logger: ['error', 'warn'],
     bodyParser: true,
   });
+
+  // Refresh token httpOnly çerezde taşınıyor.
+  app.use(cookieParser());
+
+  // ⚠️ Ters proxy arkasında çalışıyoruz. Bu ayar olmadan req.ip her istek için
+  // proxy'nin IP'sini döner; hız limiti tüm kullanıcıları tek kova sayar ve
+  // işlevsiz kalır. Yalnızca BİR proxy'ye güveniyoruz (nginx) — 'true' demek
+  // istemcinin gönderdiği X-Forwarded-For zincirine güvenmek olurdu.
+  app.set('trust proxy', 1);
 
   app.use(
     helmet({
