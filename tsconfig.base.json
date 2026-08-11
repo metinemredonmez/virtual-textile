@@ -17,6 +17,10 @@
     "declarationMap": true,
     "sourceMap": true,
     "incremental": true,
+    // Artımlı derleme durumu ÇIKTININ İÇİNDE tutulur.
+    // Dışarıda kalırsa: `nest build` dist'i siler, tsbuildinfo hayatta kalır,
+    // tsc "zaten derledim" deyip main.js'i hiç yazmaz ve uygulama açılmaz.
+    "tsBuildInfoFile": "${configDir}/dist/.tsbuildinfo",
     "composite": false,
 
     "esModuleInterop": true,

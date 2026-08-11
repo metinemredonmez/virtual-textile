@@ -30,9 +30,20 @@ function orderNumber(seq: number): string {
 async function main(): Promise<void> {
   console.log('🌱 Demo veri yükleniyor...\n');
 
-  // ── Temizlik (yalnızca geliştirme) ──────────────────────────────────────
   if (process.env.NODE_ENV === 'production') {
     throw new Error('Seed üretim ortamında çalıştırılamaz.');
+  }
+
+  // Seed tekrar çalıştırılabilir olmalı ama İKİNCİ BİR SİPARİŞ ÜRETMEMELİ —
+  // ledger'a mükerrer kayıt girerse bakiyeler anlamsızlaşır.
+  // Bu yüzden var olan veriyi silmiyoruz, sessizce çıkıyoruz.
+  const existing = await prisma.store.findUnique({ where: { slug: 'atolye-nord' } });
+  if (existing) {
+    console.log('ℹ️  Demo veri zaten yüklü, hiçbir şey yapılmadı.\n');
+    console.log(
+      '   Sıfırdan yüklemek için:  pnpm infra:reset && pnpm db:migrate && pnpm db:seed\n',
+    );
+    return;
   }
 
   // ── 1. Kategori ağacı ───────────────────────────────────────────────────
