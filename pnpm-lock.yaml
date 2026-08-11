@@ -134,6 +134,22 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)
 
+  packages/adapters:
+    dependencies:
+      '@vt/config':
+        specifier: workspace:*
+        version: link:../config
+      '@vt/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.12)
+
   packages/config:
     dependencies:
       dotenv:
