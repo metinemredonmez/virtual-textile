@@ -55,3 +55,6 @@ Thumbs.db
 /uploads/
 .pgdata/
 .redisdata/
+
+# pnpm
+pnpm-lock.yaml.bak
