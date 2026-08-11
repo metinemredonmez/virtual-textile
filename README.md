@@ -46,6 +46,10 @@ Detay: [`docs/architecture.md`](docs/architecture.md) · Kararlar: [`docs/adr/`]
 
 ---
 
+> **Docker yalnızca yerel geliştirme içindir.** Sunucuda konteyner yok: PostgreSQL,
+> Redis ve Node doğrudan makinede kurulur, süreçler PM2 veya systemd ile yönetilir.
+> Bkz. [`docs/deployment.md`](docs/deployment.md).
+
 ## Gereksinimler
 
 - Node.js **≥ 20.11**
@@ -131,7 +135,7 @@ Monoliti ileride ayırabilmek için 4 kural, ESLint ile zorlanır:
 - Rıza kayıtları append-only tutulur; yurt dışına aktarım için ayrı rıza alınır.
 - Gizli anahtarlar repoda tutulmaz — bkz. [`docs/secrets.md`](docs/secrets.md).
 
-Detay: [`docs/privacy.md`](docs/privacy.md)
+Detay: [`docs/privacy.md`](docs/privacy.md) · Dağıtım: [`docs/deployment.md`](docs/deployment.md)
 
 ## Hata yönetimi
 

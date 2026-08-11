@@ -1,0 +1,48 @@
+# PM2 KULLANMAK İSTEMEZSEN: Node'u doğrudan systemd altında çalıştırır.
+#
+# Tek süreç. Birden fazla örnek istersen systemd template kullan:
+#   vt-api@.service + `systemctl enable vt-api@{1..4}`
+# ve her örneğe farklı PORT ver, önüne nginx upstream koy.
+#
+# PM2'ye göre: daha az katman, journald ile bütünleşik log, cluster yok.
+
+[Unit]
+Description=Virtual Textile — API
+After=network-online.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=vt
+Group=vt
+WorkingDirectory=/srv/virtual-textile/apps/api
+
+EnvironmentFile=/etc/virtual-textile/api.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node dist/main.js
+
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vt-api
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+LockPersonality=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
