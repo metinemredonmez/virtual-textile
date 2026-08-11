@@ -12,7 +12,6 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
 
 jobs:
   verify:
@@ -53,9 +52,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Sürüm belirtilmiyor: package.json'daki "packageManager" alanı tek
+      # doğruluk kaynağıdır. İkisi birden verilirse action çakışma hatası verir.
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -103,9 +102,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Sürüm belirtilmiyor: package.json'daki "packageManager" alanı tek
+      # doğruluk kaynağıdır. İkisi birden verilirse action çakışma hatası verir.
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
@@ -138,9 +137,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      # Sürüm belirtilmiyor: package.json'daki "packageManager" alanı tek
+      # doğruluk kaynağıdır. İkisi birden verilirse action çakışma hatası verir.
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
