@@ -183,8 +183,25 @@ sudo -u vt pm2 monit
 API stateless olduğu için cluster modu güvenlidir: oturum ve kuyruk Redis'te, bellekte
 durum tutulmuyor.
 
-> ⚠️ Worker yazıldığında **fork** modunda ve tek örnek çalışmalıdır. Cluster'a alınırsa
-> aynı iş birden fazla süreç tarafından işlenebilir.
+#### Worker: iki ayrı rol
+
+| Proses            | Rol     | İşler                                   | Örnek   | Ölçekleme sinyali    |
+| ----------------- | ------- | --------------------------------------- | ------- | -------------------- |
+| `vt-worker-core`  | `core`  | outbox, bildirim, cron'lar              | **tek** | —                    |
+| `vt-worker-media` | `media` | görüntü işleme, sanal deneme, embedding | çoklu   | **kuyruk derinliği** |
+
+Tek proseste olsalardı ağır görüntü işleme, 10 saniyede bir çalışması gereken outbox
+dağıtıcısını aç bırakırdı ve ödeme bildirimi görsel kuyruğunun arkasında beklerdi.
+
+> ⚠️ `core` **tek örnek** olmalıdır. Zamanlanmış işler yalnızca bu rolde çalışır; ikinci
+> bir örnek aynı fotoğrafı iki kez silmeye, aynı rezervasyonu iki kez serbest bırakmaya
+> (stoğu iki kez artırmaya) kalkardı.
+
+> ⚠️ `media` ölçeklenirken sinyal **CPU değil kuyruk derinliği** olmalıdır. İşler dış
+> API yanıtını beklerken CPU düşük görünür; CPU'ya bakarsan kuyruk büyürken ölçeklemezsin.
+> Bu, üretim inference mimarilerinin ortak dersidir.
+
+> Her iki rol de **fork** modunda çalışır, cluster değil.
 
 ### Seçenek B — Doğrudan systemd (PM2 yok)
 

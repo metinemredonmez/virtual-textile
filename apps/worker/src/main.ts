@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { loadEnv } from '@vt/config';
+import { loadEnv, env } from '@vt/config';
 import { WorkerModule } from './worker.module.js';
 
 /**
@@ -39,7 +39,14 @@ async function bootstrap(): Promise<void> {
     shutdown('SIGINT');
   });
 
-  process.stdout.write('Worker ayakta — zamanlanmış işler çalışıyor\n');
+  const role = env().WORKER_ROLE;
+  process.stdout.write(
+    role === 'media'
+      ? 'Worker ayakta — rol: media (görüntü işleme, sanal deneme, embedding)\n'
+      : role === 'core'
+        ? 'Worker ayakta — rol: core (outbox, bildirim, zamanlanmış işler)\n'
+        : 'Worker ayakta — rol: all (yalnızca geliştirme için; üretimde core/media ayrılır)\n',
+  );
 }
 
 void bootstrap().catch((error: unknown) => {

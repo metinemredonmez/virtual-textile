@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Logger } from 'pino';
-import { PHOTO_RETENTION } from '@vt/config';
+import { PHOTO_RETENTION, env } from '@vt/config';
 import { WORKER_LOGGER } from './infra.module.js';
 import { OutboxDispatcher } from './jobs/outbox.dispatcher.js';
 import { PhotoRetentionJob, ReservationReleaseJob } from './jobs/photo-retention.job.js';
@@ -19,6 +19,14 @@ export class SchedulerService {
   private readonly lastRunAt = new Map<string, Date>();
   private readonly lastError = new Map<string, string>();
 
+  /**
+   * ⚠️ Zamanlanmış işler YALNIZCA 'core' rolünde çalışır.
+   * 'media' prosesi de çalıştırsaydı, iki proses aynı anda aynı fotoğrafı
+   * silmeye ve aynı rezervasyonu serbest bırakmaya kalkardı — stok iki kez
+   * artardı. Rol ayrımı bunun tek savunması.
+   */
+  private readonly runsCronJobs = env().WORKER_ROLE !== 'media';
+
   constructor(
     private readonly outbox: OutboxDispatcher,
     private readonly photoRetention: PhotoRetentionJob,
@@ -27,6 +35,7 @@ export class SchedulerService {
   ) {}
 
   private async guard(name: string, fn: () => Promise<unknown>): Promise<void> {
+    if (!this.runsCronJobs) return;
     try {
       await fn();
       this.lastRunAt.set(name, new Date());
@@ -61,9 +70,14 @@ export class SchedulerService {
    * `staleJobs` boş değilse bir cron beklenenden uzun süredir çalışmıyor demektir.
    */
   health(): {
+    role: string;
     jobs: Array<{ name: string; lastRunAt: string | null; lastError: string | null }>;
     staleJobs: string[];
   } {
+    // 'media' rolü cron çalıştırmaz; bayat iş raporu üretmesi yanıltıcı olur.
+    if (!this.runsCronJobs) {
+      return { role: env().WORKER_ROLE, jobs: [], staleJobs: [] };
+    }
     const expectedIntervalMs: Record<string, number> = {
       outbox: 60_000,
       reservations: 5 * 60_000,
@@ -84,6 +98,6 @@ export class SchedulerService {
       };
     });
 
-    return { jobs, staleJobs };
+    return { role: env().WORKER_ROLE, jobs, staleJobs };
   }
 }

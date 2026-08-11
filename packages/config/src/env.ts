@@ -102,6 +102,19 @@ export const envSchema = z
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
 
     INTERNAL_API_TOKEN: z.string().min(16, 'INTERNAL_API_TOKEN en az 16 karakter olmalı.'),
+
+    /**
+     * Worker prosesinin rolü.
+     *
+     *  core  → outbox, bildirim, zamanlanmış işler. Hafif ve GECİKMEYE DUYARLI.
+     *  media → görüntü işleme, sanal deneme, embedding. Ağır ve CPU/IO yoğun.
+     *  all   → ikisi birden (yalnızca yerel geliştirme).
+     *
+     * ⚠️ Üretimde ayrı proseslerde çalışırlar: ağır görsel işleme, 10 saniyede
+     *    bir çalışması gereken outbox dağıtıcısını aç bırakmasın. İkisi aynı
+     *    proseste olduğunda ödeme bildirimi görsel kuyruğunun arkasında bekler.
+     */
+    WORKER_ROLE: z.enum(['core', 'media', 'all']).default('all'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
