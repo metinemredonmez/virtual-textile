@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Logger } from 'pino';
 import { PHOTO_RETENTION, env } from '@vt/config';
-import { WORKER_LOGGER } from './infra.module.js';
+import { STORAGE_STATUS, WORKER_LOGGER, type StorageStatus } from './infra.module.js';
 import { OutboxDispatcher } from './jobs/outbox.dispatcher.js';
 import { PhotoRetentionJob, ReservationReleaseJob } from './jobs/photo-retention.job.js';
 
@@ -32,6 +32,14 @@ export class SchedulerService {
     private readonly photoRetention: PhotoRetentionJob,
     private readonly reservations: ReservationReleaseJob,
     @Inject(WORKER_LOGGER) private readonly logger: Logger,
+    /**
+     * ⚠️ Depo durumu sağlık raporunda YAYINLANIR. Yer tutucu depo `delete()`
+     *    çağrısında sessizce başarılı döner ama nesneyi SİLMEZ: fotoğraf
+     *    temizliği cron'u zamanında çalışmış görünürken saklama süresi
+     *    taahhüdü fiilen yerine getirilmemiş olur. `staleJobs` bunu YAKALAYAMAZ
+     *    — iş gerçekten çalışmıştır. Dışarıdan görünen tek işaret budur.
+     */
+    @Inject(STORAGE_STATUS) private readonly storage: StorageStatus,
   ) {}
 
   private async guard(name: string, fn: () => Promise<unknown>): Promise<void> {
@@ -68,15 +76,19 @@ export class SchedulerService {
   /**
    * Sağlık raporu — izleme servisi bunu okur.
    * `staleJobs` boş değilse bir cron beklenenden uzun süredir çalışmıyor demektir.
+   * `storage.deleteWorks` false ise cron'lar çalışsa bile fotoğraf SİLİNMİYOR.
    */
   health(): {
     role: string;
     jobs: Array<{ name: string; lastRunAt: string | null; lastError: string | null }>;
     staleJobs: string[];
+    storage: StorageStatus;
   } {
     // 'media' rolü cron çalıştırmaz; bayat iş raporu üretmesi yanıltıcı olur.
+    // ⚠️ Depo durumu bu erken dönüşte de raporlanır: 'media' prosesi fotoğraf
+    //    YÜKLER, dolayısıyla deposunun gerçek olup olmadığı orada da anlamlıdır.
     if (!this.runsCronJobs) {
-      return { role: env().WORKER_ROLE, jobs: [], staleJobs: [] };
+      return { role: env().WORKER_ROLE, jobs: [], staleJobs: [], storage: this.storage };
     }
     const expectedIntervalMs: Record<string, number> = {
       outbox: 60_000,
@@ -98,6 +110,6 @@ export class SchedulerService {
       };
     });
 
-    return { role: env().WORKER_ROLE, jobs, staleJobs };
+    return { role: env().WORKER_ROLE, jobs, staleJobs, storage: this.storage };
   }
 }

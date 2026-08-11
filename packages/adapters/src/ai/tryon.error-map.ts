@@ -9,7 +9,8 @@ import { isPermanentFailure, type TryOnFailureReason } from './tryon.provider.js
  * ⚠️ BU DOSYA PARA HARCATIR. Sınıflandırma fallback zincirinin davranışını
  * belirler:
  *   - KALICI (INVALID_INPUT / CONTENT_BLOCKED / NO_PERSON_DETECTED) → zincir KESİLİR
- *   - GEÇİCİ (PROVIDER_ERROR / TIMEOUT / RATE_LIMITED / QUOTA_EXCEEDED) → sıradaki sağlayıcı denenir
+ *   - GEÇİCİ (PROVIDER_ERROR / TIMEOUT / RATE_LIMITED / QUOTA_EXCEEDED /
+ *     MISCONFIGURED) → sıradaki sağlayıcı denenir
  *
  * İki yanlış yönün maliyeti simetrik DEĞİL:
  *
@@ -129,9 +130,11 @@ export interface TryOnSignal {
  *           kullanıcının fotoğrafı hakkında hiçbir şey söylemez.
  * 2) 429  : hız limiti. Gövde bakiye bitişine işaret ediyorsa QUOTA_EXCEEDED.
  * 3) 402  : ödeme gerekli → QUOTA_EXCEEDED.
- * 4) 401/403 : anahtarımız/izinlerimiz — KULLANICININ hatası değil. Yedek
- *           sağlayıcının anahtarı farklıdır, o yüzden GEÇİCİ sayılır ve zincir
- *           devam eder. (Ama gövde içerik reddi diyorsa o kazanır.)
+ * 4) 401/403 : anahtarımız/izinlerimiz — KULLANICININ hatası değil →
+ *           MISCONFIGURED. Yedek sağlayıcının anahtarı farklıdır, o yüzden
+ *           KALICI SAYILMAZ ve zincir devam eder; PROVIDER_ERROR'dan ayrı
+ *           tutulması yalnızca alarm içindir (gerçek kesinti ile karışmasın).
+ *           (Ama gövde içerik reddi diyorsa o kazanır.)
  * 5) gövde anahtar kelimeleri: içerik → kişi yok → geçersiz girdi
  * 6) diğer 4xx : geçersiz girdi
  * 7) hiçbiri : PROVIDER_ERROR (geçici) — varsayılan güvenli taraftır.
@@ -180,8 +183,9 @@ export function classifyTryOnSignal(signal: TryOnSignal): TryOnClassification {
   if (status === 401 || status === 403) {
     // ⚠️ Yapılandırma hatası. Kalıcı gibi görünür ama BİZİM tarafımızdadır;
     // kullanıcının fotoğrafıyla ilgisi yoktur, o yüzden zinciri kesmeyiz.
+    // MISCONFIGURED, PERMANENT_TRYON_FAILURES'ta DEĞİLDİR — bkz. tryon.provider.ts.
     return {
-      reason: 'PROVIDER_ERROR',
+      reason: 'MISCONFIGURED',
       ...(code ? { providerCode: code } : {}),
       rule: `http-${status}-auth`,
     };
@@ -363,7 +367,15 @@ export function classifyGeminiTextResponse(text: string): TryOnClassification {
     : fallback;
 }
 
-// TODO(kod-gerekli): TRYON_PROVIDER_MISCONFIGURED (503, integration) — şu an
-// 401/403 (bizim anahtar/izin hatamız) PROVIDER_ERROR olarak raporlanıyor ve
-// gerçek sağlayıcı kesintisinden ayırt edilemiyor. Kod eklendiğinde buradaki
-// `http-401-auth` / `http-403-auth` kuralları ve alarm eşiği güncellenmeli.
+// NOT: TRYON_PROVIDER_MISCONFIGURED artık bağlı. Zincir üç parçadan geçiyor:
+//   1. tryon.provider.ts    → `TryOnFailureReason` birleşimine 'MISCONFIGURED',
+//   2. bu dosya             → `http-401-auth` / `http-403-auth` o değere,
+//   3. worker/tryon.processor.ts → FAILURE_ERROR_CODE eşlemesinde katalog kodu.
+//
+// ⚠️ TODO'nun ilk hâli `isPermanentFailure`ın bunu KALICI saymasını istiyordu;
+//    UYGULANMADI ve uygulanmamalı. Bu kod tabanında "kalıcı" =
+//    `generateWithFallback` ZİNCİRİ KESER demektir; MISCONFIGURED'ı kalıcı
+//    yapmak, fal anahtarı bozukken gemini'yi hiç denememek olurdu — TODO'nun
+//    kendi gerekçesiyle ("yedek sağlayıcıya geçilmeli") çelişir.
+//    Aynı sağlayıcıda tekrar deneme zaten yok: `isTryOnRetryable` 401/403 için
+//    false döner (yalnızca 429 ve 5xx tekrar denenir).

@@ -47,7 +47,24 @@ export type TryOnFailureReason =
   | 'PROVIDER_ERROR'
   | 'TIMEOUT'
   | 'RATE_LIMITED'
-  | 'QUOTA_EXCEEDED';
+  | 'QUOTA_EXCEEDED'
+  /**
+   * ⚠️ BİZİM anahtarımız/iznimiz hatalı (401/403) — kullanıcının fotoğrafıyla
+   * ilgisi YOK.
+   *
+   * "Kalıcı" DEĞİLDİR ve olmamalıdır: kalıcı işaretlemek `generateWithFallback`
+   * zincirini KESER (aşağıya bakınız), oysa yedek sağlayıcının anahtarı
+   * farklıdır ve büyük ihtimalle çalışır. Kendi yapılandırma hatamız yüzünden
+   * çalışan yolu kapatmak, kullanıcıya bedelini ödetmektir.
+   *
+   * Aynı sağlayıcıda TEKRAR DENENMEZ: `isTryOnRetryable` 401/403'ü zaten
+   * reddediyor — anahtar düzelmeden sonuç değişmez, yalnızca para yanar.
+   *
+   * PROVIDER_ERROR'dan ayrılmasının tek nedeni ALARM: gerçek kesinti ile
+   * kendi eksik yapılandırmamız aynı kutuya düşerse, ikincisi haftalarca
+   * "sağlayıcı arızası" diye okunur.
+   */
+  | 'MISCONFIGURED';
 
 export interface TryOnFailure {
   status: 'FAILED';
@@ -65,6 +82,11 @@ export type TryOnResult = TryOnSuccess | TryOnFailure;
  * Kalıcı hatalar tekrar denenmez.
  * "Fotoğrafta kişi yok" hatası üçüncü denemede de kişi bulmayacaktır —
  * sadece maliyet üretir ve kullanıcıyı bekletir.
+ *
+ * ⚠️ MISCONFIGURED bilinçli olarak BU LİSTEDE DEĞİL. Buradaki "kalıcı",
+ *    `generateWithFallback` için "zinciri kes" anlamına gelir; yapılandırma
+ *    hatası fotoğrafın değil BİZİM sorunumuzdur ve yedek sağlayıcıda
+ *    tekrarlanmaz. Bkz. TryOnFailureReason → 'MISCONFIGURED'.
  */
 export const PERMANENT_TRYON_FAILURES: readonly TryOnFailureReason[] = [
   'INVALID_INPUT',

@@ -111,7 +111,10 @@ function shippingShareOf(item: OrderItemMoneySnapshot): bigint {
     // Satıcıya lineTotal − komisyon'dan FAZLA hakediş yazılmış: satış anındaki
     // kayıt tutarsız. Sessizce devam edilirse iade satıcı bakiyesini eksiye
     // düşürür; işlem burada durur.
-    throw appError('PAYMENT_AMOUNT_MISMATCH', {
+    // ⚠️ LEDGER_INCONSISTENT (500), PAYMENT_AMOUNT_MISMATCH (4xx) DEĞİL: bu bir
+    // istemci hatası değil, satış anında yazılmış kaydın bozukluğudur. 4xx
+    // dönmek istemciye "isteğini düzelt" der; düzeltilecek bir istek yok.
+    throw appError('LEDGER_INCONSISTENT', {
       internalMessage:
         `Kalem ${item.orderItemId} tutarsız: lineTotal=${item.lineTotalMinor} ` +
         `komisyon=${item.commissionAmountMinor} sellerNet=${item.sellerNetMinor}`,
@@ -263,7 +266,10 @@ export function ledgerBalanceMinor(entries: readonly LedgerEntryDraft[]): bigint
   return entries.reduce((acc, entry) => acc + entry.amountMinor, 0n);
 }
 
-// TODO(kod-gerekli): LEDGER_INCONSISTENT — satış kaydı kendi içinde tutarsız
-// olduğunda (sellerNet > lineTotal − komisyon) PAYMENT_AMOUNT_MISMATCH
-// kullanılıyor. Aile ve HTTP kodu doğru (system/409) ama kullanıcı mesajı
-// ödeme diyor; defter tutarsızlığı için ayrı bir kod daha isabetli olur.
+// NOT: `shippingShareOf` artık LEDGER_INCONSISTENT (500, system) fırlatıyor;
+// eskiden PAYMENT_AMOUNT_MISMATCH (409) idi. Test de aynı anda güncellendi.
+//
+// ⚠️ DAVRANIŞ DEĞİŞİKLİĞİ: bu senaryoda uçtan dönen HTTP durumu 409 → 500
+//    oldu ve hata artık Sentry'ye RAPORLANIYOR (system ailesi). İstemci bu
+//    senaryoyu 4xx olarak ele alıyorsa güncellenmeli. Bilinçli: bu bir istemci
+//    hatası değil, satış anında yazılmış kaydın bozukluğudur.

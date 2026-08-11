@@ -50,11 +50,13 @@ export interface ImageWatermarker {
   embed(image: Buffer, text: string): Promise<{ image: Buffer; contentType: string }>;
 }
 
-// NEEDS-DEP: sharp
 /**
- * Gerçek filigran uygulaması `sharp` gerektirir (SVG metin katmanını piksele
- * düzleştirmek için). Bağımlılık kurulana kadar bu yer tutucu KASITLI OLARAK
- * HATA FIRLATIR.
+ * ⚠️ ARTIK BAĞLAMADA KULLANILMIYOR — gerçek uygulama
+ *    `tryon.watermarker.ts` → `SharpWatermarker`dır ve `worker.module.ts`
+ *    koşulsuz onu bağlar.
+ *
+ * Dışa açık kalıyor çünkü testlerin "filigran bileşeni yokken iş ne olur"
+ * senaryosunu (başarısız yazılır, kota iade edilir) kurabilmesi gerekiyor.
  *
  * ⚠️ Sessizce filigransız kaydetmek seçenek değildir: uyarı taşımayan bir
  *    üretim görselinin kullanıcıya ulaşması, hiç görsel üretmemekten daha
@@ -62,9 +64,7 @@ export interface ImageWatermarker {
  */
 export class UnavailableWatermarker implements ImageWatermarker {
   embed(): Promise<{ image: Buffer; contentType: string }> {
-    return Promise.reject(
-      new Error('Filigran bileşeni yok (NEEDS-DEP: sharp) — görsel kaydedilmedi'),
-    );
+    return Promise.reject(new Error('Filigran bileşeni bağlanmadı — görsel kaydedilmedi'));
   }
 }
 
@@ -142,6 +142,10 @@ const FAILURE_ERROR_CODE: Record<TryOnFailureReason, string> = {
   TIMEOUT: 'TRYON_TIMEOUT',
   RATE_LIMITED: 'TRYON_PROVIDER_ERROR',
   QUOTA_EXCEEDED: 'AI_BUDGET_EXCEEDED',
+  // ⚠️ Kök neden BİZDE (anahtar/izin). Kullanıcı mesajı TRYON_PROVIDER_ERROR
+  //    ile aynı şeyi söyler ama kod ayrıdır: alarm kuralı "sağlayıcı arızası"
+  //    ile "bizim yapılandırmamız bozuk"u ayırt edebilmeli.
+  MISCONFIGURED: 'TRYON_PROVIDER_MISCONFIGURED',
 };
 
 @Injectable()

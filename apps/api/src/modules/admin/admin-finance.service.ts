@@ -92,7 +92,9 @@ export class AdminFinanceService {
     if (!context) throw appError('ORDER_NOT_FOUND');
 
     if (context.paidAt === null || context.capturedMinor <= 0n) {
-      throw appError('REFUND_EXCEEDS_PAYMENT', {
+      // Tahsilat HİÇ yok — "iade tutarı ödemeyi aşıyor" demek operatörü
+      // tutarı düşürmeye yönlendirirdi; doğru eylem sipariş iptali.
+      throw appError('REFUND_NO_CAPTURED_PAYMENT', {
         internalMessage: `Sipariş ${context.orderNumber} için tahsil edilmiş ödeme yok`,
       });
     }
@@ -334,16 +336,12 @@ export class AdminFinanceService {
     payoutId: string,
   ): void {
     if (current !== 'REQUESTED') {
-      throw appError('PAYOUT_PENDING_EXISTS', {
+      // Bu mesajı ADMİN görür: "bekleyen talebiniz var" satıcıya yazılmış bir
+      // cümledir ve burada yanlış kitleye hitap ederdi.
+      throw appError('PAYOUT_INVALID_STATE', {
+        params: { status: current },
         internalMessage: `Payout ${payoutId} ${current} durumunda, ${target} yapılamaz`,
       });
     }
   }
 }
-
-// TODO(kod-gerekli): PAYOUT_INVALID_STATE — "bu talep zaten karara bağlanmış"
-// durumu şu an PAYOUT_PENDING_EXISTS ile dönüyor; kullanıcı mesajı ("Bekleyen
-// bir ödeme talebiniz var") bu bağlamda satıcıya değil admine gösteriliyor ve
-// tam oturmuyor.
-// TODO(kod-gerekli): REFUND_NO_CAPTURED_PAYMENT — tahsilat hiç yapılmamışken
-// iade denenmesi şu an REFUND_EXCEEDS_PAYMENT ile dönüyor.

@@ -187,6 +187,19 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message: 'Bu üründen tek siparişte en fazla {max} adet alabilirsiniz.',
   },
+  /**
+   * Adet tavanından (MAX_QUANTITY_EXCEEDED) AYRI: burada sınır tek varyantın
+   * adedi değil, sepetteki FARKLI ürün sayısıdır. Aynı kodla dönülürse
+   * kullanıcı "10 adetten fazla alamazsınız" okur ve adedi düşürerek çözmeye
+   * çalışır — oysa bir ürünü çıkarması gerekir.
+   */
+  CART_TOO_MANY_ITEMS: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    message:
+      'Sepetinize en fazla {max} farklı ürün ekleyebilirsiniz. Bir ürünü çıkarıp tekrar deneyin.',
+  },
   COUPON_INVALID: {
     status: 400,
     family: 'domain',
@@ -210,6 +223,17 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Bu kuponu daha önce kullandınız.',
+  },
+  /**
+   * COUPON_EXPIRED'dan AYRI: kupon hâlâ tarih olarak geçerli, ama toplam
+   * kontenjanı bitti. "Süresi doldu" demek yanlış bilgi olurdu — kullanıcı
+   * tarihi kontrol edip geçerli görünce destek kaydı açar.
+   */
+  COUPON_USAGE_LIMIT_REACHED: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message: 'Bu kupon için ayrılan kontenjan doldu. Başka bir kupon deneyebilirsiniz.',
   },
   COUPON_NOT_APPLICABLE: {
     status: 422,
@@ -304,6 +328,31 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message: 'İade tutarı ödeme tutarını aşamaz.',
   },
+  /**
+   * REFUND_EXCEEDS_PAYMENT'tan AYRI: orada tahsilat VAR ama tutar fazla,
+   * burada tahsilat HİÇ yok. Operatörün yapması gereken iş farklı — iade
+   * değil sipariş iptali. Aynı kodla dönmek yanlış işleme yönlendirir.
+   */
+  REFUND_NO_CAPTURED_PAYMENT: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    message: 'Bu siparişte tahsil edilmiş ödeme yok. İade yerine sipariş iptalini kullanın.',
+  },
+  /**
+   * Webhook imzası tutmadı → istek sahte veya secret döndürülmüş.
+   *
+   * ⚠️ Aile `domain`, `integration` DEĞİL: sahte bildirim BEKLENEN bir olaydır
+   *    (uç nokta herkese açık). Sentry'ye gitseydi tarayan botlar gerçek
+   *    entegrasyon alarmlarını gürültüye boğardı. Gerçek secret uyuşmazlığı
+   *    imza reddi oranından izlenir, tek tek hatalardan değil.
+   */
+  WEBHOOK_SIGNATURE_INVALID: {
+    status: 401,
+    family: 'domain',
+    retryable: false,
+    message: 'Bildirimin imzası doğrulanamadı. Geçerli bir imza ile tekrar gönderin.',
+  },
   REFUND_WINDOW_CLOSED: {
     status: 422,
     family: 'domain',
@@ -353,6 +402,31 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Bu ürün için zaten açık bir iade talebiniz var.',
+  },
+  /**
+   * CART_EXPIRED'dan AYRI: sepet değil, siparişe AYRILMIŞ stok düştü. Sepet
+   * hâlâ duruyor olabilir; kullanıcının yapması gereken sepeti doldurmak
+   * değil, ödemeyi yeniden başlatmak.
+   */
+  ORDER_RESERVATION_EXPIRED: {
+    status: 410,
+    family: 'domain',
+    retryable: false,
+    message: 'Siparişiniz için ayrılan stok süresi doldu. Sepetinizden yeniden sipariş oluşturun.',
+  },
+  /**
+   * Satış kaydı kendi içinde tutarsız (ör. satıcı hakedişi brütten büyük).
+   *
+   * ⚠️ Aile `system` + 500: bu bir kullanıcı hatası DEĞİL, veri bozukluğudur.
+   *    Muhasebe kayıtları yanlışsa her iade yanlış tutar üretir; sessizce
+   *    geçilirse fark ancak mutabakatta, günler sonra fark edilir. ALARM ŞART.
+   */
+  LEDGER_INCONSISTENT: {
+    status: 500,
+    family: 'system',
+    retryable: false,
+    message:
+      'Sipariş kaydında tutarsızlık var, işlem güvenlik nedeniyle durduruldu. Destek ekibine şu kodu iletin: {requestId}',
   },
 
   // ── AI / SANAL DENEME ─────────────────────────────────────────────────
@@ -441,11 +515,19 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message: 'Fotoğrafınız işlenemedi. Lütfen farklı bir fotoğraf deneyin.',
   },
+  /**
+   * Platform AI harcama tavanı doldu — hem sanal deneme hem stil danışmanı.
+   *
+   * ⚠️ Mesaj bilinçli olarak GENEL: yalnızca "sanal deneme" deseydi, aynı kod
+   *    stil danışmanında kullanıldığında kullanıcıya hiç denemediği bir
+   *    özellikten söz edilirdi. Özellik adı geçmediği için her iki akışta da
+   *    doğru okunur.
+   */
   AI_BUDGET_EXCEEDED: {
     status: 503,
     family: 'domain',
     retryable: true,
-    message: 'Sanal deneme geçici olarak kullanılamıyor. Kısa süre sonra tekrar deneyin.',
+    message: 'Yapay zekâ özellikleri geçici olarak kullanılamıyor. Kısa süre sonra tekrar deneyin.',
   },
   STYLIST_UNAVAILABLE: {
     status: 503,
@@ -458,6 +540,60 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: true,
     message: 'Çok hızlı mesaj gönderiyorsunuz. Biraz bekleyip tekrar deneyin.',
+  },
+  /**
+   * STYLIST_UNAVAILABLE'dan AYRI: sağlayıcı ayakta ama YAVAŞ.
+   *
+   * Neden ayrı kod: ikisi tek kodda toplanınca "kesinti mi, yavaşlık mı"
+   * ayrımı alarm kuralında yapılamıyordu. Zaman aşımı oranı yükselmesi
+   * genelde kapasite sorunudur ve kesintiden farklı bir müdahale gerektirir.
+   */
+  STYLIST_TIMEOUT: {
+    status: 504,
+    family: 'integration',
+    retryable: true,
+    message: 'Stil danışmanı yanıt vermekte gecikti. Tekrar deneyebilirsiniz.',
+  },
+  /**
+   * Sağlayıcı 401/403 döndü → anahtar/izin YANLIŞ.
+   *
+   * ⚠️ Aile `integration` DEĞİL `system`: kök neden dış servis kesintisi değil,
+   *    BİZİM yapılandırmamız. Integration sayılırsa "sağlayıcı çökmüş" diye
+   *    beklenir ve kendiliğinden düzelmesi umulur; oysa kimse anahtarı
+   *    düzeltmeden hizmet geri gelmez. Alarm bize bakmamızı söylemeli.
+   */
+  AI_PROVIDER_MISCONFIGURED: {
+    status: 503,
+    family: 'system',
+    retryable: false,
+    message: 'Stil danışmanı şu an kullanılamıyor. Ekibimiz durumdan haberdar.',
+  },
+  /** Sanal deneme sağlayıcısında aynı durum — bkz. AI_PROVIDER_MISCONFIGURED. */
+  TRYON_PROVIDER_MISCONFIGURED: {
+    status: 503,
+    family: 'system',
+    retryable: false,
+    message: 'Sanal deneme şu an kullanılamıyor. Ekibimiz durumdan haberdar.',
+  },
+  /**
+   * Sağlayıcı beklenen boyutta olmayan vektör döndürdü.
+   *
+   * ⚠️ Aile `system`: bu sessizce geçilirse arama indeksi eksik kalır ve
+   *    "benzer ürünler" listesi kimseye hata göstermeden bozulur. Sabit
+   *    kosinüs eşiğimiz yanlış boyutta anlamını yitirir (bkz. l2Normalize).
+   */
+  EMBEDDING_DIMENSION_MISMATCH: {
+    status: 500,
+    family: 'system',
+    retryable: false,
+    message: 'Ürün araması güncellenemedi. Destek ekibine şu kodu iletin: {requestId}',
+  },
+  /** Gömme sağlayıcısı yanıt vermedi — genel UPSTREAM_UNAVAILABLE yerine. */
+  EMBEDDING_PROVIDER_ERROR: {
+    status: 503,
+    family: 'integration',
+    retryable: true,
+    message: 'Ürün araması geçici olarak güncellenemiyor. Kısa süre sonra tekrar deneyin.',
   },
 
   // ── SATICI ────────────────────────────────────────────────────────────
@@ -484,6 +620,82 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Zaten bekleyen bir başvurunuz var.',
+  },
+  /** DUPLICATE_RESOURCE yerine: hangi alanın çakıştığı mesajın kendisinde. */
+  SELLER_STORE_SLUG_TAKEN: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message: 'Bu mağaza adresi kullanılıyor, farklı bir adres deneyin.',
+  },
+  /** DUPLICATE_RESOURCE yerine: satıcı aynı kupon kodunu ikinci kez girdi. */
+  COUPON_CODE_TAKEN: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message: 'Bu kupon kodu zaten kullanımda, farklı bir kod deneyin.',
+  },
+  /**
+   * Satıcı fiziksel stoğu, müşteri sepetlerinde REZERVE olan adedin altına
+   * çekmek istedi.
+   *
+   * INSUFFICIENT_STOCK'tan AYRI: o kod müşteriye "en fazla N adet
+   * alabilirsiniz" der. Satıcı panelinde bu cümlenin karşılığı yok — satıcı
+   * satın almıyor, stok düzeltiyor. Sayı aynı, anlatılan iş farklı.
+   */
+  STOCK_BELOW_RESERVED: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message:
+      'Bu varyanttan {reserved} adet müşteri sepetlerinde rezerve. Stoğu bu adedin altına indiremezsiniz.',
+  },
+  /**
+   * Şifreli alan çözülemedi (anahtar rotasyonu veya bozuk kayıt).
+   *
+   * ⚠️ Ayrı kod olmasının nedeni ALARM: INTERNAL_ERROR gürültüsü içinde
+   *    kaybolursa, IBAN'ı çözülemeyen satıcıların ödemesi sessizce yapılamaz.
+   *    Kullanıcıya teknik ayrıntı SIZDIRILMAZ — mesaj bilinçli olarak genel.
+   */
+  FIELD_DECRYPT_FAILED: {
+    status: 500,
+    family: 'system',
+    retryable: false,
+    message:
+      'Kayıtlı bilgileriniz okunamadı, işlem tamamlanamadı. Destek ekibine şu kodu iletin: {requestId}',
+  },
+  /**
+   * PAYOUT_PENDING_EXISTS'ten AYRI: orada satıcıya "zaten talebin var" denir,
+   * burada ADMİNE "bu talep çoktan karara bağlanmış" denir. İki farklı kitle,
+   * iki farklı eylem — satıcı bekler, admin listeyi tazeler.
+   */
+  PAYOUT_INVALID_STATE: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message: 'Bu ödeme talebi zaten karara bağlanmış ({status}). Listeyi yenileyip tekrar bakın.',
+  },
+  /** Komisyon oranı politika tavanını aştı — genel VALIDATION_FAILED yerine. */
+  COMMISSION_RATE_ABOVE_CAP: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    message: 'Komisyon oranı en fazla %{maxPercent} olabilir. Daha düşük bir oran girin.',
+  },
+  /**
+   * Komisyon versiyon çizelgesi çakışıyor (aynı anda iki açık versiyon vb.).
+   *
+   * ⚠️ Aile `system`: operatör girdisi değil, VERİ bozuk. Çakışan çizelgede
+   *    hangi oranın uygulandığı belirsizdir — yanlış komisyon kesilir ve hata
+   *    mutabakata kadar görünmez. Genel 500 gürültüsünden ayrılmalı ki alarm
+   *    kuralı bu duruma özel eşik koyabilsin.
+   */
+  COMMISSION_VERSION_OVERLAP: {
+    status: 500,
+    family: 'system',
+    retryable: false,
+    message:
+      'Komisyon çizelgesinde çakışma var, işlem durduruldu. Destek ekibine şu kodu iletin: {requestId}',
   },
   BULK_UPLOAD_INVALID: {
     status: 422,

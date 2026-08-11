@@ -197,6 +197,8 @@ describe('computeReturnReversal — reddedilen girdiler', () => {
   });
 
   it('tutarsız satış kaydı (hakediş brütten büyük) işlemi durdurur', () => {
+    // ⚠️ LEDGER_INCONSISTENT (500), PAYMENT_AMOUNT_MISMATCH (409) DEĞİL:
+    //    istemcinin düzeltebileceği bir şey yok, kayıt bozuk.
     expect(
       codeOf(() =>
         computeReturnReversal([
@@ -208,6 +210,6 @@ describe('computeReturnReversal — reddedilen girdiler', () => {
           },
         ]),
       ),
-    ).toBe('PAYMENT_AMOUNT_MISMATCH');
+    ).toBe('LEDGER_INCONSISTENT');
   });
 });

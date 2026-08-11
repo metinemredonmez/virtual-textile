@@ -32,3 +32,4 @@ export {
   type AwsS3DriverOptions,
   type S3ClientLike,
 } from './aws-s3.driver.js';
+export { createR2Storage, r2StorageFromEnv, resetR2Storage, type R2Env } from './r2.factory.js';

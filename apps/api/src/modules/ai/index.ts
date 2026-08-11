@@ -1,6 +1,15 @@
 import { Module } from '@nestjs/common';
+import { env, type Env } from '@vt/config';
+import {
+  createTryOnProviders,
+  logProviderWiring,
+  r2StorageFromEnv,
+  type StorageProvider,
+  type TryOnProvider,
+} from '@vt/adapters';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
+import type { Logger } from '../../common/logger.js';
 import { AiController } from './ai.controller.js';
 import { TryOnService } from './tryon.service.js';
 import { SizeService } from './size.service.js';
@@ -19,7 +28,55 @@ import {
   TRYON_CACHE_KEY_PORT,
   TRYON_CATALOG_PORT,
   TRYON_STORAGE_PORT,
+  type TryOnStoragePort,
 } from './ai.ports.js';
+
+/**
+ * SANAL DENEME SAĞLAYICI ZİNCİRİ — DI belirteci.
+ *
+ * Üretimi yürüten taraf worker'dır; API bu zinciri yalnızca yayımlar ki
+ * "hangi sağlayıcı yapılandırılmış" sorusunun cevabı tek yerde üretilsin ve
+ * iki taraf farklı zincir kurmasın.
+ */
+export const TRYON_PROVIDERS = 'AI_TRYON_PROVIDERS';
+
+/**
+ * ⚠️ FAIL-CLOSED. FAL_KEY de GOOGLE_AI_API_KEY de yoksa zincir tek elemanlıdır
+ *    ve o eleman çağrıldığında hata fırlatır. Sahte bir "başarılı" sonuç,
+ *    kullanıcıya üzerinde ürün olmayan bir görsel göstermek ve kotasını
+ *    harcamak olurdu.
+ *
+ * Zincire yalnızca YAPILANDIRILMIŞ sağlayıcılar girer: anahtarsız bir sağlayıcı
+ * listede kalsaydı her üretim önce onun 401'ini bekler, sonra yedeğe düşerdi.
+ */
+export function createTryOnProviderChain(config: Env = env()): readonly TryOnProvider[] {
+  return createTryOnProviders(config);
+}
+
+/**
+ * Sanal deneme sonucunun imzalı adresini üretir.
+ *
+ * ⚠️ Sonuç görseli private kovadadır ve kullanıcının vücut görüntüsünü taşır;
+ *    adres kısa ömürlüdür ve tavanı `SIGNED_URL_TTL_SECONDS.tryOnResult` ile
+ *    depolama katmanında ayrıca sınırlanır (bkz. r2.config.ts) — çağıran taraf
+ *    daha uzun bir süre isteyemez.
+ *
+ * ⚠️ Hata YUTULMAZ. Port sözleşmesinde `null` "görsel yok" demektir; imza
+ *    üretilemediğinde null dönmek, var olan bir sonucu yokmuş gibi göstermek
+ *    ve depolama kesintisini sessizce gizlemek olurdu.
+ */
+class SignedUrlTryOnStorageAdapter implements TryOnStoragePort {
+  constructor(private readonly storage: StorageProvider) {}
+
+  signedResultUrl(resultKey: string, expiresInSeconds: number): Promise<string | null> {
+    return this.storage.signedUrl({
+      key: resultKey,
+      visibility: 'private',
+      operation: 'get',
+      expiresInSeconds,
+    });
+  }
+}
 
 /**
  * AI MODÜLÜ
@@ -28,9 +85,8 @@ import {
  * Rıza (kullanıcı), varyant/ürün/beden tablosu (katalog) ve iade geri bildirimi
  * (sipariş) verisine yalnızca `ai.ports.ts`'deki dar arayüzlerden erişir.
  *
- * ⚠️ CANLIYA ÇIKMADAN ÖNCE: `TRYON_STORAGE_PORT` şu an imzalı URL üretemeyen
- *    bir yer tutucuya bağlı. Gerçek `StorageProvider` bağlanmadan sanal deneme
- *    sonucu kullanıcıya gösterilemez.
+ * Dış sağlayıcılar ORTAMDAN seçilir: anahtar varsa gerçek adapter, yoksa
+ * fail-closed yer tutucu. Anahtar geldiğinde kod değil env değişir.
  */
 @Module({
   controllers: [AiController],
@@ -58,14 +114,29 @@ import {
     {
       provide: TRYON_STORAGE_PORT,
       inject: [APP_LOGGER],
-      useFactory: (...args: ConstructorParameters<typeof PlaceholderTryOnStorageAdapter>) =>
-        new PlaceholderTryOnStorageAdapter(...args),
+      useFactory: (logger: Logger): TryOnStoragePort => {
+        const config = env();
+        logProviderWiring(logger, config);
+
+        // ⚠️ Depo yapılandırılmamışsa yer tutucu: uyarı yazar ve `null` döner.
+        //    Sanal deneme sonucu görünmez ama uygulama açılır ve ticaret akışı
+        //    çalışmaya devam eder — burada fail-closed olan şey görselin
+        //    gösterilmemesidir, akışın kesilmesi değil.
+        const storage = r2StorageFromEnv(config);
+        return storage === null
+          ? new PlaceholderTryOnStorageAdapter(logger)
+          : new SignedUrlTryOnStorageAdapter(storage);
+      },
     },
     {
       // ⚠️ @vt/adapters `apps/api` bağımlılığı olduğunda burası doğrudan
       //    `tryOnCacheKey`'e bağlanmalı (bkz. ai.gateway.ts NEEDS-DEP notu).
       provide: TRYON_CACHE_KEY_PORT,
       useFactory: () => new LocalTryOnCacheKeyAdapter(),
+    },
+    {
+      provide: TRYON_PROVIDERS,
+      useFactory: (): readonly TryOnProvider[] => createTryOnProviderChain(env()),
     },
     {
       provide: TryOnService,
@@ -88,7 +159,9 @@ import {
   ],
   // Ürün detayı ve stil danışmanı beden önerisini yeniden kullanacak;
   // AI tablolarına doğrudan erişmesinler diye servisler dışa açılıyor.
-  exports: [TryOnService, SizeService],
+  // Sağlayıcı zinciri de dışa açık: üretimi yürüten taraf (worker) aynı
+  // seçimi ikinci kez kurmasın.
+  exports: [TryOnService, SizeService, TRYON_PROVIDERS],
 })
 export class AiModule {}
 

@@ -136,7 +136,7 @@ export class SellerService {
       .catch((error: unknown) => {
         if (isPrismaKnownError(error) && error.code === PRISMA_ERROR.UNIQUE_VIOLATION) {
           // Tek çakışabilecek alan mağaza adresi (Store.slug @unique).
-          throw appError('DUPLICATE_RESOURCE', {
+          throw appError('SELLER_STORE_SLUG_TAKEN', {
             cause: error,
             internalMessage: `Mağaza adresi çakıştı: ${input.storeSlug}`,
             details: {
@@ -327,15 +327,12 @@ function maskStoredSecret(encrypted: string): string {
   return encrypted.length > 0 ? '••••' : '';
 }
 
-// TODO(kod-gerekli): SELLER_STORE_SLUG_TAKEN — mağaza adresi çakışmasında
-// DUPLICATE_RESOURCE kullanılıyor. HTTP kodu (409) ve aile doğru, ancak
-// kullanıcı mesajı genel ("Bu kayıt zaten mevcut"); alan bazlı `details`
-// ile telafi ediliyor. Adrese özel bir kod daha isabetli olur.
-
-// TODO(kod-gerekli): FIELD_DECRYPT_FAILED — şifreli alan çözülemediğinde
-// (anahtar rotasyonu, bozuk veri) INTERNAL_ERROR kullanılıyor (bkz.
-// seller-crypto.ts). Aile ve HTTP kodu doğru; ayrı bir kod, alarm
-// kuralında bu durumu diğer 500'lerden ayırmayı kolaylaştırır.
+// NOT: FIELD_DECRYPT_FAILED artık `seller-crypto.ts` → `decryptField()` içindeki
+// ÜÇ çıkış yolunda da fırlatılıyor (biçim tanınmadı, IV/etiket uzunluğu
+// geçersiz, çözme başarısız). Ayrı kod olmasının nedeni alarm: IBAN'ı
+// çözülemeyen satıcının ödemesi sessizce yapılamaz, bu durum genel 500
+// gürültüsünde kaybolmamalı. HTTP durumu DEĞİŞMEDİ — INTERNAL_ERROR de
+// FIELD_DECRYPT_FAILED de 500/system.
 
 // Yardımcı, sınıfın dışında tanımlı olduğu için burada yeniden dışa açılmıyor.
 export { maskIban, maskTaxNumber };

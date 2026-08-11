@@ -579,7 +579,9 @@ export function mapLlmError(error: unknown): AppError {
   if (error instanceof AppError) return error;
 
   if (error instanceof TimeoutError) {
-    return appError('STYLIST_UNAVAILABLE', {
+    // Kesinti DEĞİL yavaşlık: sağlayıcı ayakta ama yetişemiyor. İkisi tek
+    // kodda toplanınca alarm eşiği "çöktü mü, yavaşladı mı" ayrımını yapamaz.
+    return appError('STYLIST_TIMEOUT', {
       cause: error,
       internalMessage: `anthropic zaman aşımı (${error.timeoutMs} ms)`,
     });
@@ -606,6 +608,15 @@ export function mapLlmError(error: unknown): AppError {
         internalMessage: `anthropic isteği reddetti: ${error.bodyPreview}`,
       });
     }
+    if (error.status === 401 || error.status === 403) {
+      // Sağlayıcı kesintisi DEĞİL: anahtar/izin bizde yanlış. Kesinti sanılırsa
+      // "kendiliğinden düzelir" diye beklenir — oysa kimse anahtarı
+      // düzeltmeden hizmet geri gelmez.
+      return appError('AI_PROVIDER_MISCONFIGURED', {
+        cause: error,
+        internalMessage: `anthropic kimlik/izin reddi HTTP ${error.status}: ${error.bodyPreview}`,
+      });
+    }
     return appError('STYLIST_UNAVAILABLE', {
       cause: error,
       internalMessage: `anthropic HTTP ${error.status}: ${error.bodyPreview}`,
@@ -628,10 +639,3 @@ export function anthropicLlmProviderFromEnv(
     ...overrides,
   });
 }
-
-// TODO(kod-gerekli): STYLIST_TIMEOUT (504, integration) — zaman aşımı şu an
-// STYLIST_UNAVAILABLE (503) ile raporlanıyor; kesinti ile yavaşlık aynı kodda
-// toplandığı için alarm eşiği ayrıştırılamıyor.
-// TODO(kod-gerekli): AI_PROVIDER_MISCONFIGURED (503, system) — 401/403 (bizim
-// anahtar hatamız) da STYLIST_UNAVAILABLE'a düşüyor ve sağlayıcı kesintisi
-// sanılıyor; ayrı kod eklendiğinde `mapLlmError` güncellenmeli.

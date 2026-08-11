@@ -146,7 +146,9 @@ export class StylistService {
     if (!decision.allowed) {
       await this.refundQuota(userId);
       this.logger.error({ reason: decision.reason }, 'AI bütçesi doldu, stil danışmanı kapalı');
-      throw appError('STYLIST_UNAVAILABLE', {
+      // Sağlayıcı kesintisi değil, BİZİM harcama tavanımız doldu. Katalog
+      // mesajı artık özellik adı geçirmediği için bu akışta da doğru okunur.
+      throw appError('AI_BUDGET_EXCEEDED', {
         internalMessage: `AI bütçesi aşıldı: ${decision.reason}`,
       });
     }
@@ -249,8 +251,17 @@ export class StylistService {
     } catch (error) {
       const appErr = toAppError(error, 'STYLIST_UNAVAILABLE');
 
-      // Sağlayıcı çöktüyse kullanıcının hakkını yakmıyoruz.
-      if (appErr.code === 'STYLIST_UNAVAILABLE') await this.refundQuota(userId);
+      // Hata BİZDEN kaynaklanıyorsa kullanıcının hakkını yakmıyoruz.
+      // ⚠️ Liste tek koda indirgenmemeli: zaman aşımı ve yanlış yapılandırma
+      //    STYLIST_UNAVAILABLE'dan ayrıldı (bkz. anthropic.ts mapLlmError).
+      //    Yalnızca eski kod kontrol edilseydi, sağlayıcı yavaşladığında
+      //    kullanıcı hiç yanıt almadan günlük hakkını kaybederdi.
+      const userNotAtFault: readonly string[] = [
+        'STYLIST_UNAVAILABLE',
+        'STYLIST_TIMEOUT',
+        'AI_PROVIDER_MISCONFIGURED',
+      ];
+      if (userNotAtFault.includes(appErr.code)) await this.refundQuota(userId);
 
       this.logger.error({ ...appErr.toLogObject(), conversationId }, 'Stil danışmanı turu düştü');
       emit({
@@ -579,13 +590,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// TODO(kod-gerekli): "model katalogda olmayan ürün üretti" için ayrı bir hata
-// kodu yok. Şu an araç sonucu olarak modele dönüyor ve denetim outbox olayına
-// yazılıyor; kullanıcıya yansıyan bir hata değil. İleride bu durum kullanıcıya
-// gösterilecekse (ör. "öneri doğrulanamadı") STYLIST_SUGGESTION_REJECTED gibi
-// bir kod gerekir.
-//
-// TODO(kod-gerekli): AI bütçesi dolduğunda AI_BUDGET_EXCEEDED yerine
-// STYLIST_UNAVAILABLE kullanılıyor; katalogdaki AI_BUDGET_EXCEEDED metni
-// yalnızca sanal denemeden söz ediyor ve stil danışmanı kullanıcısına yanlış
-// bilgi verirdi. Mesaj genelleştirilirse burası AI_BUDGET_EXCEEDED'e dönmeli.
+// NOT: "model katalogda olmayan ürün üretti" için bilinçli olarak hata kodu
+// YOK. Bu durum araç sonucu olarak modele geri döner ve denetim outbox olayına
+// yazılır; kullanıcıya yansıyan bir hata değildir. Kullanıcıya gösterilmesi
+// ürün kararı olduğu için kod da o karar verilince eklenmeli — şimdi eklenirse
+// hiçbir yerden fırlatılmayan ölü bir katalog kaydı olur.

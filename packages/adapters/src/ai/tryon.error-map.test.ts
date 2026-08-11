@@ -135,9 +135,15 @@ describe('classifyTryOnSignal — HTTP durum kodları', () => {
     const unauthorized = classifyTryOnSignal({ status: 401, text: 'invalid api key' });
     const forbidden = classifyTryOnSignal({ status: 403, text: 'forbidden' });
 
-    expect(unauthorized.reason).toBe('PROVIDER_ERROR');
-    expect(forbidden.reason).toBe('PROVIDER_ERROR');
+    // PROVIDER_ERROR'dan AYRI kod: gerçek kesinti ile kendi yapılandırma
+    // hatamız alarm panosunda aynı kutuya düşmemeli.
+    expect(unauthorized.reason).toBe('MISCONFIGURED');
+    expect(forbidden.reason).toBe('MISCONFIGURED');
+
+    // ⚠️ Asıl güvence bu: ayrı kod verdik ama zinciri KESMEDİK. Kalıcı
+    //    işaretlenseydi fal anahtarı bozukken gemini hiç denenmezdi.
     expect(isPermanentFailure(unauthorized.reason)).toBe(false);
+    expect(isPermanentFailure(forbidden.reason)).toBe(false);
   });
 
   it('403 + içerik politikası mesajı KALICI içerik reddidir', () => {

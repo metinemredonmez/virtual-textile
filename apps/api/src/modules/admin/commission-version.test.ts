@@ -150,15 +150,21 @@ describe('planCommissionVersion — versiyonlama', () => {
 
 describe('planCommissionVersion — reddedilen girdiler', () => {
   it('⚠️ FINANCE.maxCommissionBps üstündeki oranı reddeder', () => {
-    expectAppError(
+    // ⚠️ Tavan aşımının kendi kodu var (422/domain). Genel VALIDATION_FAILED
+    //    olsaydı admin panelinde "oran çok yüksek" ile "oran biçimi bozuk"
+    //    aynı kutuya düşerdi.
+    const error = expectAppError(
       () =>
         planCommissionVersion(
           [],
           { rateBps: FINANCE.maxCommissionBps + 1, fixedFeeMinor: 0n, validFrom: NOW },
           NOW,
         ),
-      'VALIDATION_FAILED',
+      'COMMISSION_RATE_ABOVE_CAP',
     );
+    // Kullanıcı mesajı tavanı SAYIYLA söylemeli — yer tutucu kalmamalı.
+    expect(error.userMessage).toContain(`%${MAX_COMMISSION_BPS / 100}`);
+    expect(error.userMessage).not.toContain('{maxPercent}');
 
     // Tam tavan kabul edilir — sınır dahil.
     expect(() =>
@@ -171,6 +177,8 @@ describe('planCommissionVersion — reddedilen girdiler', () => {
   });
 
   it('negatif, kesirli oranı ve negatif sabit ücreti reddeder', () => {
+    // ⚠️ Bunlar tavan aşımı DEĞİL şema hatasıdır; COMMISSION_RATE_ABOVE_CAP'e
+    //    çevrilmemeli — "daha düşük bir oran girin" mesajı yanıltıcı olurdu.
     expectAppError(() => assertRateWithinCap(-1), 'VALIDATION_FAILED');
     expectAppError(() => assertRateWithinCap(12.5), 'VALIDATION_FAILED');
     expectAppError(
@@ -223,7 +231,7 @@ describe('planCommissionVersion — reddedilen girdiler', () => {
       version('v2', 1500, '2026-02-01T00:00:00.000Z'),
     ];
 
-    expectAppError(() => assertTimelineConsistent(corrupt), 'INTERNAL_ERROR');
+    expectAppError(() => assertTimelineConsistent(corrupt), 'COMMISSION_VERSION_OVERLAP');
     expectAppError(
       () =>
         planCommissionVersion(
@@ -231,7 +239,7 @@ describe('planCommissionVersion — reddedilen girdiler', () => {
           { rateBps: 1000, fixedFeeMinor: 0n, validFrom: at('2026-06-01T00:00:00.000Z') },
           NOW,
         ),
-      'INTERNAL_ERROR',
+      'COMMISSION_VERSION_OVERLAP',
     );
   });
 });
@@ -244,7 +252,7 @@ describe('assertTimelineConsistent', () => {
           version('v1', 1200, '2026-01-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z'),
           version('v2', 1500, '2026-02-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z'),
         ]),
-      'INTERNAL_ERROR',
+      'COMMISSION_VERSION_OVERLAP',
     );
   });
 
@@ -263,14 +271,14 @@ describe('assertTimelineConsistent', () => {
         assertTimelineConsistent([
           version('v1', 1200, '2026-03-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'),
         ]),
-      'INTERNAL_ERROR',
+      'COMMISSION_VERSION_OVERLAP',
     );
     expectAppError(
       () =>
         assertTimelineConsistent([
           version('v1', 1200, '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.000Z'),
         ]),
-      'INTERNAL_ERROR',
+      'COMMISSION_VERSION_OVERLAP',
     );
   });
 
@@ -295,7 +303,7 @@ describe('activeVersionAt', () => {
           ],
           NOW,
         ),
-      'INTERNAL_ERROR',
+      'COMMISSION_VERSION_OVERLAP',
     );
   });
 });

@@ -156,7 +156,8 @@ export class AuthController {
     // TODO(bildirim): SMS adapter'ı yazıldığında kod buradan gönderilecek.
     // Geliştirmede kodu görebilmek için geçici çıktı; üretimde ASLA basılmaz.
     if (env().NODE_ENV === 'development') {
-      // eslint-disable-next-line no-console
+      // `no-console` kuralı `warn`/`error`a zaten izin veriyor — disable
+      // yorumu gereksizdi ve "kullanılmayan direktif" uyarısı üretiyordu.
       console.warn(`[GELİŞTİRME] ${phone} için OTP: ${code}`);
     }
 

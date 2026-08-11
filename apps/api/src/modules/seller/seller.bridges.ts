@@ -506,8 +506,11 @@ export class PrismaSellerCatalogBridge implements SellerCatalogPort {
           //    satılabilir adet (onHand − reserved) negatife düşer ve ödemesi
           //    devam eden siparişler karşılıksız kalırdı.
           if (update.stock < reserved) {
-            throw appError('INSUFFICIENT_STOCK', {
-              params: { available: reserved },
+            // Satıcı panelinde konuşuyoruz: burada kimse satın almıyor, stok
+            // düzeltiliyor. Müşteri mesajı ("en fazla N adet alabilirsiniz")
+            // bu ekranda anlamsız kalırdı.
+            throw appError('STOCK_BELOW_RESERVED', {
+              params: { reserved },
               internalMessage: `Varyant ${update.variantId}: stok ${update.stock} < rezerve ${reserved}`,
             });
           }
@@ -1363,7 +1366,7 @@ export class PrismaSellerCouponBridge implements SellerCouponPort {
         // Kupon kodu GLOBAL benzersiz: başka bir mağazanın veya platformun
         // kodu olabilir. Hangi mağazaya ait olduğu SÖYLENMEZ — rakip mağaza
         // kampanya kodlarını deneme yanılmayla keşfetmesin.
-        throw appError('DUPLICATE_RESOURCE', {
+        throw appError('COUPON_CODE_TAKEN', {
           cause: error,
           internalMessage: `Kupon kodu çakıştı: ${input.code}`,
           details: {
@@ -1410,12 +1413,3 @@ export class PrismaSellerCouponBridge implements SellerCouponPort {
     return coupon;
   }
 }
-
-// TODO(kod-gerekli): STOCK_BELOW_RESERVED — satıcı fiziksel stoku rezerve
-// adedin altına indirmeye çalıştığında INSUFFICIENT_STOCK kullanılıyor.
-// HTTP kodu (409) ve aile doğru, ancak mesaj müşteriye yönelik ("en fazla N
-// adet alabilirsiniz"); satıcı panelinde "N adet sepetlerde rezerve" demek
-// daha anlaşılır olurdu.
-
-// TODO(kod-gerekli): COUPON_CODE_TAKEN — kupon kodu çakışmasında
-// DUPLICATE_RESOURCE kullanılıyor; alan bazlı `details` ile telafi ediliyor.

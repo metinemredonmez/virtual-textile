@@ -1,6 +1,11 @@
 export * from './resilience/resilient.js';
 export * from './resilience/circuit-breaker.js';
 
+// ── Sağlayıcı seçimi ───────────────────────────────────────────────────────
+// Hangi yeteneğin gerçek adapter'a, hangisinin fail-closed yer tutucuya
+// bağlanacağı ORTAM DEĞİŞKENİNDEN okunur; kararı veren yüklemler burada.
+export * from './wiring.js';
+
 // ── Sözleşmeler ────────────────────────────────────────────────────────────
 export * from './payment/payment.provider.js';
 export * from './storage/storage.provider.js';

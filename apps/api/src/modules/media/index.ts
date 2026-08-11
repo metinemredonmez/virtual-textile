@@ -1,16 +1,65 @@
 import { Module } from '@nestjs/common';
+import sharp from 'sharp';
+import { env, type Env } from '@vt/config';
+import { logProviderWiring, r2StorageFromEnv } from '@vt/adapters';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
+import type { Logger } from '../../common/logger.js';
 import { MeMediaController, SellerMediaController } from './media.controller.js';
 import { MediaService } from './media.service.js';
 import { MediaProductService } from './media-product.service.js';
-import { MEDIA_IMAGE_PROCESSOR, UnconfiguredImageProcessor } from './image-processor.js';
-import { MEDIA_CATALOG, MEDIA_CONSENT, MEDIA_STORAGE } from './media.ports.js';
+import { MEDIA_IMAGE_PROCESSOR, type ImageProcessor } from './image-processor.js';
+import { SharpImageProcessor, type SharpFactory } from './sharp-image-processor.js';
+import {
+  MEDIA_CATALOG,
+  MEDIA_CONSENT,
+  MEDIA_STORAGE,
+  type MediaStoragePort,
+} from './media.ports.js';
 import {
   PrismaMediaCatalogBridge,
   PrismaMediaConsentBridge,
   UnconfiguredStorageProvider,
 } from './media.bridges.js';
+
+/**
+ * DEPOLAMA FABRİKASI
+ *
+ * ⚠️ FAIL-CLOSED. R2 kimlik bilgileri yoksa her çağrıda görünür hata veren yer
+ *    tutucu bağlanır. Yapılandırılmamış bir deponun "yüklendi" ya da "sildim"
+ *    demesi, ürün görselinin kaybolmasından çok daha kötüdür: kullanıcı
+ *    fotoğrafının silindiğini sanması KVKK taahhüdünün sessizce ihlalidir.
+ *
+ * ⚠️ Üretimde buranın yer tutucuya düşmesi bir YAPILANDIRMA HATASIDIR; ek
+ *    kontrol yazılmıyor çünkü env şeması R2_ENDPOINT / R2_ACCESS_KEY_ID /
+ *    R2_SECRET_ACCESS_KEY anahtarlarını üretimde zaten zorunlu kılıyor.
+ *
+ * ⚠️ ALTYAPI ŞARTI: private ve public kova AYRI olmalı ve iki kovada da
+ *    SÜRÜMLEME (versioning) KAPALI olmalıdır. Sürümleme açıkken silme nesneyi
+ *    kaldırmaz; "sildim" denilen fotoğraf sürüm geçmişinde kalır (bkz.
+ *    r2.provider.ts). Bu, kodla kapatılabilecek bir açık değildir.
+ */
+export function createStorageProvider(config: Env = env()): MediaStoragePort {
+  return r2StorageFromEnv(config) ?? new UnconfiguredStorageProvider();
+}
+
+/**
+ * GÖRSEL İŞLEYİCİ FABRİKASI — KOŞULSUZ GERÇEK.
+ *
+ * ⚠️ Burada env'e BAKILMAZ ve bakılmamalıdır. `sharp` bir dış servis değil,
+ *    kurulu bir kütüphanedir; anahtar gerektirmez. EXIF/GPS temizliği bu
+ *    işleyicide yapıldığı için yapılandırmaya bağlanmış olsaydı, unutulan tek
+ *    bir ortam değişkeni yüzünden kullanıcının ev konumunu taşıyan bir fotoğraf
+ *    depoya girebilirdi. `UnconfiguredImageProcessor` artık hiçbir bağlamada
+ *    kullanılmıyor; testlerin "işleyici yokken ne olur" senaryosunu kurabilmesi
+ *    için dışa açık kalıyor.
+ *
+ * blurhash kodlayıcısı BİLEREK geçilmiyor: ayrı bir bağımlılıktır ve yokluğunda
+ * `blurhash()` null döner — yer tutucu bir kolaylıktır, güvenlik gereği değil.
+ */
+export function createImageProcessor(): ImageProcessor {
+  return new SharpImageProcessor(sharp as unknown as SharpFactory);
+}
 
 /**
  * MEDYA MODÜLÜ — görsel yükleme, EXIF temizliği, kalite ve try-on uygunluk skoru.
@@ -21,41 +70,8 @@ import {
  *   • ProductImage / Product → `MEDIA_CATALOG` portu, geçici Prisma köprüsü
  *   • ConsentRecord          → `MEDIA_CONSENT` portu, geçici Prisma köprüsü
  *
- * ⚠️ ENTEGRASYON AJANI İÇİN — dört iş:
- *
- *   1. Bu modülü `app.module.ts`'e ekleyin (bu ajan o dosyaya dokunmuyor).
- *
- *   2. `apps/api/package.json` → dependencies'e `"@vt/adapters": "workspace:*"`
- *      ve `"sharp": "^0.33"` ekleyin. İsteğe bağlı: `"blurhash"`.
- *      `packages/adapters/package.json` → `"@aws-sdk/client-s3"` ve
- *      `"@aws-sdk/s3-request-presigner"`.
- *
- *   3. MEDIA_STORAGE token'ını gerçek sağlayıcıya bağlayın:
- *
- *        import { R2StorageProvider, createAwsS3Driver, r2ConfigFromEnv } from '@vt/adapters';
- *        {
- *          provide: MEDIA_STORAGE,
- *          useFactory: () => {
- *            const config = r2ConfigFromEnv(env());
- *            return new R2StorageProvider(config, createAwsS3Driver(awsSdk, config));
- *          },
- *        }
- *
- *   4. MEDIA_IMAGE_PROCESSOR token'ını `SharpImageProcessor`'a bağlayın:
- *
- *        import sharp from 'sharp';
- *        { provide: MEDIA_IMAGE_PROCESSOR, useFactory: () => new SharpImageProcessor(sharp) }
- *
- *      ⚠️ 3 ve 4 yapılmadan modül AYAKTA ama KAPALIDIR: her yükleme isteği
- *         görünür biçimde hata verir. Bu bilinçli — yapılandırılmamış bir
- *         medya katmanının sessizce "başarılı" demesi, EXIF'i temizlenmemiş
- *         fotoğrafın depoya girmesi ya da silinmiş sanılan verinin durması
- *         demektir.
- *
- * ⚠️ ALTYAPI ŞARTI: private ve public kova AYRI olmalı ve iki kovada da
- *    SÜRÜMLEME (versioning) KAPALI olmalıdır. Sürümleme açıkken silme, nesneyi
- *    kaldırmaz; "sildim" denilen fotoğraf sürüm geçmişinde kalır ve KVKK silme
- *    taahhüdü sessizce ihlal edilir (bkz. r2.provider.ts).
+ * Sağlayıcı seçimi ORTAMDAN okunur (yukarıdaki fabrikalar): anahtar geldiğinde
+ * deploy edilen şey yeni bir kod değil, yeni bir env'dir.
  */
 @Module({
   controllers: [SellerMediaController, MeMediaController],
@@ -72,9 +88,19 @@ import {
       useFactory: (prisma: PrismaService) => new PrismaMediaConsentBridge(prisma),
     },
 
-    // ── Bağlanmayı bekleyen dış bağımlılıklar (fail-closed) ──
-    { provide: MEDIA_STORAGE, useClass: UnconfiguredStorageProvider },
-    { provide: MEDIA_IMAGE_PROCESSOR, useClass: UnconfiguredImageProcessor },
+    // ── Dış bağımlılıklar — ortama göre gerçek ya da fail-closed yer tutucu ──
+    {
+      provide: MEDIA_STORAGE,
+      // Logger yalnızca açılış raporu için: hangi yetenek gerçek, hangisi yer
+      // tutucu — tek bir kayıtta, anahtar DEĞERLERİ yazılmadan.
+      inject: [APP_LOGGER],
+      useFactory: (logger: Logger): MediaStoragePort => {
+        const config = env();
+        logProviderWiring(logger, config);
+        return createStorageProvider(config);
+      },
+    },
+    { provide: MEDIA_IMAGE_PROCESSOR, useFactory: createImageProcessor },
 
     // ── Servisler ──
     {

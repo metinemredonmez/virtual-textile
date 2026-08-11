@@ -225,7 +225,10 @@ export class FalEmbeddingProvider implements EmbeddingProvider {
         {
           provider: this.name,
           operation: 'embed',
-          errorCode: 'UPSTREAM_UNAVAILABLE',
+          // Genel UPSTREAM_UNAVAILABLE değil: gömme kesintisi yalnızca arama
+          // indeksini etkiler, sipariş akışını değil. Ayrı kod olmadan bu iki
+          // durum aynı alarma düşüyor ve aciliyetleri karıştırılıyordu.
+          errorCode: 'EMBEDDING_PROVIDER_ERROR',
           ...(this.config.timeoutMs === undefined ? {} : { timeoutMs: this.config.timeoutMs }),
           // Gömme İDEMPOTENTTİR: aynı girdi aynı vektörü üretir, yan etkisi yok.
           // Bu yüzden burada yeniden denemek güvenli — try-on/LLM'den farklı.
@@ -421,9 +424,12 @@ export function falEmbeddingProviderFromEnv(
   });
 }
 
-// TODO(kod-gerekli): EMBEDDING_DIMENSION_MISMATCH (500, system) — boyut
-// uyuşmazlığı şu an yalnızca öğe bazında `failed` listesine yazılıyor;
-// katalog işinin tamamı bu yüzden sessizce eksik kalabiliyor. Kod eklenip
-// eşik aşıldığında alarm üretilmeli.
-// TODO(kod-gerekli): EMBEDDING_PROVIDER_ERROR (503, integration) — grup
-// hataları şu an UPSTREAM_UNAVAILABLE ile raporlanıyor.
+// TODO(kod-gerekli): EMBEDDING_DIMENSION_MISMATCH katalogda TANIMLI (500,
+// system) ama burada henüz fırlatılmıyor. Boyut uyuşmazlığı hâlâ yalnızca öğe
+// bazında `failed` listesine yazılıyor (bkz. toVectors).
+//
+// Kalan iş bir kod değişimi DEĞİL, yeni bir politika: "kaç öğe/oran bozulursa
+// iş durdurulup alarm üretilir?" Eşik bu dosyada tek başına kararlaştırılamaz
+// çünkü çağıran indeksleme işinin kısmi başarıyı nasıl ele aldığına bağlı.
+// Eşik belirlenene kadar eldeki davranış korunuyor: tek bozuk öğe yüzünden
+// tüm katalog işini düşürmek, sessizce eksik kalmaktan daha yıkıcı olurdu.

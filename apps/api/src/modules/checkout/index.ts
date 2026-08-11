@@ -1,6 +1,14 @@
 import { Module } from '@nestjs/common';
+import { env, type Env } from '@vt/config';
+import {
+  IyzicoPaymentProvider,
+  circuitFor,
+  isPaymentConfigured,
+  logProviderWiring,
+} from '@vt/adapters';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
+import type { Logger } from '../../common/logger.js';
 import { CheckoutController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
 import {
@@ -8,7 +16,12 @@ import {
   PrismaCatalogReaderBridge,
   UnconfiguredPaymentProvider,
 } from './checkout.bridges.js';
-import { ADDRESS_READER, CATALOG_READER, PAYMENT_PROVIDER } from './checkout.ports.js';
+import {
+  ADDRESS_READER,
+  CATALOG_READER,
+  PAYMENT_PROVIDER,
+  type PaymentProviderPort,
+} from './checkout.ports.js';
 import { CartModule, CartService } from '../cart/index.js';
 import { OrderModule, OrderService } from '../order/index.js';
 
@@ -22,6 +35,39 @@ export * from './checkout.bridges.js';
 export { captureRawBody, RawBody, plainHeaders } from './raw-body.js';
 
 /**
+ * ÖDEME SAĞLAYICISI FABRİKASI
+ *
+ * ⚠️ FAIL-CLOSED. Anahtar yoksa gerçek sağlayıcı yerine her çağrıda GÖRÜNÜR
+ *    hata veren yer tutucu bağlanır. Sessizce "başarılı" dönen sahte bir ödeme
+ *    sağlayıcısı, bu sistemde yapılabilecek en tehlikeli şeydir: tahsil
+ *    edilmemiş bir sipariş kargoya verilir ve fark ancak mutabakatta görülür.
+ *
+ * ⚠️ Üretimde (NODE_ENV=production) buranın yer tutucuya düşmesi bir
+ *    YAPILANDIRMA HATASIDIR. Burada ayrıca kontrol edilmiyor: `@vt/config` env
+ *    şeması IYZICO_API_KEY / IYZICO_SECRET_KEY / IYZICO_WEBHOOK_SECRET
+ *    anahtarlarını üretimde zaten zorunlu kılıyor ve eksikse süreç hiç
+ *    başlamıyor. İkinci bir kapı, ilkinin ne söylediğini belirsizleştirirdi.
+ *
+ * `config` parametresi varsayılanıyla `env()`'ten okur; testte seçim mantığı
+ * ortam kurmadan doğrulanabilsin diye dışarıdan da verilebilir.
+ */
+export function createPaymentProvider(config: Env = env()): PaymentProviderPort {
+  if (!isPaymentConfigured(config)) return new UnconfiguredPaymentProvider();
+
+  return new IyzicoPaymentProvider({
+    baseUrl: config.IYZICO_BASE_URL,
+    apiKey: config.IYZICO_API_KEY,
+    secretKey: config.IYZICO_SECRET_KEY,
+    // ⚠️ Webhook HMAC anahtarı API secret'tan AYRIDIR; karıştırılırsa her
+    //    sağlayıcı bildirimi geçersiz imza sayılır ve ödemeler askıda kalır.
+    webhookSecret: config.IYZICO_WEBHOOK_SECRET,
+    // Devre kesici sağlayıcı ADIYLA paylaşılır: iade ve hakediş çağrıları da
+    // aynı devreyi görsün, biri açıkken diğeri çöken servise ısrar etmesin.
+    circuitBreaker: circuitFor('iyzico'),
+  });
+}
+
+/**
  * CHECKOUT MODÜLÜ
  *
  * Uçlar:
@@ -30,28 +76,9 @@ export { captureRawBody, RawBody, plainHeaders } from './raw-body.js';
  *   POST /v1/payments/3ds/callback → banka dönüşü (@Public)
  *   POST /v1/webhooks/iyzico       → sağlayıcı bildirimi (@Public, ham gövde)
  *
- * ⚠️ ENTEGRASYON AJANI İÇİN ÜÇ ADIM:
- *
- *  1. `apps/api/package.json` → dependencies'e `"@vt/adapters": "workspace:*"`
- *
- *  2. Bu modüldeki PAYMENT_PROVIDER bağlamasını gerçek adapter'a çevir:
- *
- *       {
- *         provide: PAYMENT_PROVIDER,
- *         useFactory: () => {
- *           const config = env();
- *           return new IyzicoPaymentProvider({
- *             baseUrl: config.IYZICO_BASE_URL,
- *             apiKey: config.IYZICO_API_KEY,
- *             secretKey: config.IYZICO_SECRET_KEY,
- *             webhookSecret: config.IYZICO_WEBHOOK_SECRET,
- *             circuitBreaker: circuitFor('iyzico'),
- *           });
- *         },
- *       }
- *
- *  3. `apps/api/src/main.ts` → `NestFactory.create(AppModule, { rawBody: true })`.
- *     Bu olmadan webhook ucu 500 döner (imza doğrulaması ATLANMAZ, bkz. raw-body.ts).
+ * ⚠️ `apps/api/src/main.ts` → `NestFactory.create(AppModule, { rawBody: true })`
+ *    olmalıdır. Bu olmadan webhook ucu 500 döner (imza doğrulaması ATLANMAZ,
+ *    bkz. raw-body.ts).
  *
  * Katalog/adres okuma köprüleri (`checkout.bridges.ts`) ilgili modüller
  * servislerini dışa açtığında token bağlamaları değiştirilerek SİLİNİR.
@@ -63,7 +90,17 @@ export { captureRawBody, RawBody, plainHeaders } from './raw-body.js';
   imports: [CartModule, OrderModule],
   controllers: [CheckoutController],
   providers: [
-    { provide: PAYMENT_PROVIDER, useClass: UnconfiguredPaymentProvider },
+    {
+      provide: PAYMENT_PROVIDER,
+      // Logger yalnızca açılış raporu için enjekte ediliyor: hangi yeteneğin
+      // gerçek, hangisinin yer tutucu olduğu tek bir kayıtta görünsün.
+      inject: [APP_LOGGER],
+      useFactory: (logger: Logger): PaymentProviderPort => {
+        const config = env();
+        logProviderWiring(logger, config);
+        return createPaymentProvider(config);
+      },
+    },
     { provide: CATALOG_READER, useClass: PrismaCatalogReaderBridge },
     { provide: ADDRESS_READER, useClass: PrismaAddressReaderBridge },
     {

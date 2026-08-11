@@ -409,7 +409,9 @@ export class CheckoutService {
     if (!order.reservationExpiresAt || order.reservationExpiresAt.getTime() <= Date.now()) {
       // Rezervasyon düştüyse stoğun hâlâ orada olduğunu garanti edemeyiz.
       await this.failPayment(order.id, { internalReason: 'Rezervasyon süresi doldu' });
-      throw new AppError('CART_EXPIRED');
+      // Sepet değil SİPARİŞ rezervasyonu düştü; kullanıcı sepetini yeniden
+      // doldurmaz, ödemeyi yeniden başlatır.
+      throw new AppError('ORDER_RESERVATION_EXPIRED');
     }
 
     const intent = order.payment;
@@ -1234,7 +1236,3 @@ function toProviderAddress(address: CheckoutAddress): {
     address: [address.line1, address.neighbourhood, address.district].filter(Boolean).join(', '),
   };
 }
-
-// TODO(kod-gerekli): ORDER_RESERVATION_EXPIRED (410, domain) — rezervasyon
-// süresi dolduğunda şu an CART_EXPIRED kullanılıyor; kullanıcı mesajı doğru
-// ama kod semantiği sipariş değil sepet ima ediyor.

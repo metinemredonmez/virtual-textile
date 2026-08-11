@@ -78,7 +78,7 @@ export function activeVersionAt(
 ): CommissionVersionSnapshot | null {
   const active = versions.filter((version) => isActiveAt(version, at));
   if (active.length > 1) {
-    throw appError('INTERNAL_ERROR', {
+    throw appError('COMMISSION_VERSION_OVERLAP', {
       internalMessage: `Aynı anda ${active.length} geçerli komisyon versiyonu: ${active
         .map((version) => version.id)
         .join(', ')} (an: ${at.toISOString()})`,
@@ -94,11 +94,16 @@ export function activeVersionAt(
  * kontrol ediliyor çünkü kısıt yalnızca "açık" (validTo IS NULL) versiyonları
  * yakalar — geçmişte ÇAKIŞAN iki kapalı aralık veritabanı için sorunsuzdur
  * ama "3 Mart'ta hangi oran geçerliydi" sorusunu belirsiz bırakır.
+ *
+ * ⚠️ Buradaki DÖRT çıkışın hepsi COMMISSION_VERSION_OVERLAP (500, system)
+ *    fırlatır — ters/boş aralık dâhil. Aynı olayın (bozuk çizelge) bazı
+ *    dalları genel INTERNAL_ERROR kalsaydı alarm kuralı olayın yalnızca bir
+ *    kısmını görürdü; teşhis için gereken ayrıntı zaten `internalMessage`'da.
  */
 export function assertTimelineConsistent(versions: readonly CommissionVersionSnapshot[]): void {
   const open = versions.filter((version) => version.validTo === null);
   if (open.length > 1) {
-    throw appError('INTERNAL_ERROR', {
+    throw appError('COMMISSION_VERSION_OVERLAP', {
       internalMessage: `Bir kuralda ${open.length} açık komisyon versiyonu var: ${open
         .map((version) => version.id)
         .join(', ')}`,
@@ -107,7 +112,7 @@ export function assertTimelineConsistent(versions: readonly CommissionVersionSna
 
   for (const version of versions) {
     if (version.validTo !== null && version.validTo.getTime() <= version.validFrom.getTime()) {
-      throw appError('INTERNAL_ERROR', {
+      throw appError('COMMISSION_VERSION_OVERLAP', {
         internalMessage: `Komisyon versiyonu ${version.id} ters/boş aralığa sahip: ${version.validFrom.toISOString()} → ${version.validTo.toISOString()}`,
       });
     }
@@ -121,12 +126,12 @@ export function assertTimelineConsistent(versions: readonly CommissionVersionSna
     // Açık uçlu versiyon yalnızca EN SONDA olabilir; ortada olursa
     // kendisinden sonraki her versiyonla çakışır.
     if (previous.validTo === null) {
-      throw appError('INTERNAL_ERROR', {
+      throw appError('COMMISSION_VERSION_OVERLAP', {
         internalMessage: `Açık komisyon versiyonu ${previous.id}, ${current.id} ile çakışıyor`,
       });
     }
     if (previous.validTo.getTime() > current.validFrom.getTime()) {
-      throw appError('INTERNAL_ERROR', {
+      throw appError('COMMISSION_VERSION_OVERLAP', {
         internalMessage: `Komisyon versiyonları çakışıyor: ${previous.id} (bitiş ${previous.validTo.toISOString()}) ve ${current.id} (başlangıç ${current.validFrom.toISOString()})`,
       });
     }
@@ -151,7 +156,11 @@ export function assertRateWithinCap(rateBps: number): void {
     });
   }
   if (rateBps > MAX_COMMISSION_BPS) {
-    throw appError('VALIDATION_FAILED', {
+    // ⚠️ Yalnızca TAVAN AŞIMI dalı bu koda çevrildi. Yukarıdaki negatif/kesirli
+    //    dal VALIDATION_FAILED kalmalı: onlar tavan sorunu değil ŞEMA hatasıdır
+    //    ve kullanıcıya "daha düşük bir oran girin" demek yanıltıcı olurdu.
+    throw appError('COMMISSION_RATE_ABOVE_CAP', {
+      params: { maxPercent: MAX_COMMISSION_BPS / 100 },
       internalMessage: `Komisyon oranı tavanı aşıyor: ${rateBps} > ${MAX_COMMISSION_BPS}`,
       details: {
         fields: [
@@ -276,8 +285,16 @@ export function applyPlan(
   return [...closed, { id: newVersionId, ...plan.create }];
 }
 
-// TODO(kod-gerekli): COMMISSION_RATE_ABOVE_CAP — tavan aşımı şu an genel
-// VALIDATION_FAILED ile dönüyor; arayüz "tavan" durumunu ayrıştıramıyor.
-// TODO(kod-gerekli): COMMISSION_VERSION_OVERLAP — çakışan versiyon çizelgesi
-// şu an INTERNAL_ERROR (500) ile dönüyor; kendi kodu olmalı ki alarm kuralı
-// genel 500 gürültüsünden ayrılabilsin.
+// NOT: COMMISSION_RATE_ABOVE_CAP (422, domain) ve COMMISSION_VERSION_OVERLAP
+// (500, system) bu dosyaya bağlandı; testler aynı anda güncellendi.
+//
+// AYRIŞTIRMA — hangi dal hangi koda gitti:
+//   • assertRateWithinCap → yalnızca "üst sınırı aştı" dalı
+//     COMMISSION_RATE_ABOVE_CAP. NEGATİF ve KESİRLİ oran VALIDATION_FAILED
+//     KALDI: onlar tavan aşımı değil şema hatasıdır.
+//   • assertTimelineConsistent + activeVersionAt → tamamı
+//     COMMISSION_VERSION_OVERLAP.
+//
+// ⚠️ DAVRANIŞ DEĞİŞİKLİĞİ: tavan aşımında HTTP 400 → 422. İkisi de `domain`/
+//    `validation` ailesinde olduğu için Sentry davranışı DEĞİŞMEDİ. Çizelge
+//    hatalarında durum 500 kaldı, yalnızca kod özelleşti (alarm eşiği için).

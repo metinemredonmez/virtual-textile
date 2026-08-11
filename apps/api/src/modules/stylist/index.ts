@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
+import { env, type Env } from '@vt/config';
+import { isStylistLlmConfigured, logProviderWiring } from '@vt/adapters';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { RedisService } from '../../infra/redis.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
+import type { Logger } from '../../common/logger.js';
 import { CatalogModule } from '../catalog/catalog.module.js';
 import { CatalogService } from '../catalog/catalog.service.js';
 // ⚠️ Servisler `import type` ile alınmaz: Nest'in DI belirteci SINIF
@@ -15,7 +18,36 @@ import {
   TryOnHandoffAdapter,
 } from './stylist.gateway.js';
 import { createStylistLlmProvider } from './llm/stylist-llm.provider.js';
-import { AI_USAGE_PORT, LLM_PROVIDER, TRYON_PORT, USER_PROFILE_PORT } from './stylist.ports.js';
+import { createAnthropicStylistProvider } from './llm/anthropic-llm.bridge.js';
+import {
+  AI_USAGE_PORT,
+  LLM_PROVIDER,
+  TRYON_PORT,
+  USER_PROFILE_PORT,
+  type LlmProvider,
+} from './stylist.ports.js';
+
+/**
+ * STİL DANIŞMANI LLM FABRİKASI
+ *
+ * ⚠️ ZARİF DÜŞÜŞ (fail-closed ama YAYILMAYAN). ANTHROPIC_API_KEY yoksa
+ *    `UnavailableLlmProvider` bağlanır: `isConfigured` false olduğu için servis
+ *    sağlayıcıya HİÇ çağrı yapmadan STYLIST_UNAVAILABLE (503) döner. Danışman
+ *    kapalıyken kullanıcı gezinmeye, sepete atmaya ve satın almaya devam eder —
+ *    buradaki eksiklik ticaret akışına yayılmaz.
+ *
+ * ⚠️ Yanlış olan seçenek "hazırım" deyip ilk kullanıcı mesajında patlamaktı:
+ *    o durumda hata, kullanıcının konuşmayı yazdığı ana ertelenir ve maliyet
+ *    defterine başarısız bir tur olarak düşer.
+ */
+export function createLlmProvider(config: Env = env()): LlmProvider {
+  if (!isStylistLlmConfigured(config)) return createStylistLlmProvider();
+
+  return createAnthropicStylistProvider({
+    apiKey: config.ANTHROPIC_API_KEY,
+    model: config.ANTHROPIC_MODEL,
+  });
+}
 
 /**
  * AI STİL DANIŞMANI MODÜLÜ
@@ -28,9 +60,8 @@ import { AI_USAGE_PORT, LLM_PROVIDER, TRYON_PORT, USER_PROFILE_PORT } from './st
  * içindeki dar arayüzlerin arkasındadır — o modüller hazır olduğunda
  * AŞAĞIDAKİ PROVIDER SATIRLARI değişir, başka hiçbir dosyaya dokunulmaz.
  *
- * ⚠️ LLM sağlayıcısı da bir porttur. `@vt/adapters` bağımlılığı eklenene
- *    kadar `UnavailableLlmProvider` devreye girer ve /stylist uçları 503
- *    döner; uygulama yine açılır, ticaret akışı çalışır.
+ * LLM sağlayıcısı da bir porttur ve ORTAMDAN seçilir: anahtar varsa gerçek
+ * Anthropic adapter'ı (bkz. llm/anthropic-llm.bridge.ts), yoksa yer tutucu.
  */
 @Module({
   imports: [CatalogModule, CartModule],
@@ -38,10 +69,13 @@ import { AI_USAGE_PORT, LLM_PROVIDER, TRYON_PORT, USER_PROFILE_PORT } from './st
   providers: [
     {
       provide: LLM_PROVIDER,
-      // ⚠️ Gerçek adapter (@vt/adapters → AnthropicLlmProvider) hazır ama
-      //    apps/api ona henüz bağımlı değil. Bağımlılık eklendiğinde YALNIZCA
-      //    bu fabrika değişir; bkz. llm/stylist-llm.provider.ts.
-      useFactory: () => createStylistLlmProvider(),
+      // Logger yalnızca açılış raporu için enjekte ediliyor.
+      inject: [APP_LOGGER],
+      useFactory: (logger: Logger): LlmProvider => {
+        const config = env();
+        logProviderWiring(logger, config);
+        return createLlmProvider(config);
+      },
     },
     {
       provide: USER_PROFILE_PORT,
@@ -81,6 +115,13 @@ export class StylistModule {}
 
 export { StylistService } from './stylist.service.js';
 export type { ConversationView, StylistEvent, StylistEmit } from './stylist.service.js';
+// Sağlayıcı seçiminin iki ucu da dışa açık: testler ve teşhis, hangi ucun
+// bağlandığını modülü ayağa kaldırmadan sorabilsin.
+export {
+  AnthropicStylistLlmProvider,
+  createAnthropicStylistProvider,
+} from './llm/anthropic-llm.bridge.js';
+export { UnavailableLlmProvider, createStylistLlmProvider } from './llm/stylist-llm.provider.js';
 export { AI_USAGE_PORT, LLM_PROVIDER, TRYON_PORT, USER_PROFILE_PORT } from './stylist.ports.js';
 export type {
   AiUsageEntry,

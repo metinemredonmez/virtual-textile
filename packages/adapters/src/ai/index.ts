@@ -28,6 +28,7 @@ export * from './gemini.js';
 export * from './http.js';
 export * from './llm.provider.js';
 export * from './tryon.error-map.js';
+export * from './tryon.factory.js';
 export * from './tryon.metered.js';
 export * from './tryon.provider.js';
 export * from './tryon.quality.js';

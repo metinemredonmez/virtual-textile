@@ -63,7 +63,7 @@ export function encryptField(plaintext: string): string {
 export function decryptField(encoded: string): string {
   const parts = encoded.split(':');
   if (parts.length !== 4 || parts[0] !== VERSION) {
-    throw appError('INTERNAL_ERROR', {
+    throw appError('FIELD_DECRYPT_FAILED', {
       internalMessage: `Şifreli alan biçimi tanınmıyor (sürüm: ${parts[0] ?? '-'})`,
     });
   }
@@ -75,7 +75,7 @@ export function decryptField(encoded: string): string {
   // Uzunluk kontrolü try'ın DIŞINDA: createDecipheriv'in kendi hata mesajıyla
   // karışmasın ve nedeni logda ayırt edilebilsin.
   if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) {
-    throw appError('INTERNAL_ERROR', {
+    throw appError('FIELD_DECRYPT_FAILED', {
       internalMessage: `Şifreli alanın IV (${iv.length}) veya etiket (${tag.length}) uzunluğu geçersiz`,
     });
   }
@@ -87,7 +87,7 @@ export function decryptField(encoded: string): string {
   } catch (error) {
     // ⚠️ `cause` loglanır ama kullanıcıya gitmez; şifreli metnin kendisi
     //    hiçbir koşulda hata mesajına konmaz.
-    throw appError('INTERNAL_ERROR', {
+    throw appError('FIELD_DECRYPT_FAILED', {
       cause: error,
       internalMessage: 'Şifreli alan çözülemedi (anahtar değişmiş veya veri bozulmuş olabilir)',
     });

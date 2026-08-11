@@ -255,9 +255,9 @@ export class CartService {
             skipped.push({ variantId: request.variantId, reason: 'CART_FULL' });
             continue;
           }
-          // Sepette farklı ürün sayısı sınırı için ayrı kod yok; en yakın
-          // anlamı taşıyan 422 kullanılıyor (bkz. dosya sonu TODO).
-          throw appError('MAX_QUANTITY_EXCEEDED', {
+          // Adet tavanı değil, FARKLI ürün sayısı tavanı: kullanıcının adedi
+          // düşürerek değil, bir ürünü çıkararak çözmesi gerekir.
+          throw appError('CART_TOO_MANY_ITEMS', {
             params: { max: CART.maxDistinctItems },
             internalMessage: `Sepette en fazla ${CART.maxDistinctItems} farklı ürün olabilir`,
           });
@@ -377,9 +377,9 @@ export class CartService {
     if (now < coupon.validFrom || now > coupon.validTo) throw appError('COUPON_EXPIRED');
 
     if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
-      // Toplam kullanım hakkı bitti. Ayrı kod yok; kullanıcı açısından sonuç
-      // aynı: kupon artık kullanılamıyor (bkz. dosya sonu TODO).
-      throw appError('COUPON_EXPIRED', {
+      // Kupon tarih olarak HÂLÂ geçerli, kontenjanı bitti. "Süresi doldu"
+      // demek kullanıcıyı tarihe bakmaya yönlendirir ve yanlış bilgi olur.
+      throw appError('COUPON_USAGE_LIMIT_REACHED', {
         internalMessage: `Kupon ${coupon.code} toplam kullanım limitine ulaştı`,
       });
     }
@@ -894,9 +894,3 @@ export class CartService {
     });
   }
 }
-
-// TODO(kod-gerekli): CART_TOO_MANY_ITEMS — "Sepetinize en fazla {max} farklı
-// ürün ekleyebilirsiniz." (422). Şimdilik MAX_QUANTITY_EXCEEDED kullanılıyor
-// ve mesaj adet limitiymiş gibi okunuyor.
-// TODO(kod-gerekli): COUPON_USAGE_LIMIT_REACHED — "Bu kupon için ayrılan
-// kontenjan doldu." (409). Şimdilik COUPON_EXPIRED kullanılıyor.

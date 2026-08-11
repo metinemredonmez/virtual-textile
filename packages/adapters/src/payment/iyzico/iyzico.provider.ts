@@ -413,7 +413,10 @@ export class IyzicoPaymentProvider implements PaymentProvider {
     });
 
     if (!check.ok) {
-      throw new AppError('AUTH_FORBIDDEN', {
+      // ⚠️ AUTH_FORBIDDEN değil: o kod "giriş yapmış ama yetkisiz kullanıcı"
+      //    anlamına gelir ve bu uç noktada hiç kullanıcı yok. Ayrı kod, imza
+      //    reddi oranını yetki hatalarından ayrı izlemeyi de mümkün kılar.
+      throw new AppError('WEBHOOK_SIGNATURE_INVALID', {
         internalMessage: `iyzico webhook imzası reddedildi: ${check.reason ?? 'bilinmiyor'}`,
       });
     }
@@ -581,7 +584,3 @@ function formatIyzicoDate(date: Date): string {
     `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
   );
 }
-
-// TODO(kod-gerekli): WEBHOOK_SIGNATURE_INVALID (401, integration) — şu an
-// imza reddi AUTH_FORBIDDEN ile raporlanıyor; kod eklendiğinde buradaki
-// `verifyWebhook` ve `iyzico.signature.ts` çağrıları güncellenmeli.
