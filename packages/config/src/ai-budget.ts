@@ -11,12 +11,7 @@ import type { Env } from './env.js';
  */
 
 export type AiFeature =
-  | 'TRYON'
-  | 'STYLIST'
-  | 'TAGGING'
-  | 'DESCRIPTION'
-  | 'EMBEDDING'
-  | 'MODERATION';
+  'TRYON' | 'STYLIST' | 'TAGGING' | 'DESCRIPTION' | 'EMBEDDING' | 'MODERATION';
 
 export interface AiBudget {
   dailyPlatformUsd: number;

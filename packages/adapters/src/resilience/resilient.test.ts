@@ -31,10 +31,7 @@ describe('idempotency ve retry ilişkisi', () => {
       .mockRejectedValueOnce(Object.assign(new Error('503'), { status: 503 }))
       .mockResolvedValueOnce('tamam');
 
-    const result = await resilient(
-      { ...base, retryAttempts: 3, idempotencyKey: 'order-1' },
-      fn,
-    );
+    const result = await resilient({ ...base, retryAttempts: 3, idempotencyKey: 'order-1' }, fn);
 
     expect(result).toBe('tamam');
     expect(fn).toHaveBeenCalledTimes(2);
@@ -113,7 +110,7 @@ describe('hata sarma', () => {
 
 describe('devre kesici', () => {
   it('eşik aşılınca açılır ve anında reddeder', async () => {
-    let clock = 0;
+    const clock = 0;
     const breaker = new CircuitBreaker({
       name: 'test',
       failureThreshold: 3,
@@ -174,7 +171,7 @@ describe('devre kesici', () => {
   });
 
   it('devre açıkken retry denenmez', async () => {
-    let clock = 0;
+    const clock = 0;
     const breaker = new CircuitBreaker({ name: 't', failureThreshold: 1, now: () => clock });
     await breaker.execute(() => Promise.reject(new Error('x'))).catch(() => undefined);
 

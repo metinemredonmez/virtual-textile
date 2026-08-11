@@ -134,7 +134,9 @@ export function allocate(m: Money, weights: readonly number[]): Money[] {
     return weights.map(() => ({ amountMinor: 0n, currency: m.currency }));
   }
 
-  const shares = weights.map((w) => (m.amountMinor * BigInt(Math.round(w * 1e6))) / BigInt(Math.round(totalWeight * 1e6)));
+  const shares = weights.map(
+    (w) => (m.amountMinor * BigInt(Math.round(w * 1e6))) / BigInt(Math.round(totalWeight * 1e6)),
+  );
   let distributed = shares.reduce((a, b) => a + b, 0n);
   const result = shares.map((amountMinor) => ({ amountMinor, currency: m.currency }));
 

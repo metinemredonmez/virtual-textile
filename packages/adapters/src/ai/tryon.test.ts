@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { photoContentHash, tryOnCacheKey, TRYON_PROMPT_VERSION } from './cache-key.js';
 import {
   generateWithFallback,
-  isPermanentFailure,
+  type isPermanentFailure,
   type TryOnProvider,
   type TryOnRequest,
   type TryOnResult,
@@ -56,7 +56,7 @@ describe('önbellek anahtarı', () => {
 
   it('kalite modu değişince anahtar değişir', () => {
     expect(tryOnCacheKey({ photoContentHash: 'abc', variantId: 'v1', mode: 'FAST' })).not.toBe(
-      tryOnCacheKey({ photoContentHash: 'abc', variantId: 'v1', mode: 'QUALITY' })
+      tryOnCacheKey({ photoContentHash: 'abc', variantId: 'v1', mode: 'QUALITY' }),
     );
   });
 

@@ -275,14 +275,39 @@ async function main(): Promise<void> {
       role: 'CUSTOMER',
       emailVerifiedAt: new Date(),
       bodyProfile: {
-        create: { heightCm: 168, weightKg: 60, chestCm: 90, waistCm: 72, usualSize: 'M', fitPref: 'REGULAR' },
+        create: {
+          heightCm: 168,
+          weightKg: 60,
+          chestCm: 90,
+          waistCm: 72,
+          usualSize: 'M',
+          fitPref: 'REGULAR',
+        },
       },
       consents: {
         create: [
-          { type: 'PHOTO_PROCESSING', granted: true, documentVersion: 'v1.0', ipAddress: '127.0.0.1', userAgent: 'seed' },
-          { type: 'CROSS_BORDER_TRANSFER', granted: true, documentVersion: 'v1.0', ipAddress: '127.0.0.1', userAgent: 'seed' },
+          {
+            type: 'PHOTO_PROCESSING',
+            granted: true,
+            documentVersion: 'v1.0',
+            ipAddress: '127.0.0.1',
+            userAgent: 'seed',
+          },
+          {
+            type: 'CROSS_BORDER_TRANSFER',
+            granted: true,
+            documentVersion: 'v1.0',
+            ipAddress: '127.0.0.1',
+            userAgent: 'seed',
+          },
           // Model eğitimi varsayılan olarak KAPALI.
-          { type: 'MODEL_TRAINING', granted: false, documentVersion: 'v1.0', ipAddress: '127.0.0.1', userAgent: 'seed' },
+          {
+            type: 'MODEL_TRAINING',
+            granted: false,
+            documentVersion: 'v1.0',
+            ipAddress: '127.0.0.1',
+            userAgent: 'seed',
+          },
         ],
       },
     },

@@ -277,7 +277,8 @@ export const ERROR_CATALOG = define({
     status: 504,
     family: 'integration',
     retryable: true,
-    message: 'Ödeme yanıtı alınamadı. Siparişlerinizi kontrol edin, tutar çekildiyse siparişiniz oluşmuştur.',
+    message:
+      'Ödeme yanıtı alınamadı. Siparişlerinizi kontrol edin, tutar çekildiyse siparişiniz oluşmuştur.',
   },
   PAYMENT_ALREADY_CAPTURED: {
     status: 409,
@@ -365,7 +366,8 @@ export const ERROR_CATALOG = define({
     status: 403,
     family: 'domain',
     retryable: false,
-    message: 'Sanal deneme için fotoğrafınızın yurt dışındaki hizmet sağlayıcısına aktarılmasına izin vermelisiniz.',
+    message:
+      'Sanal deneme için fotoğrafınızın yurt dışındaki hizmet sağlayıcısına aktarılmasına izin vermelisiniz.',
   },
   PHOTO_NOT_FOUND: {
     status: 404,
@@ -591,7 +593,8 @@ export const ERROR_CATALOG = define({
     status: 500,
     family: 'system',
     retryable: false,
-    message: 'Beklenmeyen bir hata oluştu. Sorun devam ederse destek ekibine şu kodu iletin: {requestId}',
+    message:
+      'Beklenmeyen bir hata oluştu. Sorun devam ederse destek ekibine şu kodu iletin: {requestId}',
   },
 });
 

@@ -1,6 +1,6 @@
 import { RESILIENCE } from '@vt/config';
 import { integrationError, type ErrorCode } from '@vt/contracts';
-import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
+import { type CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 
 /**
  * DIŞ SERVİS ÇAĞRISI SARMALAYICISI
@@ -56,7 +56,11 @@ export class TimeoutError extends Error {
 /** HTTP durum kodu veya ağ hatası taşıyan nesnelerden durum çıkarır. */
 function statusOf(error: unknown): number | undefined {
   if (typeof error !== 'object' || error === null) return undefined;
-  const candidate = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown } };
+  const candidate = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    response?: { status?: unknown };
+  };
   for (const value of [candidate.status, candidate.statusCode, candidate.response?.status]) {
     if (typeof value === 'number') return value;
   }
@@ -87,7 +91,11 @@ export function defaultIsRetryable(error: unknown): boolean {
   return status === 429 || (status >= 500 && status < 600);
 }
 
-async function withTimeout<T>(operation: string, timeoutMs: number, fn: () => Promise<T>): Promise<T> {
+async function withTimeout<T>(
+  operation: string,
+  timeoutMs: number,
+  fn: () => Promise<T>,
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -130,7 +138,9 @@ export async function resilient<T>(options: ResilientOptions<T>, fn: () => Promi
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const run = (): Promise<T> => withTimeout(label, timeoutMs, fn);
-      const result = options.circuitBreaker ? await options.circuitBreaker.execute(run) : await run();
+      const result = options.circuitBreaker
+        ? await options.circuitBreaker.execute(run)
+        : await run();
       options.onAttempt?.({ attempt });
       return result;
     } catch (error) {

@@ -1,4 +1,9 @@
-import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from '@nestjs/common';
+import {
+  Injectable,
+  type CallHandler,
+  type ExecutionContext,
+  type NestInterceptor,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { map, type Observable } from 'rxjs';
 import type { ApiSuccess, ResponseMeta } from '@vt/contracts';
@@ -12,7 +17,12 @@ export interface Paginated<T> {
 }
 
 function isPaginated(value: unknown): value is Paginated<unknown> {
-  return typeof value === 'object' && value !== null && 'items' in value && Array.isArray((value as Paginated<unknown>).items);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'items' in value &&
+    Array.isArray((value as Paginated<unknown>).items)
+  );
 }
 
 /**

@@ -45,4 +45,22 @@ export default tseslint.config(
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  {
+    // NestJS bağımlılık enjeksiyonu, `emitDecoratorMetadata` ile üretilen
+    // `design:paramtypes` verisine dayanır ve bu veri SINIF REFERANSINI
+    // gerektirir. Bir servisi `import type` ile içeri almak referansı derleme
+    // sırasında siler; Nest çalışma zamanında "bağımlılık çözümlenemedi" der.
+    // Kural burada bilinçli olarak kapalıdır — otomatik düzeltme uygulamayı bozar.
+    files: ['apps/api/**/*.ts', 'apps/worker/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'off',
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts', 'packages/db/prisma/seed.ts'],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
 );

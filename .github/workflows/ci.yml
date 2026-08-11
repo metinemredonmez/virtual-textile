@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  verify:
+    name: Lint · Tip · Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: vt
+          POSTGRES_PASSWORD: vt
+          POSTGRES_DB: virtual_textile_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vt -d virtual_textile_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # CI'da servisler doğrudan 5432/6379'da; yerelde 5433/6380 kullanılıyor
+      # çünkü geliştirici makinesinde başka bir Postgres olabilir.
+      DATABASE_URL: postgresql://vt:vt@localhost:5432/virtual_textile_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Bağımlılıkları kur
+        run: pnpm install --frozen-lockfile
+
+      - name: Paketleri derle
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tip kontrolü
+        run: pnpm typecheck
+
+      - name: Migration'ları uygula
+        working-directory: packages/db
+        run: pnpm exec prisma migrate deploy
+
+      - name: Şema ile veritabanı arasında sapma var mı
+        working-directory: packages/db
+        # Migration'lar uygulandıktan sonra şema ile DB birebir aynı olmalı.
+        # Aksi hâlde biri elle migration yazıp schema.prisma'yı güncellememiş
+        # (veya tersi) demektir — üretimde sürpriz çıkarır.
+        run: pnpm exec prisma migrate status
+
+      - name: Testler
+        run: pnpm test
+
+      - name: Seed çalışıyor mu
+        working-directory: packages/db
+        # Seed, komisyon ve ledger mantığını uçtan uca yürütür; bozulursa
+        # veri modeli sözleşmesi bozulmuş demektir.
+        run: pnpm exec tsx prisma/seed.ts
+
+  security:
+    name: Güvenlik
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Bağımlılıkları kur
+        run: pnpm install --frozen-lockfile
+
+      - name: Bilinen açık taraması
+        run: pnpm audit --audit-level moderate
+
+      - name: Sızmış gizli anahtar taraması
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gizli/ticari dosya commit edilmiş mi
+        # .gitignore'a güvenmek yetmez; birisi -f ile zorlayabilir.
+        run: |
+          if git ls-files | grep -iE '\.(pdf|docx|xlsx)$|^\.env$'; then
+            echo "::error::Gizli veya ticari doküman depoya girmiş."
+            exit 1
+          fi
+          echo "✓ temiz"
+
+  format:
+    name: Biçim
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check

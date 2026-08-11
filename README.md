@@ -33,16 +33,16 @@ Detay: [`docs/architecture.md`](docs/architecture.md) · Kararlar: [`docs/adr/`]
 
 ### Temel tasarım kararları
 
-| Konu | Karar | Neden |
-|---|---|---|
-| Mimari | Modüler monolit + 1 worker | Küçük takım, kısa takvim. Sınırlar kodda zorlanır (ESLint), ayırmak sonra kolay. |
-| Dil | Baştan sona TypeScript | MVP'de AI = HTTP orkestrasyonu, model çalıştırma değil. Python'a gerek yok. |
-| Arama | PostgreSQL FTS + `pg_trgm` + `pgvector` | Bu ölçekte OpenSearch gereksiz operasyon yükü. Arayüz arkasında, sonra geçilebilir. |
-| Kuyruk | BullMQ (Redis) | Retry, backoff, DLQ, delayed job hazır. Kafka bu ölçekte fazla. |
-| Try-on | Hosted model API (adapter arkasında) | Kendi GPU havuzu MVP'ye zaman ve sabit gider ekler, ürün faydası eklemez. |
-| Para | `BigInt` + kuruş (minor unit) | Kayan noktalı sayı finansal hesapta kullanılmaz. |
-| Komisyon | Versiyonlu kural + sipariş kaleminde snapshot | Kural değişince geçmiş siparişin muhasebesi bozulmaz. |
-| Satıcı bakiyesi | Append-only ledger, `SUM()` ile hesaplanır | Ayrı `balance` kolonu er geç tutarsızlaşır. |
+| Konu            | Karar                                         | Neden                                                                               |
+| --------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Mimari          | Modüler monolit + 1 worker                    | Küçük takım, kısa takvim. Sınırlar kodda zorlanır (ESLint), ayırmak sonra kolay.    |
+| Dil             | Baştan sona TypeScript                        | MVP'de AI = HTTP orkestrasyonu, model çalıştırma değil. Python'a gerek yok.         |
+| Arama           | PostgreSQL FTS + `pg_trgm` + `pgvector`       | Bu ölçekte OpenSearch gereksiz operasyon yükü. Arayüz arkasında, sonra geçilebilir. |
+| Kuyruk          | BullMQ (Redis)                                | Retry, backoff, DLQ, delayed job hazır. Kafka bu ölçekte fazla.                     |
+| Try-on          | Hosted model API (adapter arkasında)          | Kendi GPU havuzu MVP'ye zaman ve sabit gider ekler, ürün faydası eklemez.           |
+| Para            | `BigInt` + kuruş (minor unit)                 | Kayan noktalı sayı finansal hesapta kullanılmaz.                                    |
+| Komisyon        | Versiyonlu kural + sipariş kaleminde snapshot | Kural değişince geçmiş siparişin muhasebesi bozulmaz.                               |
+| Satıcı bakiyesi | Append-only ledger, `SUM()` ile hesaplanır    | Ayrı `balance` kolonu er geç tutarsızlaşır.                                         |
 
 ---
 
@@ -63,12 +63,12 @@ pnpm db:seed
 pnpm dev
 ```
 
-| Servis | Adres |
-|---|---|
-| Müşteri web | http://localhost:3000 |
-| API | http://localhost:3001 |
+| Servis        | Adres                 |
+| ------------- | --------------------- |
+| Müşteri web   | http://localhost:3000 |
+| API           | http://localhost:3001 |
 | Satıcı paneli | http://localhost:3002 |
-| Admin paneli | http://localhost:3003 |
+| Admin paneli  | http://localhost:3003 |
 | MinIO konsolu | http://localhost:9001 |
 
 ## Komutlar

@@ -17,7 +17,10 @@ import { RESILIENCE } from '@vt/config';
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export class CircuitOpenError extends Error {
-  constructor(readonly circuitName: string, readonly retryAfterMs: number) {
+  constructor(
+    readonly circuitName: string,
+    readonly retryAfterMs: number,
+  ) {
     super(`Devre açık: ${circuitName}`);
     this.name = 'CircuitOpenError';
   }

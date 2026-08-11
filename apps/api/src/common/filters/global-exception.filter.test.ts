@@ -110,10 +110,7 @@ describe('GlobalExceptionFilter', () => {
     const filter = new GlobalExceptionFilter(silentLogger);
     const { host, getBody, getStatus } = createHost();
 
-    filter.catch(
-      new Error('connect ECONNREFUSED 10.0.0.5:5432 password=süpergizli'),
-      host,
-    );
+    filter.catch(new Error('connect ECONNREFUSED 10.0.0.5:5432 password=süpergizli'), host);
 
     expect(getStatus()).toBe(500);
     const serialized = JSON.stringify(getBody());
@@ -146,7 +143,10 @@ describe('GlobalExceptionFilter', () => {
     const filter = new GlobalExceptionFilter(silentLogger);
     const { host, getHeaders } = createHost();
 
-    filter.catch(appError('RATE_LIMITED', { params: { retryAfter: 30 }, retryAfterSeconds: 30 }), host);
+    filter.catch(
+      appError('RATE_LIMITED', { params: { retryAfter: 30 }, retryAfterSeconds: 30 }),
+      host,
+    );
 
     expect(getHeaders()['Retry-After']).toBe('30');
   });

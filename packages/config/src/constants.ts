@@ -102,12 +102,7 @@ export const TRYON = {
 } as const;
 
 /** Try-on desteklenen kategoriler. Listede olmayan ürünlerde buton gösterilmez. */
-export const TRYONABLE_CATEGORIES = [
-  'UPPER_BODY',
-  'LOWER_BODY',
-  'DRESS',
-  'OUTERWEAR',
-] as const;
+export const TRYONABLE_CATEGORIES = ['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR'] as const;
 
 // ── Beden önerisi (MVP: kural motoru) ─────────────────────────────────────
 export const SIZE_ENGINE = {

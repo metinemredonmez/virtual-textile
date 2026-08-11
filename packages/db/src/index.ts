@@ -63,9 +63,7 @@ export const PRISMA_ERROR = {
   TRANSACTION_CONFLICT: 'P2034',
 } as const;
 
-export function isPrismaKnownError(
-  error: unknown,
-): error is Prisma.PrismaClientKnownRequestError {
+export function isPrismaKnownError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
   return error instanceof Prisma.PrismaClientKnownRequestError;
 }
 

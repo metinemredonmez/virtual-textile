@@ -20,29 +20,44 @@ describe('mikro-dolar dönüşümü', () => {
 
 describe('checkBudget', () => {
   it('bütçe altındayken izin verir', () => {
-    const d = checkBudget(budget, { todayMicroUsd: usdToMicro(10), thisMonthMicroUsd: usdToMicro(100) });
+    const d = checkBudget(budget, {
+      todayMicroUsd: usdToMicro(10),
+      thisMonthMicroUsd: usdToMicro(100),
+    });
     expect(d.allowed).toBe(true);
     expect(d.allowed && d.warnAtRatio).toBeUndefined();
   });
 
   it('eşiği geçince izin verir ama uyarı döndürür', () => {
-    const d = checkBudget(budget, { todayMicroUsd: usdToMicro(41), thisMonthMicroUsd: usdToMicro(100) });
+    const d = checkBudget(budget, {
+      todayMicroUsd: usdToMicro(41),
+      thisMonthMicroUsd: usdToMicro(100),
+    });
     expect(d.allowed).toBe(true);
     expect(d.allowed && d.warnAtRatio).toBe(0.8);
   });
 
   it('en yüksek aşılan eşiği bildirir', () => {
-    const d = checkBudget(budget, { todayMicroUsd: usdToMicro(48), thisMonthMicroUsd: usdToMicro(100) });
+    const d = checkBudget(budget, {
+      todayMicroUsd: usdToMicro(48),
+      thisMonthMicroUsd: usdToMicro(100),
+    });
     expect(d.allowed && d.warnAtRatio).toBe(0.95);
   });
 
   it('günlük bütçe dolunca durdurur', () => {
-    const d = checkBudget(budget, { todayMicroUsd: usdToMicro(50), thisMonthMicroUsd: usdToMicro(100) });
+    const d = checkBudget(budget, {
+      todayMicroUsd: usdToMicro(50),
+      thisMonthMicroUsd: usdToMicro(100),
+    });
     expect(d).toEqual({ allowed: false, reason: 'DAILY_BUDGET' });
   });
 
   it('aylık bütçe dolunca durdurur', () => {
-    const d = checkBudget(budget, { todayMicroUsd: usdToMicro(1), thisMonthMicroUsd: usdToMicro(1200) });
+    const d = checkBudget(budget, {
+      todayMicroUsd: usdToMicro(1),
+      thisMonthMicroUsd: usdToMicro(1200),
+    });
     expect(d).toEqual({ allowed: false, reason: 'MONTHLY_BUDGET' });
   });
 });

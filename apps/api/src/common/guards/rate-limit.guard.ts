@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  SetMetadata,
-  type CanActivate,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { Injectable, SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type Redis from 'ioredis';

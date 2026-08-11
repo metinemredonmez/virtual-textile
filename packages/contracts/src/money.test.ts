@@ -37,8 +37,9 @@ describe('money', () => {
   });
 
   it('Türkçe biçimde gösterir', () => {
-    // Intl boşluk olarak U+00A0 kullanabilir; normalize ederek karşılaştır
-    expect(formatMoney(money(12345)).replace(/ /g, ' ')).toBe('₺123,45');
+    // Intl, para birimi ile sayı arasında bölünemez boşluk (U+00A0) kullanır.
+    // Kaçış dizisi ile yazılıyor: kaynak dosyada görünmez karakter bırakmamak için.
+    expect(formatMoney(money(12345)).replace(/\u00a0/g, ' ')).toBe('\u20ba123,45');
   });
 });
 
