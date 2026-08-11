@@ -28,7 +28,13 @@ services:
     image: redis:7-alpine
     container_name: vt-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    # ⚠️ maxmemory-policy NOEVICTION olmalı.
+    # Bu Redis hem önbellek hem KUYRUK taşıyor. allkeys-lru olsaydı, bellek
+    # dolduğunda Redis sessizce anahtar atardı — atılan şey bir kuyruk işi
+    # olabilir: gönderilmemiş bildirim, silinmemiş kullanıcı fotoğrafı,
+    # dağıtılmamış ödeme olayı. noeviction'da Redis yazma hatası döndürür;
+    # gürültülü hata, sessiz veri kaybından iyidir.
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
     ports:
       # Yerel Redis ile çakışmasın diye 6380.
       - '6380:6379'

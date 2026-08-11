@@ -100,10 +100,19 @@ sudo apt-get install -y redis-server
 
 ```
 maxmemory 1gb
-maxmemory-policy allkeys-lru
+maxmemory-policy noeviction
 appendonly yes
 bind 127.0.0.1 ::1
 ```
+
+> ⚠️ **`maxmemory-policy` mutlaka `noeviction` olmalı.** Bu Redis hem önbellek
+> hem kuyruk taşıyor. `allkeys-lru` gibi bir tahliye politikasında bellek
+> dolduğunda Redis sessizce anahtar atar — atılan şey bir kuyruk işi olabilir:
+> gönderilmemiş bildirim, silinmemiş kullanıcı fotoğrafı, dağıtılmamış ödeme
+> olayı. `noeviction` ile Redis yazma hatası döndürür ve sorun görünür olur.
+>
+> Önbellek baskısı gerçekten sorun olursa çözüm tahliye açmak değil, önbellek
+> için **ayrı bir Redis örneği** kullanmaktır.
 
 > ⚠️ Redis'i **dışarıya açma.** Kuyruk ve oturum verisi burada.
 

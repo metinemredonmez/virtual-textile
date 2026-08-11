@@ -51,20 +51,35 @@ module.exports = {
       },
     },
 
-    // ⚠️ apps/worker henüz yazılmadı. Yazıldığında bu blok açılacak.
-    // Worker cluster DEĞİL fork modunda çalışır: BullMQ eşzamanlılığı kendi
-    // içinde yönetir, cluster ile birlikte iş çift işlenebilir.
-    // {
-    //   name: 'vt-worker',
-    //   cwd: '/srv/virtual-textile/apps/worker',
-    //   script: 'dist/main.js',
-    //   exec_mode: 'fork',
-    //   instances: 1,
-    //   kill_timeout: 30000, // çalışan işin bitmesini bekle
-    //   max_memory_restart: '900M',
-    //   error_file: '/var/log/virtual-textile/worker.error.log',
-    //   out_file: '/var/log/virtual-textile/worker.out.log',
-    //   env_production: { NODE_ENV: 'production' },
-    // },
+    {
+      name: 'vt-worker',
+      cwd: '/srv/virtual-textile/apps/worker',
+      script: 'dist/main.js',
+
+      // ⚠️ FORK ve TEK ÖRNEK — cluster DEĞİL.
+      // Zamanlanmış işler her örnekte tetiklenir: iki örnek olsaydı fotoğraf
+      // silme ve outbox dağıtımı iki kez çalışır, rezervasyon serbest bırakma
+      // stoğu iki kez artırırdı. BullMQ eşzamanlılığı zaten iş içinde
+      // yönetiliyor (queues.ts → CONCURRENCY).
+      exec_mode: 'fork',
+      instances: 1,
+
+      // Çalışan işin bitmesini bekle. Yarıda kesilen bir fotoğraf silme veya
+      // ödeme dağıtımı tutarsız durum bırakır.
+      kill_timeout: 30000,
+
+      max_memory_restart: '900M',
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '30s',
+      restart_delay: 2000,
+
+      error_file: '/var/log/virtual-textile/worker.error.log',
+      out_file: '/var/log/virtual-textile/worker.out.log',
+      merge_logs: true,
+      time: false,
+
+      env_production: { NODE_ENV: 'production' },
+    },
   ],
 };
