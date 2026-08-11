@@ -10,13 +10,14 @@ services:
       POSTGRES_USER: vt
       POSTGRES_PASSWORD: vt
       POSTGRES_DB: virtual_textile
-      # Türkçe sıralama/karşılaştırma
-      LANG: tr_TR.utf8
+      # Türkçe sıralama (i/İ, ı/I) ICU ile sağlanır — imajda tr_TR.utf8 OS
+      # locale'i bulunmadığı için LANG kullanılmaz.
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale-provider=icu --icu-locale=tr-TR --locale=C.UTF-8'
     ports:
-      - '5432:5432'
+      # Makinede zaten bir Postgres çalışıyor olabilir; 5433'e bağlanıyoruz.
+      - '5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U vt -d virtual_textile']
       interval: 5s
@@ -29,7 +30,8 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
-      - '6379:6379'
+      # Yerel Redis ile çakışmasın diye 6380.
+      - '6380:6379'
     volumes:
       - redisdata:/data
     healthcheck:

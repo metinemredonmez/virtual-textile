@@ -1,0 +1,1335 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  virtual-textile — veri modeli
+//
+//  DEĞİŞMEZ KURALLAR
+//   1. Para ASLA float değil: BigInt + kuruş (minor unit). 12345 = 123,45 ₺
+//   2. Finansal ve yasal kayıtlar append-only: Commission*, LedgerEntry,
+//      ConsentRecord, OrderEvent, AuditLog — UPDATE edilmez, yeni satır yazılır.
+//   3. Komisyon versiyonlanır; sipariş kalemi kendi anındaki oranı snapshot alır.
+//   4. Sipariş kalemleri ürün verisini SNAPSHOT'lar — ürün silinse/değişse bile
+//      geçmiş sipariş bozulmaz.
+//   5. Soft delete yok, `status` var. Gerçek DELETE yalnızca KVKK silme akışında.
+//   6. Modül öneki: tablolar @@map ile modül adına göre adlandırılır ki
+//      ileride şema/servis ayırmak kolay olsun.
+// ═══════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pg_trgm, unaccent, btree_gin, pgcrypto]
+}
+
+// ═══════════════════════════════ KİMLİK ═══════════════════════════════════
+
+enum Role {
+  CUSTOMER
+  SELLER_USER
+  SUPPORT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_DELETION
+  DELETED
+}
+
+model User {
+  id            String     @id @default(uuid(7))
+  email         String?    @unique
+  phone         String?    @unique
+  passwordHash  String?
+  role          Role       @default(CUSTOMER)
+  status        UserStatus @default(ACTIVE)
+
+  firstName     String?
+  lastName      String?
+  locale        String     @default("tr-TR")
+
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  twoFactorEnabled Boolean  @default(false)
+
+  /// Hesap silme talebi — grace period sonunda hard delete + anonimleştirme.
+  deletionRequestedAt DateTime?
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  addresses     Address[]
+  sessions      Session[]
+  socialAccounts SocialAccount[]
+  bodyProfile   BodyProfile?
+  consents      ConsentRecord[]
+  photos        UserPhoto[]
+  carts         Cart[]
+  orders        Order[]
+  reviews       Review[]
+  favorites     Favorite[]
+  outfits       Outfit[]
+  tryOnJobs     TryOnJob[]
+  stylistConversations StylistConversation[]
+  sellerMemberships SellerUser[]
+
+  @@index([status, createdAt])
+  @@map("user_users")
+}
+
+model Session {
+  id              String   @id @default(uuid(7))
+  userId          String
+  /// Refresh token'ın kendisi DEĞİL, SHA-256 özeti saklanır.
+  refreshTokenHash String  @unique
+  /// Rotasyon zinciri: bu oturum hangi oturumun yerine geçti.
+  replacedBySessionId String?
+  revokedAt       DateTime?
+  /// Yeniden kullanım tespit edildi mi — tespit edilirse kullanıcının
+  /// TÜM oturumları düşürülür (token hırsızlığı sinyali).
+  reusedAt        DateTime?
+
+  ipAddress       String
+  userAgent       String
+  deviceLabel     String?
+
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model SocialAccount {
+  id             String   @id @default(uuid(7))
+  userId         String
+  provider       String   // "google" | "apple"
+  providerUserId String
+  createdAt      DateTime @default(now())
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@map("user_social_accounts")
+}
+
+model Address {
+  id             String   @id @default(uuid(7))
+  userId         String
+  title          String
+  firstName      String
+  lastName       String
+  phone          String
+  city           String
+  district       String
+  neighbourhood  String?
+  line1          String
+  postalCode     String?
+  companyName    String?
+  taxOffice      String?
+  /// Uygulama katmanında AES-256-GCM ile şifrelenir.
+  taxNumberEnc   String?
+  isDefault      Boolean  @default(false)
+  archivedAt     DateTime?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, archivedAt])
+  @@map("user_addresses")
+}
+
+enum FitPref {
+  SLIM
+  REGULAR
+  OVERSIZE
+}
+
+model BodyProfile {
+  userId    String   @id
+  heightCm  Int?
+  weightKg  Int?
+  chestCm   Int?
+  waistCm   Int?
+  hipCm     Int?
+  usualSize String?
+  fitPref   FitPref?
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_body_profiles")
+}
+
+// ═══════════════════════════ KVKK / RIZA ═════════════════════════════════
+
+enum ConsentType {
+  PHOTO_PROCESSING
+  CROSS_BORDER_TRANSFER
+  PHOTO_STORAGE
+  MODEL_TRAINING
+  MARKETING
+}
+
+/// APPEND-ONLY. Rıza geri çekilirse yeni satır (granted=false) yazılır.
+/// Kullanıcı hesabını silse bile bu kayıtlar (anonim kimlikle) korunur —
+/// rızanın varlığı/yokluğu denetlenebilir olmalıdır.
+model ConsentRecord {
+  id        String      @id @default(uuid(7))
+  userId    String
+  type      ConsentType
+  granted   Boolean
+  /// Onaylanan aydınlatma metninin sürümü, ör. "v1.2"
+  documentVersion String
+  ipAddress String
+  userAgent String
+  createdAt DateTime    @default(now())
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt])
+  @@map("consent_records")
+}
+
+enum PhotoPurpose {
+  ONE_TIME
+  SAVED_PROFILE
+}
+
+/// ⚠️ ÖZEL NİTELİKLİ KİŞİSEL VERİ.
+/// Private bucket'ta durur, yalnızca imzalı URL ile erişilir, süreli saklanır.
+/// Yönetici hesapları dahil serbest erişim YOKTUR (break-glass + AuditLog).
+model UserPhoto {
+  id           String       @id @default(uuid(7))
+  userId       String
+  storageKey   String       @unique
+  purpose      PhotoPurpose
+  /// Yükleme anında hesaplanan kalite skoru (0-100). Eşiğin altı reddedilir.
+  qualityScore Int?
+  qualityIssues Json?       // ["too_dark","no_person","cropped"]
+  /// Aynı fotoğrafın try-on önbelleğinde anahtar olarak kullanılması için içerik özeti.
+  contentHash  String
+  widthPx      Int
+  heightPx     Int
+  sizeBytes    Int
+
+  /// Bu tarihten sonra silme cron'u tarafından kaldırılır.
+  expiresAt    DateTime
+  deletedAt    DateTime?
+
+  createdAt    DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tryOnJobs    TryOnJob[]
+
+  @@index([expiresAt, deletedAt])
+  @@index([userId, createdAt])
+  @@map("ai_user_photos")
+}
+
+// ═══════════════════════════════ SATICI ═══════════════════════════════════
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+model Seller {
+  id             String       @id @default(uuid(7))
+  legalName      String
+  displayName    String
+  /// Şifreli saklanır (AES-256-GCM).
+  taxNumberEnc   String
+  taxOffice      String
+  /// Şifreli saklanır. Payout dışında hiçbir yerde çözülmez.
+  ibanEnc        String
+  contactEmail   String
+  contactPhone   String
+
+  status         SellerStatus @default(PENDING)
+  statusReason   String?
+  /// Ödeme sağlayıcısındaki alt üye işyeri kimliği.
+  submerchantKey String?
+  /// 0-100. Geç kargo, yüksek iade, moderasyon reddi bunu düşürür.
+  qualityScore   Int          @default(50)
+  vacationMode   Boolean      @default(false)
+
+  approvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  store          Store?
+  documents      SellerDocument[]
+  members        SellerUser[]
+  products       Product[]
+  packages       OrderPackage[]
+  ledgerEntries  LedgerEntry[]
+  payouts        PayoutRequest[]
+  coupons        Coupon[]
+  commissionRules CommissionRule[]
+
+  @@index([status])
+  @@map("seller_sellers")
+}
+
+model SellerUser {
+  id        String   @id @default(uuid(7))
+  sellerId  String
+  userId    String
+  /// "owner" | "manager" | "staff"
+  storeRole String   @default("staff")
+  createdAt DateTime @default(now())
+
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, userId])
+  @@map("seller_users")
+}
+
+enum SellerDocumentType {
+  TAX_CERTIFICATE
+  TRADE_REGISTRY
+  SIGNATURE_CIRCULAR
+  ID_CARD
+  OTHER
+}
+
+model SellerDocument {
+  id         String             @id @default(uuid(7))
+  sellerId   String
+  type       SellerDocumentType
+  /// Private bucket. Yalnızca admin, imzalı URL ile, AuditLog kaydıyla erişir.
+  storageKey String
+  fileName   String
+  reviewedAt DateTime?
+  reviewedBy String?
+  approved   Boolean?
+  createdAt  DateTime           @default(now())
+
+  seller     Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@map("seller_documents")
+}
+
+model Store {
+  id          String   @id @default(uuid(7))
+  sellerId    String   @unique
+  slug        String   @unique
+  name        String
+  description String?
+  logoKey     String?
+  bannerKey   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@map("seller_stores")
+}
+
+// ═══════════════════════════════ KATALOG ══════════════════════════════════
+
+model Category {
+  id        String     @id @default(uuid(7))
+  parentId  String?
+  slug      String     @unique
+  name      String
+  /// Sanal deneme kategorisi — null ise bu kategoride try-on gösterilmez.
+  tryOnCategory TryOnCategory?
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+  commissionRules CommissionRule[]
+
+  @@index([parentId, sortOrder])
+  @@map("catalog_categories")
+}
+
+enum TryOnCategory {
+  UPPER_BODY
+  LOWER_BODY
+  DRESS
+  OUTERWEAR
+}
+
+enum Gender {
+  WOMAN
+  MAN
+  UNISEX
+  KIDS
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+model Product {
+  id          String        @id @default(uuid(7))
+  sellerId    String
+  categoryId  String
+  slug        String        @unique
+  title       String
+  description String
+  brandName   String
+  gender      Gender
+  season      String?
+  collection  String?
+  status      ProductStatus @default(DRAFT)
+  statusReason String?
+
+  /// AI çıkarımı: {color, pattern, fabric, neckline, sleeve, fit}
+  aiTags         Json?
+  /// Satıcı AI etiketlerini onaylamadan ürün yayınlanamaz.
+  aiTagsApproved Boolean    @default(false)
+
+  /// Try-On Uygunluk Skoru (0-100) — düşükse satıcıya somut iyileştirme önerilir.
+  tryOnScore     Int?
+  tryOnIssues    Json?      // ["missing_back_angle","low_resolution","busy_background"]
+
+  /// {"M":{"chest":98,"length":70,"sleeve":60}, ...} — beden öneri motoru okur.
+  sizeChart      Json?
+
+  /// Görsel embedding (SigLIP/CLIP, 768 boyut). Prisma Client sorgulayamaz;
+  /// benzer ürün araması ham SQL ile yapılır (bkz. migration).
+  embedding      Unsupported("vector(768)")?
+  /// Türkçe FTS — generated column, migration'da tanımlanır.
+  searchVector   Unsupported("tsvector")?
+
+  viewCount      Int        @default(0)
+  tryOnCount     Int        @default(0)
+  popularityScore Int       @default(0)
+
+  publishedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  seller     Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category   Category       @relation(fields: [categoryId], references: [id])
+  variants   Variant[]
+  images     ProductImage[]
+  reviews    Review[]
+  favorites  Favorite[]
+
+  @@index([sellerId, status])
+  @@index([categoryId, status, publishedAt])
+  @@index([status, popularityScore])
+  /// Türkçe tam metin araması. Vektörün kendisi migration'da GENERATED column.
+  @@index([searchVector], type: Gin, map: "catalog_products_search_vector_idx")
+  /// Autocomplete + yazım toleransı: "gomlek" → "gömlek"
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "catalog_products_title_trgm_idx")
+  @@index([brandName(ops: raw("gin_trgm_ops"))], type: Gin, map: "catalog_products_brand_trgm_idx")
+  @@map("catalog_products")
+}
+
+model Variant {
+  id             String   @id @default(uuid(7))
+  productId      String
+  sku            String   @unique
+  color          String
+  colorHex       String
+  size           String
+  /// Kuruş cinsinden.
+  priceMinor     BigInt
+  /// Üstü çizili referans fiyat.
+  listPriceMinor BigInt?
+  barcode        String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory      Inventory?
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  tryOnJobs      TryOnJob[]
+  priceHistory   PriceHistory[]
+
+  @@unique([productId, color, size])
+  @@index([productId, isActive])
+  @@map("catalog_variants")
+}
+
+model Inventory {
+  variantId String   @id
+  /// Fiziksel stok.
+  onHand    Int      @default(0)
+  /// Checkout sırasında rezerve edilen, henüz ödenmemiş adet.
+  /// Satılabilir = onHand - reserved
+  reserved  Int      @default(0)
+  /// Optimistic lock — eşzamanlı checkout'ta fazla satışı engeller.
+  version   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("catalog_inventory")
+}
+
+/// Fiyat değişiklikleri append-only — kampanya denetimi ve "sahte indirim"
+/// iddialarına karşı kanıt.
+model PriceHistory {
+  id             String   @id @default(uuid(7))
+  variantId      String
+  priceMinor     BigInt
+  listPriceMinor BigInt?
+  changedBy      String
+  createdAt      DateTime @default(now())
+
+  variant        Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId, createdAt])
+  @@map("catalog_price_history")
+}
+
+enum ImageAngle {
+  FRONT
+  BACK
+  SIDE
+  DETAIL
+  MODEL
+  FLATLAY
+}
+
+model ProductImage {
+  id         String     @id @default(uuid(7))
+  productId  String
+  storageKey String
+  angle      ImageAngle
+  isPrimary  Boolean    @default(false)
+  /// Arka planı temizlenmiş sürüm var mı — try-on kalitesini artırır.
+  bgRemovedKey String?
+  blurhash   String?
+  widthPx    Int
+  heightPx   Int
+  sortOrder  Int        @default(0)
+  createdAt  DateTime   @default(now())
+
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("catalog_product_images")
+}
+
+model Review {
+  id         String   @id @default(uuid(7))
+  productId  String
+  userId     String
+  orderItemId String? @unique
+  rating     Int
+  title      String?
+  body       String?
+  /// Beden geri bildirimi — fit motorunu besler.
+  fitFeedback String? // "TOO_SMALL" | "TRUE_TO_SIZE" | "TOO_LARGE"
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId, isApproved, createdAt])
+  @@map("catalog_reviews")
+}
+
+model Favorite {
+  id        String   @id @default(uuid(7))
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("catalog_favorites")
+}
+
+// ═══════════════════════════════ SEPET ════════════════════════════════════
+
+model Cart {
+  id        String     @id @default(uuid(7))
+  userId    String?
+  /// Misafir sepeti için tarayıcı oturum kimliği.
+  sessionId String?
+  couponId  String?
+  expiresAt DateTime
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon    Coupon?    @relation(fields: [couponId], references: [id])
+  items     CartItem[]
+  outfits   Outfit[]
+
+  @@unique([userId])
+  @@unique([sessionId])
+  @@index([expiresAt])
+  @@map("cart_carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid(7))
+  cartId    String
+  variantId String
+  outfitId  String?
+  quantity  Int
+  /// Sepete eklendiği andaki fiyat — checkout'ta güncel fiyatla karşılaştırılır,
+  /// değiştiyse kullanıcıya onay sorulur (CART_PRICE_CHANGED).
+  addedPriceMinor BigInt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant   Variant  @relation(fields: [variantId], references: [id])
+  outfit    Outfit?  @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+
+  @@unique([cartId, variantId])
+  @@map("cart_items")
+}
+
+/// Kombin — kombin tabanlı sepetin çekirdeği.
+/// Kullanıcı "Günlük", "İş görüşmesi" gibi kombinler oluşturur, tamamını sepete atar.
+model Outfit {
+  id         String     @id @default(uuid(7))
+  userId     String?
+  cartId     String?
+  name       String
+  /// Bu kombinin sanal deneme görseli (varsa).
+  tryOnJobId String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cart       Cart?      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  items      CartItem[]
+
+  @@index([userId, createdAt])
+  @@map("cart_outfits")
+}
+
+// ═══════════════════════════ KAMPANYA & KUPON ════════════════════════════
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+model Coupon {
+  id              String       @id @default(uuid(7))
+  code            String       @unique
+  /// null = platform kuponu, dolu = mağaza kuponu
+  sellerId        String?
+  discountType    DiscountType
+  /// PERCENTAGE için basis point (1000 = %10), FIXED_AMOUNT için kuruş.
+  discountValue   BigInt
+  /// Yüzdesel indirimde azami indirim tutarı (kuruş).
+  maxDiscountMinor BigInt?
+  minCartMinor    BigInt       @default(0)
+  usageLimit      Int?
+  usageLimitPerUser Int        @default(1)
+  usedCount       Int          @default(0)
+  validFrom       DateTime
+  validTo         DateTime
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  seller          Seller?      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  carts           Cart[]
+  redemptions     CouponRedemption[]
+
+  @@index([code, isActive])
+  @@index([sellerId, isActive])
+  @@map("promo_coupons")
+}
+
+model CouponRedemption {
+  id        String   @id @default(uuid(7))
+  couponId  String
+  userId    String
+  orderId   String
+  amountMinor BigInt
+  createdAt DateTime @default(now())
+
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, orderId])
+  @@index([couponId, userId])
+  @@map("promo_coupon_redemptions")
+}
+
+// ═══════════════════════════════ SİPARİŞ ══════════════════════════════════
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_FAILED
+  EXPIRED
+  PAID
+  PARTIALLY_SHIPPED
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PackageStatus {
+  AWAITING_APPROVAL
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+}
+
+model Order {
+  id          String      @id @default(uuid(7))
+  /// Kullanıcıya gösterilen numara: VT-260811-0042
+  orderNumber String      @unique
+  userId      String?
+  /// Misafir siparişinde de zorunlu — bildirim ve takip için.
+  email       String
+  phone       String
+
+  status      OrderStatus @default(PENDING_PAYMENT)
+
+  // ── Para (kuruş) ──
+  itemsTotalMinor    BigInt
+  shippingTotalMinor BigInt @default(0)
+  discountMinor      BigInt @default(0)
+  grandTotalMinor    BigInt
+  currency           String @default("TRY")
+
+  // ── Snapshot: adres o anki hâliyle kopyalanır ──
+  shippingAddress Json
+  billingAddress  Json
+
+  /// Stok rezervasyonunun düşme zamanı — ödeme tamamlanmazsa serbest bırakılır.
+  reservationExpiresAt DateTime?
+  paidAt      DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user        User?       @relation(fields: [userId], references: [id])
+  packages    OrderPackage[]
+  items       OrderItem[]
+  events      OrderEvent[]
+  payment     PaymentIntent?
+  returns     ReturnRequest[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([reservationExpiresAt])
+  @@map("order_orders")
+}
+
+/// ÇOK SATICILI SİPARİŞİN KALBİ — her satıcı için ayrı paket.
+/// A satıcısı kargolarken B satıcısı iptal edebilir; Order.status
+/// paketlerin bileşkesinden HESAPLANIR, ayrı kolonda tutulmaz.
+model OrderPackage {
+  id          String        @id @default(uuid(7))
+  orderId     String
+  sellerId    String
+  status      PackageStatus @default(AWAITING_APPROVAL)
+
+  itemsTotalMinor    BigInt
+  shippingMinor      BigInt @default(0)
+  /// Bu pakete düşen indirim payı (allocate ile kuruş kaybı olmadan dağıtılır).
+  discountShareMinor BigInt @default(0)
+
+  carrier     String?
+  trackingNo  String?
+  /// Satıcının kargoya verme son tarihi.
+  slaDeadline DateTime
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  cancelReason String?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller      Seller        @relation(fields: [sellerId], references: [id])
+  items       OrderItem[]
+
+  @@unique([orderId, sellerId])
+  @@index([sellerId, status])
+  @@index([status, slaDeadline])
+  @@map("order_packages")
+}
+
+model OrderItem {
+  id        String @id @default(uuid(7))
+  orderId   String
+  packageId String
+  variantId String
+
+  // ── SNAPSHOT: ürün silinse/değişse bile sipariş bozulmaz ──
+  productId      String
+  productTitle   String
+  brandName      String
+  variantLabel   String   // "Siyah / M"
+  sku            String
+  imageKey       String
+  unitPriceMinor BigInt
+  quantity       Int
+  lineTotalMinor BigInt
+
+  // ── KOMİSYON SNAPSHOT: kural sonradan değişse bile bu sipariş bozulmaz ──
+  commissionRuleVersionId String
+  commissionRateBps       Int
+  commissionAmountMinor   BigInt
+  /// Satıcının bu kalemden hakedişi = lineTotal - komisyon (- kargo payı).
+  sellerNetMinor          BigInt
+
+  createdAt DateTime @default(now())
+
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  package   OrderPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  variant   Variant      @relation(fields: [variantId], references: [id])
+  commissionRuleVersion CommissionRuleVersion @relation(fields: [commissionRuleVersionId], references: [id])
+  returnItems ReturnItem[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([orderId])
+  @@index([packageId])
+  @@map("order_items")
+}
+
+enum ActorType {
+  SYSTEM
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+/// APPEND-ONLY sipariş durum geçmişi. "Bu sipariş neden iptal oldu?"
+/// sorusunun cevabı burada.
+model OrderEvent {
+  id        String    @id @default(uuid(7))
+  orderId   String
+  type      String    // "payment.captured", "package.shipped", "return.approved"
+  actorType ActorType
+  actorId   String?
+  payload   Json
+  createdAt DateTime  @default(now())
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
+}
+
+// ═══════════════════════════════ İADE ═════════════════════════════════════
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  RECEIVED
+  REFUNDED
+  CANCELLED
+}
+
+enum ReturnReason {
+  SIZE_TOO_SMALL
+  SIZE_TOO_LARGE
+  NOT_AS_DESCRIBED
+  DAMAGED
+  WRONG_ITEM
+  CHANGED_MIND
+  QUALITY
+  OTHER
+}
+
+model ReturnRequest {
+  id          String       @id @default(uuid(7))
+  returnNumber String      @unique
+  orderId     String
+  status      ReturnStatus @default(REQUESTED)
+  reason      ReturnReason
+  note        String?
+  /// İade kanıt fotoğrafları — private bucket.
+  photoKeys   String[]
+
+  refundAmountMinor BigInt @default(0)
+  decidedBy   String?
+  decidedAt   DateTime?
+  rejectReason String?
+  refundedAt  DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items       ReturnItem[]
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@map("return_requests")
+}
+
+model ReturnItem {
+  id          String @id @default(uuid(7))
+  returnId    String
+  orderItemId String
+  quantity    Int
+  refundMinor BigInt
+
+  returnRequest ReturnRequest @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  orderItem     OrderItem     @relation(fields: [orderItemId], references: [id])
+
+  @@unique([returnId, orderItemId])
+  @@map("return_items")
+}
+
+// ═══════════════════════════════ ÖDEME ════════════════════════════════════
+
+enum PaymentStatus {
+  CREATED
+  THREEDS_PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model PaymentIntent {
+  id          String        @id @default(uuid(7))
+  orderId     String        @unique
+  provider    String        @default("iyzico")
+  /// Sağlayıcının işlem kimliği.
+  providerRef String?
+  /// Idempotency: retry sırasında AYNI değer gönderilir, çifte tahsilatı engeller.
+  conversationId String     @unique
+
+  status      PaymentStatus @default(CREATED)
+  amountMinor BigInt
+  currency    String        @default("TRY")
+  installment Int           @default(1)
+
+  /// Yalnızca maskeli gösterim — tam kart verisi ASLA saklanmaz (PCI kapsamı dışı).
+  cardMask    String?
+  cardBrand   String?
+  /// Sağlayıcının ürettiği saklı kart tokenı.
+  cardToken   String?
+
+  failureCode    String?
+  failureMessage String?
+  /// Sağlayıcı ham yanıtı — denetim ve mutabakat için.
+  rawResponse    Json?
+
+  authorizedAt DateTime?
+  capturedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  attempts    PaymentAttempt[]
+  refunds     Refund[]
+
+  @@index([status, createdAt])
+  @@index([providerRef])
+  @@map("payment_intents")
+}
+
+model PaymentAttempt {
+  id          String   @id @default(uuid(7))
+  intentId    String
+  attemptNo   Int
+  status      PaymentStatus
+  providerCode String?
+  providerMessage String?
+  /// Kullanıcıya gösterilen Türkçe mesaja çevrilmiş hâli.
+  mappedErrorCode String?
+  latencyMs   Int?
+  createdAt   DateTime @default(now())
+
+  intent      PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  @@unique([intentId, attemptNo])
+  @@map("payment_attempts")
+}
+
+model Refund {
+  id          String   @id @default(uuid(7))
+  intentId    String
+  returnId    String?
+  amountMinor BigInt
+  providerRef String?
+  /// Idempotency anahtarı — retry'da aynı değer gönderilir.
+  refundRef   String   @unique
+  status      String   @default("REQUESTED")
+  failureCode String?
+  createdAt   DateTime @default(now())
+
+  intent      PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  @@index([intentId])
+  @@map("payment_refunds")
+}
+
+// ═══════════════════════════ KOMİSYON & FİNANS ═══════════════════════════
+
+/// Komisyon kuralı — kategori ve/veya satıcı bazlı.
+/// Kuralın kendisi değişmez; her değişiklik yeni bir VERSİYON yaratır.
+model CommissionRule {
+  id         String   @id @default(uuid(7))
+  categoryId String?
+  sellerId   String?
+  label      String
+  createdAt  DateTime @default(now())
+
+  category   Category? @relation(fields: [categoryId], references: [id])
+  seller     Seller?   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  versions   CommissionRuleVersion[]
+
+  /// ⚠️ Benzersizlik Prisma ile ifade EDİLEMEZ.
+  /// Normal bir @@unique([categoryId, sellerId]) burada işe yaramaz: Postgres'te
+  /// NULL'lar unique kısıtta birbirinden farklı sayılır, dolayısıyla aynı
+  /// kategori için birden fazla platform kuralı (sellerId = NULL) eklenebilirdi.
+  /// Bu, komisyon aramasını belirsiz hâle getirir — para hatası.
+  /// Gerçek kısıt migration'da: UNIQUE ... NULLS NOT DISTINCT (PostgreSQL 15+).
+  @@index([categoryId, sellerId])
+  @@map("finance_commission_rules")
+}
+
+/// APPEND-ONLY. Sipariş kalemi buraya referans verir ve oranı snapshot alır;
+/// komisyon ileride değişse bile eski siparişin muhasebesi bozulmaz.
+model CommissionRuleVersion {
+  id            String    @id @default(uuid(7))
+  ruleId        String
+  /// 1250 = %12,50
+  rateBps       Int
+  fixedFeeMinor BigInt    @default(0)
+  validFrom     DateTime
+  /// null = hâlâ geçerli
+  validTo       DateTime?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+
+  rule          CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  orderItems    OrderItem[]
+
+  @@index([ruleId, validFrom])
+  @@map("finance_commission_rule_versions")
+}
+
+enum LedgerType {
+  SALE
+  COMMISSION
+  SHIPPING_SHARE
+  REFUND
+  COMMISSION_REVERSAL
+  SHIPPING_REVERSAL
+  PAYOUT
+  ADJUSTMENT
+}
+
+/// APPEND-ONLY ÇİFT TARAFLI DEFTER.
+/// ⚠️ Satıcı bakiyesi AYRI KOLONDA TUTULMAZ — her zaman
+///    SUM(amount_minor) WHERE seller_id = ? ile hesaplanır.
+///    Ayrı bakiye kolonu er geç tutarsızlaşır.
+model LedgerEntry {
+  id          String     @id @default(uuid(7))
+  sellerId    String
+  type        LedgerType
+  /// + alacak, − borç. Kuruş.
+  amountMinor BigInt
+  currency    String     @default("TRY")
+
+  orderItemId String?
+  payoutId    String?
+  description String
+  /// Hakedişin ödenebilir hâle geldiği tarih (iade penceresi sonrası).
+  availableAt DateTime?
+  createdAt   DateTime   @default(now())
+
+  seller      Seller     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+  payout      PayoutRequest? @relation(fields: [payoutId], references: [id])
+
+  @@index([sellerId, createdAt])
+  @@index([sellerId, availableAt])
+  @@index([orderItemId])
+  @@map("finance_ledger_entries")
+}
+
+enum PayoutStatus {
+  REQUESTED
+  APPROVED
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model PayoutRequest {
+  id          String       @id @default(uuid(7))
+  sellerId    String
+  amountMinor BigInt
+  status      PayoutStatus @default(REQUESTED)
+  /// Talep anındaki IBAN — sonradan değişse bile kayıt bozulmaz (şifreli).
+  ibanEnc     String
+  /// Idempotency anahtarı — sağlayıcıya retry'da aynı değer gider.
+  payoutRef   String       @unique
+
+  approvedBy  String?
+  approvedAt  DateTime?
+  providerRef String?
+  sentAt      DateTime?
+  failureReason String?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  seller      Seller       @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+
+  @@index([sellerId, status])
+  @@index([status, createdAt])
+  @@map("finance_payout_requests")
+}
+
+// ═══════════════════════════════ AI ═══════════════════════════════════════
+
+enum TryOnMode {
+  FAST
+  QUALITY
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  FAILED_PERMANENT
+  CANCELLED
+}
+
+model TryOnJob {
+  id            String    @id @default(uuid(7))
+  userId        String?
+  sessionId     String?
+  userPhotoId   String
+  variantId     String
+  mode          TryOnMode @default(FAST)
+  status        JobStatus @default(QUEUED)
+
+  /// ⚠️ EN BÜYÜK MALİYET KALDIRACI.
+  /// sha256(photoContentHash + variantId + mode + promptVersion)
+  /// Aynı foto + aynı ürün ikinci kez ÜRETİLMEZ, önbellekten döner.
+  cacheKey      String    @unique
+
+  provider      String?
+  providerJobId String?
+  resultKey     String?
+  /// Görsel güven skoru (0-100). Beden güveninden AYRI gösterilir.
+  visualConfidence Int?
+
+  attempts      Int       @default(0)
+  errorCode     String?
+  errorMessage  String?
+
+  /// Gerçek maliyet — sağlayıcının döndürdüğü değerden yazılır.
+  costMicroUsd  BigInt?
+  latencyMs     Int?
+
+  queuedAt      DateTime  @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userPhoto     UserPhoto @relation(fields: [userPhotoId], references: [id], onDelete: Cascade)
+  variant       Variant   @relation(fields: [variantId], references: [id])
+
+  @@index([userId, queuedAt])
+  @@index([status, queuedAt])
+  @@map("ai_tryon_jobs")
+}
+
+enum AiFeature {
+  TRYON
+  STYLIST
+  TAGGING
+  DESCRIPTION
+  EMBEDDING
+  MODERATION
+}
+
+/// Maliyet paneli bunu okur. Her AI çağrısı — başarılı veya başarısız — buraya yazılır.
+/// Başarısız çağrılar da para harcar; loglanmazsa fatura açıklanamaz.
+model AiUsageLog {
+  id           String    @id @default(uuid(7))
+  userId       String?
+  sellerId     String?
+  feature      AiFeature
+  provider     String
+  model        String
+  inputTokens  Int?
+  outputTokens Int?
+  imageCount   Int?
+  costMicroUsd BigInt
+  latencyMs    Int
+  success      Boolean
+  errorCode    String?
+  /// Önbellekten mi döndü — isabet oranı bu alandan hesaplanır.
+  cacheHit     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
+  @@map("ai_usage_logs")
+}
+
+model StylistConversation {
+  id        String   @id @default(uuid(7))
+  userId    String?
+  sessionId String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  StylistMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_stylist_conversations")
+}
+
+model StylistMessage {
+  id             String   @id @default(uuid(7))
+  conversationId String
+  role           String   // "user" | "assistant"
+  content        String
+  /// LLM'in çağırdığı araçlar ve dönen ürünler — "uydurma ürün" denetimi için.
+  toolCalls      Json?
+  /// Bu mesajda önerilen ürün kimlikleri.
+  suggestedProductIds String[]
+  costMicroUsd   BigInt?
+  createdAt      DateTime @default(now())
+
+  conversation   StylistConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_stylist_messages")
+}
+
+// ═══════════════════════════════ ALTYAPI ══════════════════════════════════
+
+/// TRANSACTIONAL OUTBOX.
+/// Domain event'leri sipariş yazımıyla AYNI transaction'da buraya yazılır,
+/// worker sonra kuyruğa taşır. Böylece "sipariş yazıldı ama bildirim gitmedi"
+/// durumu oluşmaz.
+model OutboxEvent {
+  id          String    @id @default(uuid(7))
+  aggregate   String    // "order"
+  aggregateId String
+  type        String    // "order.paid"
+  payload     Json
+  publishedAt DateTime?
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([publishedAt, id])
+  @@index([aggregate, aggregateId])
+  @@map("infra_outbox_events")
+}
+
+/// Aynı isteğin iki kez işlenmesini engeller.
+/// ⚠️ Ödeme, payout ve sipariş oluşturmada ZORUNLU.
+model IdempotencyKey {
+  key         String    @id
+  userId      String?
+  endpoint    String
+  /// İstek gövdesinin özeti — aynı anahtarla FARKLI gövde gelirse çakışma.
+  requestHash String
+  statusCode  Int?
+  response    Json?
+  lockedAt    DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+  @@map("infra_idempotency_keys")
+}
+
+/// Gelen webhook'lar. id = sağlayıcının event kimliği → çift işleme imkânsız.
+model WebhookEvent {
+  id          String    @id
+  provider    String
+  type        String
+  payload     Json
+  signatureOk Boolean
+  processedAt DateTime?
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@index([provider, processedAt])
+  @@map("infra_webhook_events")
+}
+
+/// Hassas işlemlerin denetim izi: komisyon değişikliği, satıcı askıya alma,
+/// kullanıcı fotoğrafına break-glass erişim, payout onayı.
+model AuditLog {
+  id         String    @id @default(uuid(7))
+  actorId    String
+  actorRole  Role
+  action     String    // "commission.rule.updated"
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  /// Break-glass erişimlerde zorunlu gerekçe.
+  reason     String?
+  ipAddress  String
+  createdAt  DateTime  @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("infra_audit_logs")
+}
+
+/// Arama eş anlamlıları — admin yönetir. "sneaker" ↔ "spor ayakkabı"
+model SearchSynonym {
+  id      String   @id @default(uuid(7))
+  term    String
+  synonyms String[]
+  createdAt DateTime @default(now())
+
+  @@unique([term])
+  @@map("search_synonyms")
+}
