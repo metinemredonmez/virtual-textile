@@ -5,13 +5,14 @@ import { PrismaService } from './infra/prisma.service.js';
 import { RedisService } from './infra/redis.service.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { EnvelopeInterceptor } from './common/interceptors/envelope.interceptor.js';
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor.js';
 import { RateLimitGuard } from './common/guards/rate-limit.guard.js';
 import { requestContextMiddleware } from './common/middleware/request-context.middleware.js';
 
 @Module({
-  imports: [InfraModule, AuthModule],
+  imports: [InfraModule, AuthModule, CatalogModule],
   controllers: [HealthController],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: EnvelopeInterceptor },

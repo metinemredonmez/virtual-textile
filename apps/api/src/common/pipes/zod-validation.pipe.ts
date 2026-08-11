@@ -1,5 +1,5 @@
 import { Injectable, type ArgumentMetadata, type PipeTransform } from '@nestjs/common';
-import type { ZodSchema } from 'zod';
+import type { ZodType, ZodTypeDef } from 'zod';
 
 /**
  * Zod ile gövde/sorgu doğrulama.
@@ -7,20 +7,25 @@ import type { ZodSchema } from 'zod';
  * Hata fırlatıldığında GlobalExceptionFilter ZodError'ı yakalayıp alan bazlı
  * VALIDATION_FAILED yanıtına çevirir — burada hata biçimlendirmesi yapılmaz.
  *
+ * Giriş ve çıkış tipleri AYRI parametreleştirilmiştir: `.transform()` veya
+ * `.default()` kullanan şemalarda ikisi farklıdır (ör. sorgu dizesinden gelen
+ * `"12"` → `12`). Tek tiple yazılsaydı bu şemalar tip hatası verirdi.
+ *
  * Kullanım:
  *   @Post()
- *   create(@Body(new ZodValidationPipe(createUserSchema)) dto: CreateUserDto) {}
+ *   create(@Body(zodBody(createUserSchema)) dto: CreateUserInput) {}
  */
 @Injectable()
-export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
-  constructor(private readonly schema: ZodSchema<T>) {}
+export class ZodValidationPipe<Output, Input = unknown> implements PipeTransform<unknown, Output> {
+  constructor(private readonly schema: ZodType<Output, ZodTypeDef, Input>) {}
 
-  transform(value: unknown, _metadata: ArgumentMetadata): T {
+  transform(value: unknown, _metadata: ArgumentMetadata): Output {
     // parse() ZodError fırlatır; filter onu yakalar.
     return this.schema.parse(value);
   }
 }
 
-/** Dekoratör kısayolu: @Body(zodBody(schema)) */
-export const zodBody = <T>(schema: ZodSchema<T>): ZodValidationPipe<T> =>
-  new ZodValidationPipe(schema);
+/** Kısayol: @Body(zodBody(schema)) */
+export const zodBody = <Output, Input>(
+  schema: ZodType<Output, ZodTypeDef, Input>,
+): ZodValidationPipe<Output, Input> => new ZodValidationPipe(schema);
