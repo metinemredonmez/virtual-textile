@@ -113,5 +113,69 @@ module.exports = {
 
       env_production: { NODE_ENV: 'production', WORKER_ROLE: 'media' },
     },
+
+    // ── Web (Next.js) ────────────────────────────────────────────────────
+    {
+      name: 'vt-web',
+      cwd: '/var/www/virtual/apps/web',
+
+      /**
+       * ⚠️ `pnpm start` DEĞİL, Next ikilisi DOĞRUDAN çalıştırılır.
+       *    PM2 `pnpm`i öldürdüğünde altındaki node çocuğu HAYATTA KALIR ve
+       *    portu tutmaya devam eder; bu tam olarak bu projede yaşandı
+       *    (Playwright'ın başlattığı sunucu ölmeyip 3001'i tutunca altı E2E
+       *    testi sahte biçimde kırmızı yandı ve saatler o izde harcandı).
+       *    Sarmalayıcı süreç yoksa sorun da yok.
+       */
+      script: 'node_modules/next/dist/bin/next',
+      args: 'start --port 3000',
+
+      /**
+       * ⚠️ ORTAM BURADA VERİLMEZ — `apps/web/.env.production` ÜZERİNDEN GELİR
+       *    ve o dosya `/etc/virtual-textile/web.env`e SİMGESEL BAĞDIR:
+       *
+       *      ln -sfn /etc/virtual-textile/web.env \
+       *              /var/www/virtual/apps/web/.env.production
+       *
+       *    Sebebi PM2 değil DERLEME: `NEXT_PUBLIC_*` değerleri `next build`
+       *    sırasında pakete GÖMÜLÜR. Ortamı yalnızca çalıştırma anında
+       *    verseydik derleme onları görmez, tarayıcıya boş değer giderdi ve
+       *    hata ancak görseller kırık göründüğünde fark edilirdi. Next
+       *    `.env.production`u HEM derlemede HEM çalıştırmada okur; tek kaynak
+       *    bu yüzden orası.
+       *
+       * ⚠️ `web.env` `api.env`den AYRI ve öyle kalmalı: frontend süreci
+       *    JWT_*, IYZICO_*, FIELD_ENCRYPTION_KEY gibi sırları GÖRMEMELİ.
+       *    Görmediği şeyi paketine gömemez (bkz. apps/web → verify:bundle).
+       *
+       * ⚠️ Bağ kopuksa süreç ÇÖKER (`required()` fırlatır) ve PM2 yeniden
+       *    başlatma döngüsüne girer. Sessiz başarısızlıktan iyidir: eksik
+       *    ortamla ayakta kalan bir web sunucusu, kullanıcıya bozuk sayfa
+       *    gösterirken sağlıklı görünürdü.
+       */
+
+      /**
+       * ⚠️ FORK, cluster DEĞİL. Next kendi sunucusunu yönetir; PM2 cluster
+       *    modunda iki örnek aynı `.next` önbelleğine yazmaya çalışır.
+       *    Ölçeklemek gerekirse örnek sayısı değil, AYRI PORTLAR + nginx
+       *    upstream eklenir.
+       */
+      exec_mode: 'fork',
+      instances: 1,
+
+      kill_timeout: 10000,
+      max_memory_restart: '800M',
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '30s',
+      restart_delay: 2000,
+
+      error_file: '/var/log/virtual-textile/web.error.log',
+      out_file: '/var/log/virtual-textile/web.out.log',
+      merge_logs: true,
+      time: true, // Next pino kullanmıyor; zaman damgasını PM2 basar
+
+      env_production: { NODE_ENV: 'production' },
+    },
   ],
 };

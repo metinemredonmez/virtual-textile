@@ -112,6 +112,23 @@ if [ -n "$(git status --porcelain)" ]; then
   [ "$yanit" = "e" ] || [ "$yanit" = "E" ] || { hata "İptal edildi"; exit 1; }
 fi
 
+# ⚠️ WEB ORTAMI DERLEMEDEN ÖNCE YERİNDE OLMALI.
+#    `NEXT_PUBLIC_*` değerleri `next build` sırasında pakete GÖMÜLÜR. Bağ
+#    kopukken derlersek paket boş değerlerle çıkar, derleme YEŞİL döner ve hata
+#    ancak kullanıcı kırık görsel gördüğünde anlaşılır. Kontrol build'den önce.
+if [ -d "$KOK/apps/web" ]; then
+  if [ ! -e "$KOK/apps/web/.env.production" ]; then
+    hata "apps/web/.env.production yok. Bir kez kurun:"
+    hata "    ln -sfn /etc/virtual-textile/web.env $KOK/apps/web/.env.production"
+    exit 1
+  fi
+  for anahtar in API_URL APP_URL SESSION_SECRET; do
+    grep -q "^$anahtar=" "$KOK/apps/web/.env.production" \
+      || { hata "web ortamında $anahtar eksik"; exit 1; }
+  done
+  bilgi "web ortamı yerinde"
+fi
+
 BOS_MB=$(df -Pm "$KOK" | awk 'NR==2 {print $4}')
 [ "$BOS_MB" -gt 2048 ] || uyari "Disk alanı düşük: ${BOS_MB} MB"
 
@@ -229,7 +246,7 @@ else
     bilgi "$eser ($(du -h "$eser" | cut -f1))"
   done
 
-  # ── Frontend (henüz yok — geldiğinde kendiliğinden devreye girer) ────────
+  # ── Frontend ────────────────────────────────────────────────────────────
   if [ -d apps/web ]; then
     # Next.js için gerçek eser BUILD_ID'dir; `.next/` klasörü başarısız bir
     # derlemeden sonra da yarım hâlde durabilir.
@@ -239,6 +256,18 @@ else
       hata "apps/web derlendi ama .next/BUILD_ID yok — derleme yarım kalmış"
       exit 1
     fi
+
+    # ⚠️ SIR PAKETE GÖMÜLDÜ MÜ — DERLEMENİN YEŞİL DÖNMESİ YETMEZ.
+    #    `@vt/contracts` ve `@vt/config` çift çıktı veriyor (CJS backend, ESM
+    #    tarayıcı) ki `env.ts` ağaç sarsmayla düşsün ve sır ADLARI istemci
+    #    paketine girmesin. Bu yapılandırma bir gün bozulursa derleme yine
+    #    başarılı döner; tek işaret bu kontroldür.
+    if ! pnpm --filter @vt/web run verify:bundle >/dev/null 2>&1; then
+      hata "İstemci paketinde sır adı bulundu — dağıtım durduruldu."
+      hata "  pnpm --filter @vt/web run verify:bundle   (ayrıntı için elle çalıştır)"
+      exit 1
+    fi
+    bilgi "istemci paketi temiz (verify:bundle)"
   else
     bilgi "apps/web yok — frontend adımı atlandı"
   fi
