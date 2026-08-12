@@ -128,17 +128,17 @@ export class PrismaAddressReaderBridge implements AddressReaderPort {
 }
 
 /**
- * ÖDEME SAĞLAYICISI BAĞLANMAMIŞ.
+ * ÖDEME SAĞLAYICISI YAPILANDIRILMAMIŞ — FAIL-CLOSED YER TUTUCU.
  *
- * `apps/api` henüz `@vt/adapters` bağımlılığını taşımıyor (bkz.
- * checkout.ports.ts / NEEDS-DEP). Modülün ayakta durabilmesi için token'a bu
- * yer tutucu bağlı.
+ * ⚠️ Bu GEÇİCİ bir bağımlılık stubu DEĞİLDİR ve silinmemelidir. Gerçek
+ *    sağlayıcı (`IyzicoPaymentProvider`) `index.ts` içinde bağlıdır; buraya
+ *    yalnızca iyzico ANAHTARLARI yokken düşülür (bkz. isPaymentConfigured).
+ *    Yani bu sınıf, anahtarsız bir ortamın sessizce ödeme kabul etmesini
+ *    engelleyen kalıcı güvenliktir.
  *
  * ⚠️ Sessizce "başarılı" DÖNMEZ. Yapılandırılmamış bir ödeme sisteminin
  *    kabul ettiği sipariş, ödenmemiş ama ödenmiş sanılan siparişten çok daha
  *    pahalıya patlar. Her çağrı görünür biçimde hata verir.
- *
- * Entegrasyon: `new IyzicoPaymentProvider({ ...env, circuitBreaker: circuitFor('iyzico') })`
  */
 @Injectable()
 export class UnconfiguredPaymentProvider implements PaymentProviderPort {

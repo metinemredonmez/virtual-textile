@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import sharp from 'sharp';
+import { encode as encodeBlurhash } from 'blurhash';
 import { env, type Env } from '@vt/config';
 import { logProviderWiring, r2StorageFromEnv } from '@vt/adapters';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -9,7 +10,11 @@ import { MeMediaController, SellerMediaController } from './media.controller.js'
 import { MediaService } from './media.service.js';
 import { MediaProductService } from './media-product.service.js';
 import { MEDIA_IMAGE_PROCESSOR, type ImageProcessor } from './image-processor.js';
-import { SharpImageProcessor, type SharpFactory } from './sharp-image-processor.js';
+import {
+  SharpImageProcessor,
+  type BlurhashEncoder,
+  type SharpFactory,
+} from './sharp-image-processor.js';
 import {
   MEDIA_CATALOG,
   MEDIA_CONSENT,
@@ -54,11 +59,16 @@ export function createStorageProvider(config: Env = env()): MediaStoragePort {
  *    kullanılmıyor; testlerin "işleyici yokken ne olur" senaryosunu kurabilmesi
  *    için dışa açık kalıyor.
  *
- * blurhash kodlayıcısı BİLEREK geçilmiyor: ayrı bir bağımlılıktır ve yokluğunda
- * `blurhash()` null döner — yer tutucu bir kolaylıktır, güvenlik gereği değil.
+ * blurhash kodlayıcısı ARTIK GEÇİLİYOR (`blurhash` paketi kuruldu). Yokluğunda
+ * `blurhash()` null dönmeye devam eder — yer tutucu bir kolaylıktır, güvenlik
+ * gereği değil — ama artık `ProductImage.blurhash` gerçek değer alıyor.
+ * Enjeksiyon korunuyor: `SharpImageProcessor` paketi kendisi import etmez, o
+ * yüzden testler kodlayıcı olmadan da (null yolu) kurulabiliyor.
  */
 export function createImageProcessor(): ImageProcessor {
-  return new SharpImageProcessor(sharp as unknown as SharpFactory);
+  return new SharpImageProcessor(sharp as unknown as SharpFactory, {
+    encodeBlurhash: encodeBlurhash as BlurhashEncoder,
+  });
 }
 
 /**

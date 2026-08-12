@@ -1,26 +1,16 @@
-// NEEDS-DEP: @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+// AWS S3 SÜRÜCÜSÜ — SDK'YI BİLEREK `import` ETMEZ.
 //
-// Paket KURULMADI (bu ajan package.json'a dokunmuyor). Bu yüzden SDK doğrudan
-// `import` EDİLMİYOR; kullandığımız yüzey aşağıda yapısal arayüzlerle
-// tanımlanıyor ve `createAwsS3Driver()` çağrısında DIŞARIDAN geçiliyor.
+// SDK kurulu ve bağlı; gerçek `import` `r2.factory.ts` içindedir ve buraya
+// `createAwsS3Driver()` çağrısıyla DIŞARIDAN geçilir. Kullandığımız yüzey
+// aşağıda yapısal arayüzlerle (`AwsS3Sdk`) tanımlanır.
 //
-// Kazanç sadece derlenebilirlik değil: SDK'nın tüm yüzeyi yerine yalnızca
-// kullandığımız 6 komut görünür, dolayısıyla "bir yerde ACL: public-read
-// geçilmiş mi" sorusunun cevabı tek dosyada okunabilir kalıyor.
-//
-// ENTEGRASYON AJANI İÇİN — bağımlılık geldiğinde:
-//
-//   import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand,
-//            DeleteObjectsCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-//   import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-//
-//   const driver = createAwsS3Driver(
-//     { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand,
-//       DeleteObjectsCommand, HeadObjectCommand, getSignedUrl },
-//     config,
-//   );
-//
-// Başka hiçbir dosya değişmez.
+// ⚠️ Bu ayrım bir eksiklik değil, TASARIM ve korunmalıdır: SDK'nın tüm yüzeyi
+//    yerine yalnızca kullandığımız 6 komut görünür. "Bir yerde ACL:
+//    public-read geçilmiş mi" sorusunun cevabı böylece TEK dosyada okunabilir
+//    kalıyor — kullanıcı fotoğraflarının herkese açık kovaya yazılıp
+//    yazılmadığı bu dosya okunarak denetlenebiliyor. SDK doğrudan `import`
+//    edilirse o denetim yüzeyi pakete dağılır ve testte sahte sürücü
+//    geçilemez.
 
 import { appError } from '@vt/contracts';
 import { circuitFor, type CircuitBreaker } from '../../resilience/circuit-breaker.js';

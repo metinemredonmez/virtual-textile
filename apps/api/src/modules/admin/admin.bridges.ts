@@ -1236,20 +1236,22 @@ export class PrismaFraudSignalBridge implements FraudSignalPort {
 
 // ═════════════════ KULLANICI FOTOĞRAFI (BREAK-GLASS) ════════════════════════
 
-// NEEDS-DEP: @vt/adapters
+// TODO(kod-gerekli): İmzalı URL üretimi BAĞLANMADI — `signedUrl` hep null.
 //
-// İmzalı URL üretimi `packages/adapters/src/storage/storage.provider.ts`
-// içindeki StorageProvider'a aittir; `apps/api/package.json` bu paketi henüz
-// bağımlılık olarak içermiyor ve package.json'a dokunmak bu ajanın yetkisi
-// dışında. Bu yüzden köprü ÜST VERİYİ döndürür, `signedUrl` alanı null kalır.
+// ⚠️ ESKİ GEREKÇE ARTIK GEÇERSİZ: bu not "apps/api @vt/adapters'a bağımlı
+//    değil" diyordu. Bağımlılık ARTIK VAR (apps/api/package.json →
+//    "@vt/adapters": "workspace:*") ve aynı modülün kardeşleri onu kullanıyor
+//    (bkz. media/index.ts, checkout/index.ts). Yani bu iş engelli değil,
+//    YALNIZCA YAPILMAMIŞ. Engel sanıldığı için kimse eline almıyordu.
 //
-// Entegrasyon ajanı için:
-//   1. apps/api/package.json → "@vt/adapters": "workspace:*"
-//   2. Bu köprüye StorageProvider enjekte edilip
-//      SIGNED_URL_TTL_SECONDS.userPhoto ömrüyle imzalı URL üretilecek.
+// Kalan iş:
+//   Bu köprüye StorageProvider (ya da MediaService) enjekte edilip
+//   SIGNED_URL_TTL_SECONDS.userPhoto ömrüyle imzalı URL üretilecek.
 //
-// ⚠️ URL üretilemiyor olması denetimi ATLATMAZ: AuditLog ve kullanıcı
-//    bildirimi, erişim TALEBİ anında yazılır (bkz. AdminReportService).
+// ⚠️ Neden acil DEĞİL: URL üretilememesi denetimi ATLATMAZ — AuditLog ve
+//    kullanıcı bildirimi erişim TALEBİ anında yazılır (bkz.
+//    AdminReportService). Yani break-glass akışının güvenlik tarafı çalışıyor,
+//    eksik olan yalnızca yöneticinin fotoğrafı görebilmesi.
 
 @Injectable()
 export class PrismaPhotoAccessBridge implements PhotoAccessPort {
@@ -1287,7 +1289,7 @@ export class PrismaPhotoAccessBridge implements PhotoAccessPort {
       },
     });
 
-    void SIGNED_URL_TTL_SECONDS; // İmzalı URL bağlandığında kullanılacak (yukarıdaki NEEDS-DEP).
+    void SIGNED_URL_TTL_SECONDS; // İmzalı URL bağlandığında kullanılacak (yukarıdaki TODO).
 
     return photos.map((photo) => ({
       id: photo.id,

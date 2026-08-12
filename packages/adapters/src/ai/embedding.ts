@@ -425,11 +425,37 @@ export function falEmbeddingProviderFromEnv(
 }
 
 // TODO(kod-gerekli): EMBEDDING_DIMENSION_MISMATCH katalogda TANIMLI (500,
-// system) ama burada henüz fırlatılmıyor. Boyut uyuşmazlığı hâlâ yalnızca öğe
+// system) ama HİÇBİR YERDEN FIRLATILMIYOR. Boyut uyuşmazlığı hâlâ yalnızca öğe
 // bazında `failed` listesine yazılıyor (bkz. toVectors).
 //
-// Kalan iş bir kod değişimi DEĞİL, yeni bir politika: "kaç öğe/oran bozulursa
-// iş durdurulup alarm üretilir?" Eşik bu dosyada tek başına kararlaştırılamaz
-// çünkü çağıran indeksleme işinin kısmi başarıyı nasıl ele aldığına bağlı.
-// Eşik belirlenene kadar eldeki davranış korunuyor: tek bozuk öğe yüzünden
-// tüm katalog işini düşürmek, sessizce eksik kalmaktan daha yıkıcı olurdu.
+// ⚠️ Bu TODO bilerek DURUYOR: kalan iş bir kod değişimi değil, bir EŞİK
+//    KARARIDIR ve bu dosyada tek başına verilemez — sonucu, çağıran indeksleme
+//    işinin kısmi başarıyı nasıl ele aldığına bağlıdır.
+//
+// VERİLECEK KARAR: "bir grupta kaç öğe / hangi oran bozuk gelirse iş
+// durdurulup alarm üretilir?"
+//
+// SEÇENEKLER ve her birinin SONUCU:
+//
+//   1. Eşik yok — bugünkü davranış. Bozuk öğe `failed`e yazılır, iş devam eder.
+//      Sonuç: sağlayıcı modeli sessizce değiştirip TÜM vektörleri yanlış
+//      boyutta döndürdüğünde bile iş "başarılı" biter; arama indeksi kimseye
+//      hata göstermeden boşalır. Bugün bu riski kabul ediyoruz.
+//
+//   2. Oransal eşik (ör. grubun %50'sinden fazlası uyuşmazsa fırlat).
+//      Sonuç: tek tük bozuk varyant işi düşürmez, ama toplu bir model/boyut
+//      değişimi anında alarm üretir. Tek bozuk öğe yüzünden tüm katalog
+//      indekslemesini düşürmemiş oluruz — aradığımız denge büyük olasılıkla
+//      burada.
+//
+//   3. Sıfır tolerans (tek uyuşmazlıkta fırlat).
+//      Sonuç: en gürültülü seçenek. Sağlayıcının tek bir bozuk yanıtı bütün
+//      katalog işini düşürür; bu, eksik indekslenmiş birkaç üründen çok daha
+//      yıkıcıdır. ÖNERİLMEZ.
+//
+// Eşik belirlenene kadar (1) korunuyor.
+//
+// ⚠️ KATALOG NOTU: karar (1)'de kalırsa EMBEDDING_DIMENSION_MISMATCH ÖLÜ bir
+//    katalog kaydıdır ve `error-catalog.ts`ten SİLİNMELİDİR — fırlatılmayan
+//    kod katalogda durmamalı. Kayıt şimdilik bırakıldı çünkü silmek, kararın
+//    "asla fırlatma" olduğunu varsaymak olurdu.

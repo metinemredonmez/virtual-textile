@@ -1,4 +1,3 @@
-// NEEDS-DEP: @vt/adapters
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -177,18 +176,29 @@ export class PrismaBodyProfileAdapter implements BodyProfilePort {
 }
 
 /**
- * ⚠️ GEÇİCİ KOPYA — `@vt/adapters` henüz `apps/api` bağımlılığı değil.
+ * GEÇİCİ KOPYA — `packages/adapters/src/ai/cache-key.ts` → `tryOnCacheKey`.
  *
- * Bu sınıf `packages/adapters/src/ai/cache-key.ts` içindeki `tryOnCacheKey`'in
- * BİREBİR aynısını üretmek zorundadır: worker o dosyayı kullanıyor ve iki taraf
- * ayrışırsa önbellek her seferinde ıskalar — sessizce, hata vermeden, her
- * istekte yeniden para harcayarak.
+ * Bu sınıf `tryOnCacheKey`'in BİREBİR aynısını üretmek zorundadır: worker o
+ * dosyayı kullanıyor ve iki taraf ayrışırsa önbellek her seferinde ıskalar —
+ * sessizce, hata vermeden, her istekte yeniden para harcayarak. Bu yüzden
+ * `cache-key.test.ts` üretilen özeti sabit vektörlere karşı kilitler.
  *
- * Bu yüzden `cache-key.test.ts` üretilen özeti sabit vektörlere karşı
- * kilitler; buradaki veya oradaki bir değişiklik testi kırar.
+ * ⚠️ TODO(kod-gerekli): KOPYANIN GEREKÇESİ ARTIK GEÇERSİZ.
+ *    Bu not "@vt/adapters henüz apps/api bağımlılığı değil" diyordu; ARTIK
+ *    bağımlılık VAR ve `ai/index.ts` zaten ondan import ediyor. Kopyayı ayakta
+ *    tutan teknik engel kalmadı — iki yerde yaşayan bir özet fonksiyonu
+ *    zamanla ayrışır ve ayrıştığında kimse fark etmez (yalnızca fatura artar).
  *
- * @vt/adapters bağımlılığı eklendiğinde: bu sınıf silinir, `index.ts` içindeki
- * provider doğrudan `tryOnCacheKey`'e bağlanır.
+ *    Kalan iş SİLME DEĞİL, DEVİR: `index.ts` içindeki TRYON_CACHE_KEY_PORT
+ *    doğrudan `tryOnCacheKey`'e bağlanır, sonra bu sınıf silinir.
+ *
+ *    ⚠️ Bu ajan uygulamadı çünkü `cache-key.test.ts` VAROLUŞ SEBEBİ bu
+ *       kopyayı @vt/adapters'a karşı doğrulamaktır: sınıf silinince o iki test
+ *       anlamsız kalır ve test sayısı düşer (kural 5). Testlerin ne olacağı —
+ *       silinmeleri mi, `tryOnCacheKey`i doğrudan kilitlemeye çevrilmeleri mi —
+ *       bu modülün sahibinin kararıdır. Doğru olan ikincisidir: özet
+ *       değerlerinin sabitliği worker ile paylaşılan bir sözleşmedir ve
+ *       kopyadan bağımsız olarak korunmalıdır.
  */
 @Injectable()
 export class LocalTryOnCacheKeyAdapter implements TryOnCacheKeyPort {

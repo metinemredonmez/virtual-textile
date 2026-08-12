@@ -5,6 +5,7 @@ import { PrismaService } from './infra/prisma.service.js';
 import { RedisService } from './infra/redis.service.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { NotificationModule } from './modules/notification/index.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { CartModule } from './modules/cart/index.js';
 import { CheckoutModule } from './modules/checkout/index.js';
@@ -22,6 +23,13 @@ import { requestContextMiddleware } from './common/middleware/request-context.mi
 @Module({
   imports: [
     InfraModule,
+    // ⚠️ Bildirim modülü kökte AÇIKÇA bağlanır, yalnızca AuthModule üzerinden
+    //    dolaylı olarak değil. Gerekçe: sağlayıcı fabrikaları açılışta bir kez
+    //    çalışıp "hangi yetenek gerçek, hangisi yer tutucu" raporunu basıyor.
+    //    Yalnızca AuthModule'e bağlı kalsaydı, o modül bir gün OTP'yi başka
+    //    yoldan gönderdiğinde bildirim bağlaması sessizce kaybolurdu. Nest
+    //    modülleri tekildir — iki yerde import edilmesi çift örnek üretmez.
+    NotificationModule,
     AuthModule,
     CatalogModule,
     // ── Ticaret ──

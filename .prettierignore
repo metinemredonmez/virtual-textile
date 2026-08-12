@@ -1,0 +1,15 @@
+# ⚠️ pnpm-lock.yaml — ÜRETİLEN dosya, prettier'ın biçimi ile pnpm'in yazdığı
+#    biçim uyuşmuyor. Listede olmasaydı: `pnpm format` kilidi yeniden yazar,
+#    sonraki `pnpm install` kendi biçimine döndürür ve CI'ın "Biçim" işi her
+#    bağımlılık değişikliğinde kırmızı yanardı. (Bu dosya eklenmeden önce main
+#    dalında zaten kırmızıydı.)
+pnpm-lock.yaml
+
+# Derleme çıktıları ve üretilen istemciler — kaynak değil.
+**/dist/**
+**/generated/**
+**/.next/**
+**/.turbo/**
+**/coverage/**
+**/playwright-report/**
+**/test-results/**

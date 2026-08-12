@@ -101,13 +101,17 @@ export { AdminReportController } from './admin-report.controller.js';
  *       ADMIN_PAYOUT_PORT     → FinanceService
  *       ADMIN_AI_USAGE_READER → AiService
  *       ADMIN_FRAUD_PORT      → FraudService (kalıcı uyarı tablosu geldiğinde)
- *       ADMIN_PHOTO_ACCESS    → MediaService (imzalı URL için; bkz. NEEDS-DEP)
+ *       ADMIN_PHOTO_ACCESS    → MediaService (imzalı URL için)
  *
  *     Yönetim servislerinde tek satır değişmesi gerekmez.
  *
- * ⚠️ `PrismaPhotoAccessBridge` şu an imzalı URL üretemiyor (NEEDS-DEP:
- *    @vt/adapters). Bu, break-glass denetimini ATLATMAZ — denetim kaydı ve
- *    kullanıcı bildirimi erişim TALEBİ anında yazılır.
+ * ⚠️ `PrismaPhotoAccessBridge` şu an imzalı URL üretemiyor: `signedUrl` null
+ *    döner. Bu bir bağımlılık engeli DEĞİLDİR (@vt/adapters artık apps/api
+ *    bağımlılığıdır) — iş yalnızca yapılmamıştır; bkz. admin.bridges.ts
+ *    içindeki TODO(kod-gerekli).
+ *
+ *    Eksiklik break-glass denetimini ATLATMAZ — denetim kaydı ve kullanıcı
+ *    bildirimi erişim TALEBİ anında yazılır.
  */
 @Module({
   controllers: [AdminController, AdminFinanceController, AdminReportController],

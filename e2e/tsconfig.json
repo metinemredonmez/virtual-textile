@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // ⚠️ NodeNext + ESM: import yollarında `.js` uzantısı ZORUNLU. Playwright
+    //    kaynak dosyaları kendi çevirdiği için uzantısız yazmak çalışır
+    //    görünür ama `tsc --noEmit` ile tip kontrolü yapılamaz hâle gelir.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "incremental": false,
+    "types": ["node"],
+    // Testler dekoratör kullanmıyor; kapalı olması derlemeyi hızlandırır.
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

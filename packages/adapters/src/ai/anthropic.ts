@@ -29,17 +29,24 @@ import type {
 /**
  * ANTHROPIC (Claude) ADAPTER'I — stil danışmanı
  *
- * ⚠️ SDK YERİNE DÜZ FETCH — gerekçe:
- *  1. Bu paketin çalışma zamanı bağımlılığı yok ve YENİ PAKET KURULAMIYOR
- *     (bkz. proje kuralları). SDK eklemek `package.json` değişikliği gerektirir.
- *  2. SDK kendi retry (varsayılan 2) ve timeout (10 dk) mantığını getirir.
+ * ⚠️ SDK YERİNE DÜZ FETCH — KARAR VERİLDİ, beklemede değil.
+ *
+ * Eski gerekçelerden biri ("yeni paket kurulamıyor") artık geçerli değil:
+ * `@anthropic-ai/sdk` kurulabilir. Buna rağmen KURULMADI, çünkü asıl gerekçe
+ * kurulabilirlik değildi:
+ *
+ *  1. SDK kendi retry (varsayılan 2) ve timeout (10 dk) mantığını getirir.
  *     Bizim `resilient()` katmanımızla üst üste binerse gerçek deneme sayısı
- *     çarpılır: 3 × 2 = 6 faturalanabilir çağrı. AI'da bu doğrudan paradır.
- *  3. İhtiyacımız olan yüzey dar: tek uç nokta, araç çağrısı ve SSE. SSE
+ *     çarpılır: 3 × 2 = 6 faturalanabilir çağrı. AI'da bu doğrudan paradır ve
+ *     `ai-budget` sayaçları bu çarpanı görmez — bütçe sessizce aşılır.
+ *  2. İhtiyacımız olan yüzey dar: tek uç nokta, araç çağrısı ve SSE. SSE
  *     ayrıştırma ~40 satır ve `http.ts` içinde zaten paylaşılıyor.
- * Bağımlılık kurulabilir hâle gelirse geçiş noktası burasıdır:
- * // NEEDS-DEP: @anthropic-ai/sdk  (isteğe bağlı — bu adapter'ın iç uygulaması
- * // değişir, `LlmProvider` arayüzü ve çağıran kod DEĞİŞMEZ.)
+ *  3. `tryon.error-map.test.ts` sağlayıcı yanıtlarını HTTP seviyesinde sahte
+ *     `fetch` ile kuruyor. SDK'ya geçiş bu testlerin kurulum yüzeyini de
+ *     değiştirir; kazanç yokken üstlenilecek bir risk değil.
+ *
+ * Geçilmek istenirse: `resilient()` sarmalayıcısı ile SDK'nın `maxRetries: 0`
+ * ayarı BİRLİKTE verilmeli. `LlmProvider` arayüzü ve çağıran kod değişmez.
  */
 
 const ANTHROPIC_BASE_URL = 'https://api.anthropic.com';

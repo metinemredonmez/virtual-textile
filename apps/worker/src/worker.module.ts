@@ -5,7 +5,14 @@ import type Redis from 'ioredis';
 import type { Logger } from 'pino';
 import { env } from '@vt/config';
 import { PrismaClient } from '@vt/db';
-import type { StorageProvider, TryOnProvider } from '@vt/adapters';
+import {
+  NotificationSender,
+  RedisNotificationDedupeStore,
+  createEmailProvider,
+  createSmsProvider,
+  type StorageProvider,
+  type TryOnProvider,
+} from '@vt/adapters';
 import { InfraModule, RedisConnection, STORAGE, WORKER_LOGGER } from './infra.module.js';
 import { SchedulerService } from './scheduler.service.js';
 import {
@@ -18,6 +25,11 @@ import {
 } from './jobs/tryon.processor.js';
 import { SharpWatermarker, type WatermarkSharpFactory } from './jobs/tryon.watermarker.js';
 import { TryOnQueueConsumer, createTryOnProviders } from './jobs/tryon.registration.js';
+import {
+  NotificationQueueConsumer,
+  PrismaNotificationContacts,
+  type NotificationContacts,
+} from './jobs/notification.processor.js';
 
 /**
  * ⚠️ Rol okuması FABRİKA İÇİNDE yapılır, modül tanımında değil.
@@ -60,6 +72,53 @@ import { TryOnQueueConsumer, createTryOnProviders } from './jobs/tryon.registrat
       inject: [STORAGE, RedisConnection],
       useFactory: (storage: StorageProvider, redis: Redis): ProviderInputUrlIssuer =>
         new SignedUrlIssuer(storage, redis),
+    },
+
+    /**
+     * BİLDİRİM GÖNDERİCİSİ
+     *
+     * ⚠️ API ile AYNI sınıflar ve AYNI Redis anahtar ön eki kullanılır. İki
+     *    taraf ayrı bir tekilleştirme deposu kullansaydı, API'nin gönderdiği
+     *    mesajı kuyruk "görülmemiş" sayıp ikinci kez gönderebilirdi.
+     *
+     * ⚠️ Sağlayıcı seçimi ORTAMDAN okunur: anahtar yoksa geliştirmede konsol,
+     *    ÜRETİMDE fail-closed (bkz. notification.factory.ts).
+     */
+    {
+      provide: NotificationSender,
+      inject: [RedisConnection, WORKER_LOGGER],
+      useFactory: (redis: Redis, logger: Logger): NotificationSender => {
+        const config = env();
+        return new NotificationSender({
+          sms: createSmsProvider(config),
+          email: createEmailProvider(config),
+          dedupe: new RedisNotificationDedupeStore(redis),
+          logger,
+        });
+      },
+    },
+
+    {
+      provide: PrismaNotificationContacts,
+      inject: [PrismaClient],
+      useFactory: (prisma: PrismaClient): NotificationContacts =>
+        new PrismaNotificationContacts(prisma),
+    },
+
+    {
+      provide: NotificationQueueConsumer,
+      inject: [RedisConnection, NotificationSender, PrismaNotificationContacts, WORKER_LOGGER],
+      useFactory: (
+        connection: Redis,
+        sender: NotificationSender,
+        contacts: NotificationContacts,
+        logger: Logger,
+      ): NotificationQueueConsumer =>
+        new NotificationQueueConsumer(
+          env().WORKER_ROLE,
+          { connection, sender, contacts, logger },
+          logger,
+        ),
     },
 
     {

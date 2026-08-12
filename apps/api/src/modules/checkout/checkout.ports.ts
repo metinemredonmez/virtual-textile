@@ -1,15 +1,14 @@
-// NEEDS-DEP: @vt/adapters
+// ÖDEME SAĞLAYICISI PORT OLARAK TANIMLANIR.
 //
-// `apps/api/package.json` içinde `@vt/adapters` bağımlılığı YOK ve package.json
-// dosyalarına dokunmak bu ajanın yetkisi dışında. Bu yüzden ödeme sağlayıcısı
-// bu modülde bir PORT olarak tanımlanıyor: tipler `packages/adapters/src/payment/
-// payment.provider.ts` ile YAPISAL olarak birebir aynıdır, dolayısıyla
-// `IyzicoPaymentProvider` hiçbir uyarlama katmanı olmadan bu porta bağlanabilir.
+// Buradaki tipler `packages/adapters/src/payment/payment.provider.ts` ile
+// YAPISAL olarak birebir aynıdır; `IyzicoPaymentProvider` hiçbir uyarlama
+// katmanı olmadan bu porta bağlanır — bağlama `index.ts` içinde yapılır.
 //
-// Entegrasyon ajanı yapması gereken:
-//   1. apps/api/package.json'a "@vt/adapters": "workspace:*" ekle
-//   2. CheckoutModule'e PAYMENT_PROVIDER token'ını IyzicoPaymentProvider ile bağla
-// Bağımlılık eklendiğinde bu dosyadaki tipler `import type` ile değiştirilebilir.
+// ⚠️ Port bir EKSİKLİK değil, TASARIM: checkout servisi somut sağlayıcıyı
+//    değil bu arayüzü görür. Testte sahte sağlayıcı geçilebilmesi ve anahtar
+//    yokken fail-closed yer tutucuya düşülebilmesi (bkz. index.ts) buna bağlı.
+//    Bu yüzden tipleri `import type` ile @vt/adapters'a bağlamak bir
+//    sadeleştirme DEĞİL, bu ayrımın kaybı olur.
 
 import type { Prisma } from '@vt/db';
 

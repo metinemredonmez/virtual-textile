@@ -17,7 +17,7 @@ module.exports = {
   apps: [
     {
       name: 'vt-api',
-      cwd: '/srv/virtual-textile/apps/api',
+      cwd: '/var/www/virtual/apps/api',
       script: 'dist/main.js',
 
       // Cluster: CPU başına bir süreç. API stateless olduğu için güvenli —
@@ -60,7 +60,7 @@ module.exports = {
 
     {
       name: 'vt-worker-core',
-      cwd: '/srv/virtual-textile/apps/worker',
+      cwd: '/var/www/virtual/apps/worker',
       script: 'dist/main.js',
 
       // ⚠️ TEK ÖRNEK. Zamanlanmış işler yalnızca bu rolde çalışır; ikinci bir
@@ -86,7 +86,7 @@ module.exports = {
 
     {
       name: 'vt-worker-media',
-      cwd: '/srv/virtual-textile/apps/worker',
+      cwd: '/var/www/virtual/apps/worker',
       script: 'dist/main.js',
 
       // Bu rol cron ÇALIŞTIRMAZ, yalnızca kuyruk tüketir — bu yüzden birden

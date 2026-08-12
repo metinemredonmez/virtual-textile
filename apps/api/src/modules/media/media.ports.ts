@@ -1,15 +1,13 @@
-// NEEDS-DEP: @vt/adapters
+// DEPOLAMA SAĞLAYICISI PORT OLARAK TANIMLANIR.
 //
-// `apps/api/package.json` içinde `@vt/adapters` bağımlılığı YOK ve package.json
-// dosyalarına dokunmak bu ajanın yetkisi dışında. Bu yüzden depolama sağlayıcısı
-// burada bir PORT olarak tanımlanıyor: tipler `packages/adapters/src/storage/
-// storage.provider.ts` ile YAPISAL olarak birebir aynıdır, dolayısıyla
-// `R2StorageProvider` hiçbir uyarlama katmanı olmadan bu porta bağlanabilir.
+// Buradaki tipler `packages/adapters/src/storage/storage.provider.ts` ile
+// YAPISAL olarak birebir aynıdır; `R2StorageProvider` hiçbir uyarlama katmanı
+// olmadan bu porta bağlanır — bağlama `index.ts` içinde yapılır.
 //
-// ENTEGRASYON AJANI İÇİN:
-//   1. apps/api/package.json → "@vt/adapters": "workspace:*"
-//   2. MediaModule'de MEDIA_STORAGE token'ını R2StorageProvider'a bağla
-//      (bkz. media/index.ts). Bu dosyadaki tipler `import type` ile değişir.
+// ⚠️ Port bir EKSİKLİK değil, TASARIM: medya servisi somut sağlayıcıyı değil
+//    bu arayüzü görür. R2 anahtarı yokken `UnconfiguredStorageProvider`a
+//    fail-closed düşebilmemiz (bkz. index.ts) buna bağlıdır. Tipleri
+//    `import type` ile @vt/adapters'a bağlamak bu ayrımı kaybettirir.
 
 import type { ImageAngle, PhotoPurpose } from '@vt/db';
 import type { TryOnReadinessIssue } from './tryon-readiness.js';

@@ -3,6 +3,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
+import { NotificationModule } from '../notification/index.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { TokenService } from './token.service.js';
@@ -12,7 +13,9 @@ import { JwtAuthGuard, RolesGuard, SellerScopeGuard } from './auth.guard.js';
 
 @Module({
   // Gizli anahtar imzalama anında env()'den okunur; burada sabitlenmez.
-  imports: [JwtModule.register({})],
+  // ⚠️ NotificationModule: OTP kodunu kullanıcıya ULAŞTIRAN bağ. Bu import
+  //    olmadan `/auth/otp/send` kodu üretir ama kimseye göndermez.
+  imports: [JwtModule.register({}), NotificationModule],
   controllers: [AuthController],
   providers: [
     PasswordService,

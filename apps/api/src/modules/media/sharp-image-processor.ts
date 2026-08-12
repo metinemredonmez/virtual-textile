@@ -1,18 +1,19 @@
-// NEEDS-DEP: sharp
+// GÖRÜNTÜ KÜTÜPHANESİ SARMALAYICISI.
 //
-// Paket KURULMADI (bu ajan package.json'a dokunmuyor). `sharp` doğrudan
-// `import` EDİLMİYOR; kullandığımız yüzey aşağıda yapısal arayüzle tanımlanıp
-// yapıcıya DIŞARIDAN geçiliyor.
+// `sharp` kurulu ve bağlı (bkz. media/index.ts → createImageProcessor), ama bu
+// dosyada doğrudan `import` EDİLMEZ: kullandığımız yüzey aşağıda yapısal
+// arayüzle tanımlanıp yapıcıya DIŞARIDAN geçilir.
 //
-// ⚠️ BU DOSYA, GÖRÜNTÜ KÜTÜPHANESİNE DOKUNAN TEK YERDİR. Bağımlılık
-//    geldiğinde değişecek olan da yalnızca burasıdır:
+// ⚠️ Bu enjeksiyon bir eksiklik değil, TASARIM: `sharp` gerçek bir kodek
+//    yığınıdır ve testte onunla çalışmak yavaş+kırılgandır. Yüzey dar
+//    tutulduğu için testler sahte bir fabrika geçebiliyor; EXIF/GPS temizliği
+//    gibi güvenlik davranışları da bu sayede kütüphane olmadan doğrulanabiliyor.
+//    Gerçek `sharp`ı `import` eden TEK yer media/index.ts'tir.
 //
-//      import sharp from 'sharp';
-//      const processor = new SharpImageProcessor(sharp as unknown as SharpFactory);
-//
-// İsteğe bağlı ikinci bağımlılık:
-// NEEDS-DEP: blurhash   → new SharpImageProcessor(sharp, { encodeBlurhash })
-//    Yoksa `blurhash()` null döner; yükleme akışı etkilenmez.
+// İkinci bağımlılık `blurhash` KURULDU ve media/index.ts tarafından geçiliyor.
+// Aynı gerekçeyle burada da `import` edilmez: `encodeBlurhash` seçeneği
+// verilmezse `blurhash()` null döner ve yükleme akışı etkilenmez — testler bu
+// yolu paketi kurmak zorunda kalmadan kurabiliyor.
 
 import { Injectable } from '@nestjs/common';
 import { MEDIA } from '@vt/config';

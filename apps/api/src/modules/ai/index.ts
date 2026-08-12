@@ -129,8 +129,10 @@ class SignedUrlTryOnStorageAdapter implements TryOnStoragePort {
       },
     },
     {
-      // ⚠️ @vt/adapters `apps/api` bağımlılığı olduğunda burası doğrudan
-      //    `tryOnCacheKey`'e bağlanmalı (bkz. ai.gateway.ts NEEDS-DEP notu).
+      // ⚠️ Burası doğrudan `tryOnCacheKey`'e bağlanmalı: @vt/adapters ARTIK
+      //    bağımlılık (bu dosya zaten ondan import ediyor), yani kopyayı
+      //    ayakta tutan engel kalktı. Devrin neden bu ajanda yapılmadığı ve
+      //    testlerin ne olacağı için bkz. ai.gateway.ts → TODO(kod-gerekli).
       provide: TRYON_CACHE_KEY_PORT,
       useFactory: () => new LocalTryOnCacheKeyAdapter(),
     },

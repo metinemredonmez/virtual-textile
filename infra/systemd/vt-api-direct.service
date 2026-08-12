@@ -15,7 +15,7 @@ Requires=postgresql.service redis-server.service
 Type=simple
 User=vt
 Group=vt
-WorkingDirectory=/srv/virtual-textile/apps/api
+WorkingDirectory=/var/www/virtual/apps/api
 
 EnvironmentFile=/etc/virtual-textile/api.env
 Environment=NODE_ENV=production

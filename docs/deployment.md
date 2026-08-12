@@ -54,7 +54,7 @@ pnpm infra:reset && pnpm db:migrate && pnpm db:seed
 ### 2.1 Sistem kullanıcısı ve dizinler
 
 ```bash
-sudo useradd --system --create-home --home-dir /srv/virtual-textile --shell /bin/bash vt
+sudo useradd --system --create-home --home-dir /var/www/virtual --shell /bin/bash vt
 sudo mkdir -p /var/log/virtual-textile /etc/virtual-textile
 sudo chown vt:vt /var/log/virtual-textile
 sudo chmod 750 /etc/virtual-textile
@@ -139,7 +139,7 @@ Bir tanesi eksikse **süreç başlamaz** ve hangi değişkenin neden gerektiğin
 
 ```bash
 sudo -u vt -i
-cd /srv/virtual-textile
+cd /var/www/virtual
 
 git fetch --all && git checkout main && git pull
 pnpm install --frozen-lockfile --prod=false

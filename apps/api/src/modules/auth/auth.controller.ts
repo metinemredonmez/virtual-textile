@@ -15,6 +15,7 @@ import {
 import { env } from '@vt/config';
 import { zodBody } from '../../common/pipes/zod-validation.pipe.js';
 import { RateLimit } from '../../common/guards/rate-limit.guard.js';
+import { NotificationService } from '../notification/notification.service.js';
 import { CurrentUser, Public } from './auth.guard.js';
 import { AuthService, type RequestMeta } from './auth.service.js';
 import type { IssuedTokens } from './token.service.js';
@@ -23,7 +24,10 @@ const REFRESH_COOKIE = 'vt_rt';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly notifications: NotificationService,
+  ) {}
 
   private meta(request: Request): RequestMeta {
     return {
@@ -153,13 +157,14 @@ export class AuthController {
     };
     const { code, ttlSeconds } = await this.auth.sendOtp(phone, purpose);
 
-    // TODO(bildirim): SMS adapter'ı yazıldığında kod buradan gönderilecek.
-    // Geliştirmede kodu görebilmek için geçici çıktı; üretimde ASLA basılmaz.
-    if (env().NODE_ENV === 'development') {
-      // `no-console` kuralı `warn`/`error`a zaten izin veriyor — disable
-      // yorumu gereksizdi ve "kullanılmayan direktif" uyarısı üretiyordu.
-      console.warn(`[GELİŞTİRME] ${phone} için OTP: ${code}`);
-    }
+    // ⚠️ Kod BURADAN ÇIKMAZ: `notifications.sendOtp` onu yalnızca şablona
+    //    doldurur, hiçbir log satırına yazmaz. Geliştirmede kodu görmek için
+    //    konsola basan sağlayıcı devreye girer (ConsoleSmsProvider) — karar
+    //    burada değil, sağlayıcı fabrikasındadır.
+    //
+    // ⚠️ Hata YUTULMAZ. Gönderim başarısızsa 202 dönüp "kod yolda" demek,
+    //    kullanıcıyı gelmeyecek bir SMS için bekletmektir.
+    await this.notifications.sendOtp({ phone, purpose, code, ttlSeconds });
 
     // ⚠️ Yanıt, numaranın kayıtlı olup olmadığını sızdırmaz.
     return { ttlSeconds };

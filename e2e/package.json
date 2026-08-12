@@ -1,0 +1,21 @@
+{
+  "name": "@vt/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "//": "⚠️ Koşum betiği BİLEREK `test` DEĞİL. CI `pnpm test` → `turbo run test` çalıştırıyor; bu paket `test` sağlasaydı Playwright ayakta bir API olmadan CI'da koşar ve her derlemede kırmızı yanardı. E2E ayrı bir işte, servisler kaldırıldıktan sonra çağrılmalı.",
+    "e2e": "playwright test",
+    "e2e:sunucuyu-sen-baslat": "E2E_SUNUCUYU_BEN_BASLAT=1 playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --config ../eslint.config.mjs",
+    "clean": "rm -rf .turbo playwright-report test-results *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^20.17.10",
+    "@vt/db": "workspace:*",
+    "ioredis": "^5.4.2",
+    "typescript": "^5.7.2"
+  }
+}

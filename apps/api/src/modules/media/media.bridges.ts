@@ -164,17 +164,17 @@ export class PrismaMediaConsentBridge implements MediaConsentPort {
 }
 
 /**
- * DEPOLAMA BAĞLANMAMIŞ.
+ * DEPOLAMA YAPILANDIRILMAMIŞ — FAIL-CLOSED YER TUTUCU.
  *
- * `apps/api` henüz `@vt/adapters` bağımlılığını taşımıyor (bkz. media.ports.ts
- * / NEEDS-DEP). Modülün ayakta durabilmesi için token'a bu yer tutucu bağlı.
+ * ⚠️ Bu GEÇİCİ bir bağımlılık stubu DEĞİLDİR ve silinmemelidir. Gerçek depo
+ *    `index.ts` içinde `r2StorageFromEnv()` ile bağlanır; buraya yalnızca R2
+ *    ANAHTARLARI yokken düşülür. Yani bu sınıf, anahtarsız bir ortamın
+ *    sessizce "yükledim/sildim" demesini engelleyen kalıcı güvenliktir.
  *
  * ⚠️ Sessizce başarılı DÖNMEZ. Yapılandırılmamış bir deponun "yüklendi" demesi,
  *    ürün görselinin kaybolmasından ve — çok daha kötüsü — kullanıcının
  *    "fotoğrafım silindi" sanmasından sorumlu olurdu. Her çağrı görünür
  *    biçimde hata verir.
- *
- * Entegrasyon: `new R2StorageProvider(r2ConfigFromEnv(env()), createAwsS3Driver(sdk, config))`
  */
 @Injectable()
 export class UnconfiguredStorageProvider implements MediaStoragePort {

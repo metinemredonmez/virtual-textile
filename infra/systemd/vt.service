@@ -23,13 +23,13 @@ Requires=postgresql.service redis-server.service
 Type=simple
 User=vt
 Group=vt
-WorkingDirectory=/srv/virtual-textile
+WorkingDirectory=/var/www/virtual
 
 # Ortam değişkenleri dosyadan okunur; repoda değil, sunucuda durur.
 # chmod 600, sahibi vt. Bkz. docs/secrets.md
 EnvironmentFile=/etc/virtual-textile/api.env
 Environment=NODE_ENV=production
-Environment=PM2_HOME=/srv/virtual-textile/.pm2
+Environment=PM2_HOME=/var/www/virtual/.pm2
 
 ExecStart=/usr/local/bin/pm2-runtime start ecosystem.config.cjs --env production
 ExecReload=/usr/local/bin/pm2 reload all
@@ -50,7 +50,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 # Yazılabilir tek yerler
-ReadWritePaths=/srv/virtual-textile/.pm2 /var/log/virtual-textile
+ReadWritePaths=/var/www/virtual/.pm2 /var/log/virtual-textile
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
