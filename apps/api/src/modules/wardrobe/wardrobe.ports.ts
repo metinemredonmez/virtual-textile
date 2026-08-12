@@ -17,6 +17,19 @@
  *
  * Diğer modüllerin verisine (katalog, stil danışmanı, sanal deneme) doğrudan
  * Prisma ile erişilmez; her biri burada dar bir arayüzün arkasındadır.
+ *
+ * ⚠️ MODÜL SINIRI — SATIN ALMA TARAFI BURADA DEĞİL.
+ *    `apps/api` gardırobun MANUEL tarafını sahiplenir: listeleme, fotoğraf
+ *    yükleme, silme, kombin önerisi. PURCHASE tarafı (`package.delivered`
+ *    olayından otomatik ekleme) tamamen `apps/worker` içindedir
+ *    (`jobs/wardrobe.auto-add.job.ts`). Bu porttaki
+ *    `insertPurchasedIgnoringDuplicates` metodu ve `WardrobeService`in
+ *    `applyDelivered` metodu SİLİNDİ — modül yazılmış, derlenmiş ve test
+ *    edilmiş hâlde durmasına rağmen ÜRETİMDE HİÇ ÇAĞRILMIYORDU. Yerine bir
+ *    "devir" metodu bırakılmadı: public duran bir yazma metodu er geç bir HTTP
+ *    ucundan çağrılır ve aynı yan etkinin İKİ farklı idempotentlik hikâyesi
+ *    olur. Şimdi `createMany({ skipDuplicates: true })` deponun TAMAMINDA tek
+ *    bir yerdedir.
  */
 
 import type { TryOnCategory } from '@vt/db';
@@ -59,22 +72,24 @@ export interface WardrobeItem {
   photoKey: string | null;
   /** PURCHASE kayıtlarında ürünün public görsel anahtarı. */
   productImageKey: string | null;
-  /** ⚠️ Mükerrer eklemeyi engelleyen doğal anahtar. Bkz. `wardrobe.auto-add.ts`. */
+  /**
+   * ⚠️ Mükerrer otomatik eklemeyi engelleyen doğal anahtar. Kuralın kendisi
+   *    `@vt/contracts` → `wardrobe/auto-add.ts` içindedir; buraya YALNIZCA
+   *    okuma tarafında görünür.
+   */
   sourceOrderItemId: string | null;
   createdAt: Date;
 }
 
-/** Otomatik eklemede kullanılan yazma komutu. */
-export interface WardrobeAutoAddCommand {
-  userId: string;
-  variantId: string;
-  category: TryOnCategory;
-  color: string;
-  label: string;
-  productImageKey: string;
-  /** ⚠️ UNIQUE(userId, sourceOrderItemId) — idempotentliğin dayanağı. */
-  sourceOrderItemId: string;
-}
+/**
+ * Otomatik eklemede kullanılan yazma komutu — TANIMI `@vt/contracts` İÇİNDE.
+ *
+ * ⚠️ Burada yeniden dışa açılıyor çünkü bu modülün düzeni "tipler tek yerden,
+ *    port dosyasından okunur"dur. Tanımın kendisi contracts'ta durmak
+ *    ZORUNDADIR: `planAutoAdd`in dönüş tipidir ve `@vt/contracts` `apps/api`den
+ *    import edemez. Komutu ÜRETEN de TÜKETEN de artık `apps/worker` içindedir.
+ */
+export type { WardrobeAutoAddCommand } from '@vt/contracts';
 
 /** Kullanıcının kendi eklediği parça. */
 export interface WardrobeManualAddCommand {
@@ -92,18 +107,14 @@ export interface WardrobeRepositoryPort {
   findOwned(userId: string, itemId: string): Promise<WardrobeItem | null>;
 
   /**
-   * Satın alınan kalemleri ekler.
-   *
-   * ⚠️ SÖZLEŞME: aynı `sourceOrderItemId` ile ikinci çağrı YENİ SATIR AÇMAZ.
-   *    Uygulaması `ON CONFLICT DO NOTHING` (UNIQUE(userId, sourceOrderItemId))
-   *    olmalıdır — "önce var mı diye bak, yoksa yaz" YAZILMAMALIDIR: iki
-   *    worker aynı olayı aynı anda işlerse ikisi de "yok" görür ve iki satır
-   *    yazılır. Tekilliği veritabanı garanti etmelidir, uygulama değil.
-   *
-   * Dönen sayı GERÇEKTEN eklenen satır sayısıdır (çakışanlar sayılmaz).
+   * ⚠️ SATIN ALMA YAZIMI BU PORTTA YOKTUR — bilerek.
+   *    `insertPurchasedIgnoringDuplicates` buradaydı; tek çağıranı
+   *    `WardrobeService.applyDelivered` idi, onun da tek çağıranı testlerdi.
+   *    İkisi de silindi. PURCHASE satırını yazan tek kod
+   *    `apps/worker/src/jobs/wardrobe.auto-add.job.ts` içindedir ve olayla
+   *    tetiklenir. Burada bir "devir" metodu bırakmak, aynı yan etkiye ikinci
+   *    bir kapı —ve ikinci bir idempotentlik hikâyesi— açardı.
    */
-  insertPurchasedIgnoringDuplicates(commands: readonly WardrobeAutoAddCommand[]): Promise<number>;
-
   insertManual(command: WardrobeManualAddCommand): Promise<WardrobeItem>;
 
   /** Sahiplik koşulu SORGUYA girer; "önce oku sonra kontrol et" değil. */

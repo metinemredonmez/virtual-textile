@@ -26,10 +26,21 @@ import {
 import { SharpWatermarker, type WatermarkSharpFactory } from './jobs/tryon.watermarker.js';
 import { TryOnQueueConsumer, createTryOnProviders } from './jobs/tryon.registration.js';
 import {
+  NotificationEventHandler,
   NotificationQueueConsumer,
   PrismaNotificationContacts,
   type NotificationContacts,
 } from './jobs/notification.processor.js';
+import {
+  DomainEventQueueConsumer,
+  type DomainEventHandler,
+  type DomainEventHandlerName,
+} from './jobs/domain-event.fanout.js';
+import {
+  PrismaWardrobeAutoAddStore,
+  WardrobeAutoAddHandler,
+  type WardrobeAutoAddStore,
+} from './jobs/wardrobe.auto-add.job.js';
 
 /**
  * ⚠️ Rol okuması FABRİKA İÇİNDE yapılır, modül tanımında değil.
@@ -107,16 +118,74 @@ import {
 
     {
       provide: NotificationQueueConsumer,
-      inject: [RedisConnection, NotificationSender, PrismaNotificationContacts, WORKER_LOGGER],
+      inject: [RedisConnection, NotificationSender, WORKER_LOGGER],
       useFactory: (
         connection: Redis,
         sender: NotificationSender,
-        contacts: NotificationContacts,
         logger: Logger,
       ): NotificationQueueConsumer =>
-        new NotificationQueueConsumer(
+        new NotificationQueueConsumer(env().WORKER_ROLE, { connection, sender, logger }, logger),
+    },
+
+    // ── QUEUE.DOMAIN_EVENT: tek Worker, iki işleyici ──────────────────────
+
+    {
+      provide: NotificationEventHandler,
+      inject: [RedisConnection, PrismaNotificationContacts, WORKER_LOGGER],
+      useFactory: (
+        connection: Redis,
+        contacts: NotificationContacts,
+        logger: Logger,
+      ): NotificationEventHandler => new NotificationEventHandler(connection, contacts, logger),
+    },
+
+    {
+      provide: PrismaWardrobeAutoAddStore,
+      inject: [PrismaClient],
+      useFactory: (prisma: PrismaClient): WardrobeAutoAddStore =>
+        new PrismaWardrobeAutoAddStore(prisma),
+    },
+
+    {
+      provide: WardrobeAutoAddHandler,
+      inject: [PrismaWardrobeAutoAddStore, WORKER_LOGGER],
+      useFactory: (store: WardrobeAutoAddStore, logger: Logger): WardrobeAutoAddHandler =>
+        new WardrobeAutoAddHandler(store, logger),
+    },
+
+    {
+      provide: DomainEventQueueConsumer,
+      inject: [RedisConnection, NotificationEventHandler, WardrobeAutoAddHandler, WORKER_LOGGER],
+      useFactory: (
+        connection: Redis,
+        notification: NotificationEventHandler,
+        wardrobe: WardrobeAutoAddHandler,
+        logger: Logger,
+      ): DomainEventQueueConsumer =>
+        new DomainEventQueueConsumer(
           env().WORKER_ROLE,
-          { connection, sender, contacts, logger },
+          {
+            connection,
+            /**
+             * ⚠️ İŞLEYİCİ KAYDI — DERLEME ZAMANI KİLİDİ.
+             *    `satisfies Record<DomainEventHandlerName, DomainEventHandler>`
+             *    sayesinde bir işleyici bu nesneden düşerse hata TEST DEĞİL
+             *    DERLEME hatasıdır: "Property 'wardrobe' is missing".
+             *
+             *    Bu projede iki kez, "yazılmış ama kabloya girmemiş" kod
+             *    yüzünden bir özellik üretimde ölü kaldı ve 1000'den fazla test
+             *    yeşil olduğu hâlde kimse fark etmedi. Düz bir dizi kullansaydık
+             *    aynı boşluk burada da açık kalırdı.
+             *
+             *    ⚠️ Kaydın DOLU olması yetmez, ARKASINDA GERÇEK NESNE olmalı:
+             *    onu `worker.module.test.ts` ölçer (SIZE_LEARNING_PORT dersi).
+             */
+            handlers: { notification, wardrobe } as const satisfies Record<
+              DomainEventHandlerName,
+              DomainEventHandler
+            >,
+            logger,
+          },
           logger,
         ),
     },

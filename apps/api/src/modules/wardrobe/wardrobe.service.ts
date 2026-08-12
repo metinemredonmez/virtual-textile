@@ -12,6 +12,13 @@
  *      imzalı URL ile okunur; kalıcı adres HİÇBİR yanıtta dönmez.
  *   3. SINIR    — kombin ve deneme mantığı burada YAZILMAZ, ilgili modüllerin
  *      servisleri çağrılır.
+ *
+ * ⚠️ SATIN ALINAN ÜRÜNÜN OTOMATİK EKLENMESİ BU SERVİSTE DEĞİLDİR.
+ *    `applyDelivered()` buradaydı ve YALNIZCA TESTLERDEN çağrılıyordu: modül
+ *    yazılmış, derlenmiş, test edilmişti ama üretimde ölüydü. Metot silindi;
+ *    yerine bir "devir" bırakılmadı. PURCHASE tarafının tek sahibi
+ *    `apps/worker/src/jobs/wardrobe.auto-add.job.ts`tir ve `package.delivered`
+ *    olayıyla tetiklenir. Bu servis gardırobun MANUEL tarafını sahiplenir.
  */
 
 import { Inject, Injectable } from '@nestjs/common';
@@ -21,7 +28,6 @@ import { SIGNED_URL_TTL_SECONDS } from '@vt/config';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import type { Logger } from '../../common/logger.js';
 import { wardrobeKeys } from './wardrobe.keys.js';
-import { planAutoAdd, type DeliveredItemSnapshot } from './wardrobe.auto-add.js';
 import {
   WARDROBE_PHOTO_STORAGE,
   WARDROBE_REPOSITORY,
@@ -256,38 +262,6 @@ export class WardrobeService {
     }
 
     return this.tryOn.prepareOutfit({ userId, variantIds });
-  }
-
-  // ── Otomatik ekleme (olay tüketicisi çağırır) ────────────────────────────
-
-  /**
-   * `package.delivered` olayının gardırop tarafı.
-   *
-   * ⚠️ Bu metot bir HTTP ucundan çağrılmaz; olay tüketicisi çağırır.
-   *    Tekillik veritabanındadır (bkz. `planAutoAdd` başlığı) — bu metot aynı
-   *    girdiyle iki kez çağrıldığında ikinci çağrı 0 ekler.
-   */
-  async applyDelivered(input: {
-    userId: string;
-    items: readonly DeliveredItemSnapshot[];
-  }): Promise<{ added: number; skipped: number }> {
-    const plan = planAutoAdd(input);
-
-    if (plan.commands.length === 0) {
-      return { added: 0, skipped: plan.skipped.length };
-    }
-
-    const added = await this.repository.insertPurchasedIgnoringDuplicates(plan.commands);
-
-    // ⚠️ added < commands.length NORMALDİR: fark, veritabanının yuttuğu
-    //    mükerrer kayıtlardır. Hata olarak loglanmaz, yoksa her tekrar
-    //    teslimat olayı sahte alarm üretir.
-    this.logger.info(
-      { userId: input.userId, planned: plan.commands.length, added, skipped: plan.skipped.length },
-      'Teslim edilen parçalar gardıroba işlendi',
-    );
-
-    return { added, skipped: plan.skipped.length };
   }
 
   // ── Görünüm ──────────────────────────────────────────────────────────────

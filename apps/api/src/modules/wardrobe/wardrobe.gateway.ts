@@ -17,7 +17,6 @@ import type { StylistService } from '../stylist/index.js';
 import type { MultiTryOnService } from '../ai/index.js';
 import { isWardrobeKey } from './wardrobe.keys.js';
 import type {
-  WardrobeAutoAddCommand,
   WardrobeItem,
   WardrobeManualAddCommand,
   WardrobeOutfitSuggestion,
@@ -102,43 +101,14 @@ export class PrismaWardrobeRepository implements WardrobeRepositoryPort {
   }
 
   /**
-   * ⚠️ `skipDuplicates: true` → PostgreSQL'de `ON CONFLICT DO NOTHING`.
-   *
-   *    Port sözleşmesinin talep ettiği tam davranış budur: ekleme öncesi HİÇBİR
-   *    OKUMA YAPILMAZ. "Önce var mı diye bak, yoksa yaz" yazılsaydı aynı olayı
-   *    aynı anda işleyen iki tüketici de "yok" cevabı alır ve iki satır yazardı;
-   *    tekilliği yalnızca UNIQUE(userId, sourceOrderItemId) indeksi kurabilir.
-   *
-   *    Dönen `count` GERÇEKTEN eklenen satır sayısıdır — çakışanlar sayılmaz,
-   *    yani `added < commands.length` bir hata değil, mükerrer teslimat
-   *    olayının yutulduğunun kanıtıdır.
+   * ⚠️ PURCHASE YAZIMI BU ADAPTÖRDE YOKTUR.
+   *    `insertPurchasedIgnoringDuplicates` buradaydı; port ve servis metoduyla
+   *    birlikte silindi. `createMany({ skipDuplicates: true })` —yani
+   *    PostgreSQL'deki `ON CONFLICT DO NOTHING`— artık deponun TAMAMINDA tek
+   *    bir yerdedir: `apps/worker/src/jobs/wardrobe.auto-add.job.ts`.
+   *    İki kopya bırakılsaydı, birinin idempotentlik davranışı diğerinden
+   *    haberi olmadan değişebilirdi.
    */
-  async insertPurchasedIgnoringDuplicates(
-    commands: readonly WardrobeAutoAddCommand[],
-  ): Promise<number> {
-    if (commands.length === 0) return 0;
-
-    const result = await this.prisma.digitalWardrobeItem.createMany({
-      data: commands.map((command) => ({
-        userId: command.userId,
-        source: 'PURCHASE' as const,
-        variantId: command.variantId,
-        category: command.category,
-        color: command.color,
-        label: command.label,
-        // ⚠️ PURCHASE kaydında `photoKey` YAZILMAZ: satın alınan ürünün görseli
-        //    satıcının public pazarlama materyalidir, kullanıcının özel
-        //    fotoğrafı değil. İkisi ayrı kolonda durur ki bir sorgu onları aynı
-        //    yoldan servis edemesin.
-        productImageKey: command.productImageKey,
-        sourceOrderItemId: command.sourceOrderItemId,
-      })),
-      skipDuplicates: true,
-    });
-
-    return result.count;
-  }
-
   async insertManual(command: WardrobeManualAddCommand): Promise<WardrobeItem> {
     const row = await this.prisma.digitalWardrobeItem.create({
       data: {

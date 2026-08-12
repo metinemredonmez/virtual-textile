@@ -102,13 +102,13 @@ export {
 export { WardrobeService } from './wardrobe.service.js';
 export type { WardrobeItemView, WardrobeUploadTicket } from './wardrobe.service.js';
 export { WardrobeController } from './wardrobe.controller.js';
-export {
-  isWardrobeTrigger,
-  planAutoAdd,
-  readDeliveredPayload,
-  WARDROBE_TRIGGER_EVENT,
-} from './wardrobe.auto-add.js';
-export type { AutoAddPlan, DeliveredItemSnapshot, SkipReason } from './wardrobe.auto-add.js';
+/**
+ * ⚠️ SAF ÇEKİRDEK BURADAN DIŞA AÇILMAZ. `planAutoAdd`, `isWardrobeTrigger`,
+ *    `readDeliveredPayload` ve tipleri `@vt/contracts` → `wardrobe/auto-add.ts`
+ *    içindedir; tek tüketicisi `apps/worker`dır ve worker `apps/api`den import
+ *    EDEMEZ. Buradan da re-export edilseydi iki içe aktarma yolu doğar, biri
+ *    diğerinden habersiz değişirdi.
+ */
 export {
   isOwnWardrobeKey,
   isWardrobeKey,

@@ -154,6 +154,26 @@ export const imageAngleSchema = z.enum(['FRONT', 'BACK', 'SIDE', 'DETAIL', 'MODE
 export const tryOnModeSchema = z.enum(['FAST', 'QUALITY']);
 export const photoPurposeSchema = z.enum(['ONE_TIME', 'SAVED_PROFILE']);
 
+/**
+ * Sanal deneme kategorisi — Prisma `TryOnCategory` enum'ının aynası.
+ *
+ * ⚠️ Aynanın TEK yeri burasıdır. `wardrobe.schema.ts` ve `admin.schema.ts`
+ *    kendi listelerini YAZMAZ, bunu içe aktarır. Aynı dört dize daha önce
+ *    dört ayrı dosyada elle yazılıydı ve hiçbiri diğerini haberdar etmiyordu.
+ *
+ * ⚠️ `z.enum` seçildi çünkü çalışma zamanı listesi ile TypeScript tipi AYNI
+ *    ifadeden türer. Elle yazılmış `type` + ayrı `const LIST` çifti kendi
+ *    içinde sapabilirdi: biri güncellenip diğeri unutulunca derleme hiçbir şey
+ *    söylemezdi.
+ *
+ * ⚠️ Prisma enum'ıyla sapma yorumla değil, DERLEMEYLE yakalanır ve iddia yük
+ *    taşıyan kodun üzerindedir: `apps/worker/src/jobs/wardrobe.auto-add.job.ts`
+ *    → `TRYON_CATEGORY` (`as const satisfies Record<PrismaTryOnCategory,
+ *    TryOnCategory>`, okuma yolunda KULLANILIR).
+ */
+export const tryOnCategorySchema = z.enum(['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR']);
+export type TryOnCategory = z.infer<typeof tryOnCategorySchema>;
+
 export const consentTypeSchema = z.enum([
   'PHOTO_PROCESSING',
   'CROSS_BORDER_TRANSFER',

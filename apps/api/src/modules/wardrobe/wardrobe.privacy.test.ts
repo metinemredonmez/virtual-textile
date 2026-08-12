@@ -82,7 +82,6 @@ function makeHarness(repositoryOverrides: Partial<WardrobeRepositoryPort> = {}):
   const repository: WardrobeRepositoryPort = {
     listByUser: vi.fn().mockResolvedValue([]),
     findOwned: vi.fn().mockResolvedValue(null),
-    insertPurchasedIgnoringDuplicates: vi.fn().mockResolvedValue(0),
     insertManual: vi.fn(async (command) =>
       manualItem({ photoKey: command.photoKey, color: command.color, label: command.label }),
     ),

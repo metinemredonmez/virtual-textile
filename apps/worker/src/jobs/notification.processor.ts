@@ -13,6 +13,12 @@ import {
   type DomainEventJobData,
   type NotificationJobData,
 } from '../queues.js';
+/**
+ * ⚠️ YALNIZCA TİP. Çalışma zamanında bir bağ oluşmaz; `domain-event.fanout.ts`
+ *    de buradan yalnızca `WorkerRole` tipini alır, yani iki dosya arasında
+ *    çevrim DOĞMAZ.
+ */
+import type { DomainEventHandler } from './domain-event.fanout.js';
 
 /**
  * BİLDİRİM İŞLEYİCİSİ
@@ -444,38 +450,50 @@ export class NotificationProcessor {
   }
 }
 
-// ── QUEUE.DOMAIN_EVENT → bildirim köprüsü ─────────────────────────────────
+// ── Domain olayı → bildirim işleyicisi ────────────────────────────────────
 
 /**
- * OUTBOX OLAYLARINI BİLDİRİME ÇEVİREN KÖPRÜ
+ * OUTBOX OLAYLARINI BİLDİRİME ÇEVİREN İŞLEYİCİ
  *
- * ⚠️⚠️ BU KUYRUĞUN TEK TÜKETİCİSİ BUDUR. BullMQ'da bir iş yalnızca BİR
- *      tüketiciye gider; `QUEUE.DOMAIN_EVENT` için ikinci bir `Worker` açılırsa
- *      olaylar iki tüketici arasında RASTGELE bölünür ve bildirimlerin yarısı
- *      sessizce kaybolur. Yeni yan etkiler (arama indeksi, muhasebe, webhook)
- *      ayrı bir tüketici olarak DEĞİL, bu köprünün yanına bir işleyici olarak
- *      eklenmelidir.
+ * ⚠️ BU SINIF ARTIK `Worker` AÇMAZ. Eskiden `DomainEventNotificationBridge`
+ *    adıyla `QUEUE.DOMAIN_EVENT`in tek tüketicisiydi. Kuyruğa ikinci bir yan
+ *    etki (gardıroba otomatik ekleme) gerektiğinde iki seçenek vardı: ikinci
+ *    bir `Worker` açmak —BullMQ olayları rastgele böler, bildirimlerin yarısı
+ *    sessizce kaybolurdu— ya da tek `Worker`ı ortak bir dağıtıcıya devretmek.
+ *    İkincisi seçildi: `DomainEventFanout` (domain-event.fanout.ts).
  *
- * ⚠️ Olayın kendisi bildirim işine çevrilirken YENİ bir kuyruk kaydı yazılır;
- *    iş kimliği `messageId`dir. Aynı olay iki kez dağıtılırsa BullMQ ikinci
- *    eklemeyi yok sayar — tekilleştirmenin ilk katmanı budur, ikincisi
- *    gönderim anındaki Redis kaydıdır.
+ *    `notificationsForEvent()` ve `process()` gövdesi DEĞİŞMEDİ; değişen tek
+ *    şey Worker sahipliğidir.
+ *
+ * ⚠️ Olay bildirim işine çevrilirken YENİ bir kuyruk kaydı yazılır; iş kimliği
+ *    `messageId`den türer. Aynı olay iki kez dağıtılırsa BullMQ ikinci eklemeyi
+ *    yok sayar — tekilleştirmenin ilk katmanı budur, ikincisi gönderim
+ *    anındaki Redis kaydıdır. Bu yüzden fanout'un işi yeniden denemesi güvenli.
  */
 /**
  * Bu yaştan eski domain olayı bildirime ÇEVRİLMEZ.
  *
  * 24 saat: bir günden eski "siparişiniz alındı" mesajı kullanıcıya bilgi
  * vermez, kafa karıştırır. Sınır aynı zamanda ilk açılıştaki birikmiş kuyruk
- * patlamasına karşı sigortadır (bkz. onModuleInit).
+ * patlamasına karşı sigortadır: `QUEUE.DOMAIN_EVENT`in uzun süre HİÇ tüketicisi
+ * yoktu, outbox dağıtıcısı ise olayları kuyruğa yazıp `publishedAt`
+ * işaretliyordu. Kapı olmasaydı ilk açılış, birikmiş her sipariş için geçmişteki
+ * her müşteriye aynı anda SMS gönderirdi — gerçek para harcayarak.
+ *
+ * ⚠️ Bu sınır BİLDİRİME AİTTİR, kuyruğa değil. Bu yüzden `Worker` geri
+ *    çağrımından çıkarılıp işleyicinin bir özelliği hâline getirildi; gardırop
+ *    işleyicisi bilinçli olarak `null` verir (bkz. wardrobe.auto-add.job.ts).
  */
 export const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000;
 
-export class DomainEventNotificationBridge {
-  private worker?: Worker<DomainEventJobData>;
+export class NotificationEventHandler implements DomainEventHandler {
+  /** ⚠️ Bkz. yukarısı: kapı bildirime aittir, kuyruğa değil. */
+  readonly maxEventAgeMs = MAX_EVENT_AGE_MS;
+
   private readonly queue: Queue<NotificationJobData>;
 
   constructor(
-    private readonly connection: Redis,
+    connection: Redis,
     private readonly contacts: NotificationContacts,
     private readonly logger: Logger,
   ) {
@@ -485,42 +503,7 @@ export class DomainEventNotificationBridge {
     });
   }
 
-  onModuleInit(): void {
-    this.worker = new Worker<DomainEventJobData>(
-      QUEUE.DOMAIN_EVENT,
-      async (job: Job<DomainEventJobData>) => {
-        // ⚠️ BAYAT OLAY KAPISI. `QUEUE.DOMAIN_EVENT`in bu köprüden önce HİÇBİR
-        //    tüketicisi yoktu: outbox dağıtıcısı olayları aylardır kuyruğa
-        //    yazıp `publishedAt` işaretliyor, işler ise Redis'te bekliyordu.
-        //    Kapı olmasaydı bu köprünün ilk açılışı, birikmiş her sipariş için
-        //    "siparişiniz alındı" SMS'i gönderirdi — geçmişteki her müşteriye,
-        //    aynı anda, gerçek para harcayarak.
-        //
-        //    Kapı kalıcı olarak da doğrudur: bir gün gecikmiş "kargoya
-        //    verildi" bildirimi bilgilendirmez, yanıltır.
-        const age = Date.now() - job.timestamp;
-        if (age > MAX_EVENT_AGE_MS) {
-          this.logger.warn(
-            { outboxEventId: job.data.outboxEventId, type: job.data.type, ageMs: age },
-            'Bayat domain olayı — bildirim üretilmedi',
-          );
-          return { enqueued: 0 };
-        }
-        return this.process(job.data);
-      },
-      { connection: this.connection, concurrency: CONCURRENCY[QUEUE.DOMAIN_EVENT] },
-    );
-
-    this.worker.on('failed', (job, error) => {
-      this.logger.error(
-        { outboxEventId: job?.data.outboxEventId, type: job?.data.type, err: error },
-        'Domain olayı bildirime çevrilemedi',
-      );
-    });
-  }
-
   async onModuleDestroy(): Promise<void> {
-    await this.worker?.close();
     await this.queue.close();
   }
 
@@ -566,39 +549,37 @@ export function consumesNotificationQueue(role: WorkerRole): boolean {
 export interface NotificationConsumerDeps {
   connection: Redis;
   sender: NotificationSender;
-  contacts: NotificationContacts;
   logger: Logger;
 }
 
 /**
  * Rol kapısı — `TryOnQueueConsumer` ile aynı kalıp ve aynı gerekçe: işleyiciler
  * rol mantığı bilmez, nesneler bu rolde HİÇ YARATILMAZ.
+ *
+ * ⚠️ Yalnızca `QUEUE.NOTIFICATION` bu tüketicinindir. `QUEUE.DOMAIN_EVENT`
+ *    artık `DomainEventQueueConsumer`ın (domain-event.fanout.ts) — kuyruk
+ *    başına TEK tüketici, tüketici başına TEK rol kapısı.
  */
 export class NotificationQueueConsumer {
   private readonly processor: NotificationProcessor | null;
-  private readonly bridge: DomainEventNotificationBridge | null;
 
   constructor(
     private readonly role: WorkerRole,
     deps: NotificationConsumerDeps,
     private readonly logger: Logger,
   ) {
-    const active = consumesNotificationQueue(role);
-    this.processor = active
+    this.processor = consumesNotificationQueue(role)
       ? new NotificationProcessor(deps.connection, deps.sender, deps.logger)
-      : null;
-    this.bridge = active
-      ? new DomainEventNotificationBridge(deps.connection, deps.contacts, deps.logger)
       : null;
   }
 
-  /** Bu proses kuyrukları tüketiyor mu? Sağlık raporu ve testler için. */
+  /** Bu proses kuyruğu tüketiyor mu? Sağlık raporu ve testler için. */
   get active(): boolean {
     return this.processor !== null;
   }
 
   onModuleInit(): void {
-    if (!this.processor || !this.bridge) {
+    if (!this.processor) {
       this.logger.info(
         { role: this.role, queue: QUEUE.NOTIFICATION },
         'Bildirim kuyruğu bu rolde tüketilmiyor',
@@ -607,15 +588,13 @@ export class NotificationQueueConsumer {
     }
 
     this.processor.onModuleInit();
-    this.bridge.onModuleInit();
     this.logger.info(
-      { role: this.role, queues: [QUEUE.NOTIFICATION, QUEUE.DOMAIN_EVENT] },
-      'Bildirim kuyrukları tüketiliyor',
+      { role: this.role, queue: QUEUE.NOTIFICATION },
+      'Bildirim kuyruğu tüketiliyor',
     );
   }
 
   async onModuleDestroy(): Promise<void> {
     await this.processor?.onModuleDestroy();
-    await this.bridge?.onModuleDestroy();
   }
 }

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Money, appError } from '@vt/contracts';
+import { Money, appError, type PackageDeliveredPayload } from '@vt/contracts';
 import { ORDER } from '@vt/config';
 import { serializeBigInts } from '@vt/db';
 import type { ActorType, OrderStatus, PackageStatus, Prisma, ReturnStatus } from '@vt/db';
@@ -851,9 +851,24 @@ export class OrderService {
 
       await this.recordEvent(tx, {
         orderId: pkg.orderId,
+        // ⚠️ Olay tipi ŞABLONDAN üretilir; derleme onu ASLA göremez. Yani
+        //    `package.delivered` adının doğruluğu yalnızca testle korunabilir
+        //    (bkz. order.service.delivered.test.ts) — ve o adı bekleyen bir
+        //    tüketici var: gardıroba otomatik ekleme.
         type: `package.${target.toLowerCase()}`,
         actorType: actor.type,
         actorId: actor.id ?? null,
+        /**
+         * ⚠️ ÜRETİCİ–TÜKETİCİ SÖZLEŞMESİ. `satisfies` burada süs değil: kuyruk
+         *    yükü (`DomainEventJobData.payload`) `unknown` tipindedir, yani bir
+         *    alan adı değiştiğinde tüketici derlemede HİÇBİR ŞEY görmez ve arıza
+         *    ancak üretimde ortaya çıkar. Bu iddia sayesinde `packageId` yeniden
+         *    adlandırılırsa İKİ TARAF BİRDEN kırılır
+         *    (bkz. @vt/contracts → wardrobe/auto-add.ts).
+         *
+         *    Yük şekli tüm `package.*` geçişleri için ORTAKTIR; tipli tüketicisi
+         *    olan tek geçiş bugün 'DELIVERED'dır.
+         */
         payload: {
           packageId,
           sellerId: pkg.sellerId,
@@ -861,7 +876,7 @@ export class OrderService {
           to: target,
           carrier: patch.carrier ?? null,
           trackingNo: patch.trackingNo ?? null,
-        },
+        } satisfies PackageDeliveredPayload,
       });
 
       return { orderStatus, packageStatus: target };

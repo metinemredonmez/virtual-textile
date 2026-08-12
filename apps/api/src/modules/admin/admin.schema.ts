@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod';
-import { idSchema, minorAmountSchema, slugSchema } from '@vt/contracts';
+import { idSchema, minorAmountSchema, slugSchema, tryOnCategorySchema } from '@vt/contracts';
 import { FINANCE } from '@vt/config';
 
 // ── Ortak parçalar ────────────────────────────────────────────────────────
@@ -75,7 +75,13 @@ export type ModerationQuery = z.infer<typeof moderationQuerySchema>;
 
 // ── Kategori ──────────────────────────────────────────────────────────────
 
-export const tryOnCategorySchema = z.enum(['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR']);
+/**
+ * ⚠️ Ayna `@vt/contracts` içindedir, burada YENİDEN YAZILMAZ. Bu dosyadaki
+ *    kopya ile `wardrobe.schema.ts`teki kopya birbirinden habersizdi: admin
+ *    kategoriye yeni bir try-on değeri açsaydı gardırop şeması onu reddederdi.
+ *    İsim korunuyor ki bu modülün uçları değişmesin.
+ */
+export { tryOnCategorySchema };
 
 export const categoryCreateSchema = z.object({
   parentId: idSchema.nullable().optional(),

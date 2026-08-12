@@ -13,9 +13,18 @@
  */
 
 import { z } from 'zod';
+import { tryOnCategorySchema } from '@vt/contracts';
 
-/** Şemadaki `TryOnCategory` enum'ı ile birebir. */
-export const wardrobeCategorySchema = z.enum(['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR']);
+/**
+ * ⚠️ AYNA BURADA YAZILMAZ, İÇE AKTARILIR. Dört dize daha önce bu dosyada ELLE
+ *    yazılıydı; aynısı `admin.schema.ts`, `packages/config/src/constants.ts` ve
+ *    `packages/adapters/src/ai/tryon.provider.ts` içinde de vardı — dört ayrı
+ *    kopya, hiçbiri diğerini haberdar etmiyor. Tek kaynak `@vt/contracts`
+ *    (`tryOnCategorySchema`); Prisma enum'ıyla sapma ise yük taşıyan kodda,
+ *    `apps/worker/.../wardrobe.auto-add.job.ts` içindeki `TRYON_CATEGORY`
+ *    kilidiyle DERLEME ZAMANINDA yakalanır.
+ */
+export const wardrobeCategorySchema = tryOnCategorySchema;
 
 /** Yalnızca fotoğraf formatları — SVG kabul edilmez (içinde script taşır). */
 export const wardrobePhotoContentTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
