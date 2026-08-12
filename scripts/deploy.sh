@@ -60,6 +60,25 @@ ONCEKI_COMMIT=""
 #    KOMŞU PROJENİN panelini servis etti — kimse hata görmedi, sayfa 200 döndü.
 WEB_PORT="${VT_WEB_PORT:-3020}"
 
+# ⚠️ KABUKTAN MİRAS ALINMAMASI GEREKEN DEĞİŞKENLER.
+#
+#    Next.js `.env.production` dosyasını var olan `process.env` ÜZERİNE YAZMAZ —
+#    bu belgelenmiş ve bilinçli bir davranıştır. Dolayısıyla kabukta kirli bir
+#    değer varsa uygulamanın kendi yapılandırması SESSİZCE ezilir.
+#
+#    ⚠️ BU GERÇEKTEN OLDU VE SİTEYİ KIRDI: `api.env` içinde API'nin kendi
+#       `APP_URL`i var (`:3000` ekli). Bir yerde kabuğa export edilmiş, PM2 onu
+#       miras almış ve `vt-web` süreci `APP_URL=http://91.99.183.64:3000`
+#       görmüş. CSRF denetimi tarayıcının `Origin: http://91.99.183.64`
+#       başlığını bununla karşılaştırıp reddetti: HER POST 403 döndü. Kayıt,
+#       giriş, sepete ekleme, ödeme — hiçbiri çalışmadı. Sayfalar 200 döndüğü
+#       için dışarıdan site SAĞLIKLI görünüyordu.
+#
+#    Aynı kirlilik daha önce `DATABASE_URL` üzerinden başka bir projenin
+#    migration'larını bizim veritabanımıza uygulatmıştı. Kalıp aynı: kabuk
+#    ortamı, dosyadaki yapılandırmayı yener.
+VT_WEB_MIRAS_ALINMAZ=(APP_URL API_URL SESSION_REDIS_URL SESSION_SECRET NEXT_PUBLIC_MEDIA_URL NODE_ENV)
+
 # `vt-web` süreci PM2'de yoksa BAŞLATIR, varsa yeniden yükler.
 #
 # ⚠️ VARLIK SEBEBİ BİR HATA: eski tek `vt-worker` topolojisindeki dal yalnızca
@@ -70,11 +89,42 @@ WEB_PORT="${VT_WEB_PORT:-3020}"
 web_baslat_veya_yukle() {
   [ -d "$KOK/apps/web" ] || { bilgi "apps/web yok — web süreci atlandı"; return 0; }
 
+  # `env -u` ile kirli değişkenler SİLİNEREK çağrılır; süreç onları
+  # `.env.production`dan okumak ZORUNDA kalır.
+  local temiz=(env)
+  local ad
+  for ad in "${VT_WEB_MIRAS_ALINMAZ[@]}"; do temiz+=("-u" "$ad"); done
+
   if pm2 describe vt-web >/dev/null 2>&1; then
-    pm2 reload vt-web --update-env
+    # ⚠️ `pm2 reload vt-web --update-env` YETMEZ ve ZARARLIDIR: `--update-env`
+    #    O ANKİ KABUK ortamını sürece basar, yani kirliliği taze taze geri
+    #    getirir. Ayrıca ecosystem dosyası verilmediği için `env_production`
+    #    bloğu (NODE_ENV=production) uygulanmaz — süreç `NODE_ENV=staging`
+    #    ile kaldı ve Next bunu "non-standard NODE_ENV" diye uyardı.
+    "${temiz[@]}" pm2 reload ecosystem.config.cjs --env production --only vt-web --update-env
   else
     bilgi "vt-web ilk kez başlatılıyor"
-    pm2 start ecosystem.config.cjs --env production --only vt-web
+    "${temiz[@]}" pm2 start ecosystem.config.cjs --env production --only vt-web
+  fi
+
+  # ⚠️ ÖLÇ, VARSAYMA. Yukarıdaki temizlik sessizce başarısız olabilir (PM2
+  #    daemon'ın kendi ortamı da mirasa karışır). Sürecin GERÇEKTEN gördüğü
+  #    değeri okuyup dosyadakiyle karşılaştır.
+  local pid beklenen goruluyor
+  pid=$(pm2 pid vt-web 2>/dev/null | tr -d '[:space:]')
+  beklenen=$(grep '^APP_URL=' "$KOK/apps/web/.env.production" | cut -d= -f2- | tr -d '"')
+
+  if [ -n "$pid" ] && [ -r "/proc/$pid/environ" ]; then
+    goruluyor=$(tr '\0' '\n' < "/proc/$pid/environ" | grep '^APP_URL=' | cut -d= -f2- || true)
+    if [ -n "$goruluyor" ] && [ "$goruluyor" != "$beklenen" ]; then
+      hata "vt-web YANLIŞ APP_URL ile çalışıyor — CSRF her POST'u reddeder."
+      hata "    dosyada : $beklenen"
+      hata "    süreçte : $goruluyor"
+      hata "Kabukta kirli bir APP_URL var. PM2 daemon'ı da miras almış olabilir:"
+      hata "    pm2 delete vt-web && pm2 kill && ./scripts/deploy.sh"
+      exit 1
+    fi
+    bilgi "vt-web APP_URL doğrulandı: ${goruluyor:-$beklenen}"
   fi
 }
 
