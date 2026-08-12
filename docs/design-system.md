@@ -32,7 +32,7 @@ bir karardır**.
 | Müşteri arayüzü                      | [SSENSE](https://www.ssense.com)                                             | Sadelik, tipografi hiyerarşisi, görselin hâkimiyeti   |
 | Mağaza gösterimi                     | [Farfetch](https://www.farfetch.com)                                         | **Yalnızca** çok satıcılı üründe mağaza adının sunumu |
 | Mobil filtre                         | [Grailed](https://www.grailed.com)                                           | Yalnızca çekmece kalıbı                               |
-| Sanal deneme                         | [DRESSX](https://dressx.com)                                                 | Sonuç görseli sunumu, paylaşım ergonomisi             |
+| Sanal deneme                         | Aşağıdaki düzen (bkz. § Sanal deneme ekranı)                                 | Ekran düzeni — DRESSX **arayüz referansı değil**      |
 | Satıcı paneli                        | [Polaris](https://polaris.shopify.com) + [Medusa](https://demo.medusajs.com) | Ürün formu, varyant matrisi, toplu düzenleme          |
 | Admin iskelet                        | [Linear](https://linear.app) + [Supabase](https://supabase.com/dashboard)    | Menü, sayfa yapısı, koyu tema, tek vurgu              |
 | **Ledger · komisyon · payout · GMV** | **[Stripe](https://stripe.com/docs/dashboard)**                              | **Sayısal tablo tasarımı**                            |
@@ -69,6 +69,61 @@ Atölye Nord                  ← ikincil, ağırlık 400, gri
 ```
 
 Mağaza adı görünür ama ürünün önüne geçmez.
+
+---
+
+## Sanal deneme ekranı
+
+⚠️ **DRESSX bir arayüz referansı DEĞİLDİR.** Bakıldı: site artık markalara
+try-on teknolojisi satan bir B2B sayfası; tüketicinin gördüğü akış orada yok.
+Yalnızca konumlandırma dili için bakılabilir (güven skorunun nasıl ifade
+edildiği), ekran düzeni için değil.
+
+Ekran düzeni:
+
+```
+┌──────────────────────────────────┐
+│  Ürün adı                        │
+│  Mağaza rozeti            ⋯      │
+├──────────────────────────────────┤
+│                                  │
+│                                  │
+│        TRY-ON GÖRSELİ            │   ← ekranın çoğu
+│        kenarlıksız               │      filigran piksel içinde
+│                                  │
+│                                  │
+├──────────────────────────────────┤
+│   [Üzerimde Dene]  [Sepete Ekle] │   ← EŞİT ağırlık
+├──────────────────────────────────┤
+│   ○ ○ ● ○ ○   ürün karuseli      │   ← parça değiştir
+└──────────────────────────────────┘
+```
+
+### Karusel neden önemli
+
+Kullanıcı karuselden başka bir parça seçtiğinde **tüm ekran yenilenmez**,
+yalnızca görsel değişir. Bu, arka taraftaki "parça bazlı yeniden üretim"
+mantığının arayüz karşılığıdır: tüm kombin baştan üretilmez, yalnızca değişen
+bölge yeniden üretilir. Ekranı komple yenileyen bir tasarım bu kazancı görünmez
+kılar.
+
+### Güven skoru sunumu
+
+Görsel güven ile beden güveni **AYRI** gösterilir:
+
+```
+Görsel benzerliği   %91
+Beden uyumu         %78   ← ayrı satır, ayrı sayı
+```
+
+Tek bir "%85 uyumlu" rozeti yanıltıcıdır: kıyafetin görselde iyi durması
+fiziksel olarak uyacağı anlamına gelmez. İki ayrı soru, iki ayrı cevap.
+
+### Fotoğraf yükleme akışı
+
+Referans: Google Shopping'in selfie ile deneme akışı — özellikle **rızayı
+hangi anda istediği**. Rıza, fotoğraf seçilmeden önce değil, kullanıcı
+"Üzerimde Dene"ye bastıktan hemen sonra istenir; bağlam netken onay anlamlıdır.
 
 ---
 
