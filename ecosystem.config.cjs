@@ -128,7 +128,7 @@ module.exports = {
        *    Sarmalayıcı süreç yoksa sorun da yok.
        */
       script: 'node_modules/next/dist/bin/next',
-      args: 'start --port 3000',
+      args: 'start --port 3020',
 
       /**
        * ⚠️ ORTAM BURADA VERİLMEZ — `apps/web/.env.production` ÜZERİNDEN GELİR

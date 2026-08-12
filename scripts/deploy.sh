@@ -54,6 +54,30 @@ hata()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; }
 
 ONCEKI_COMMIT=""
 
+# ⚠️ apps/web'in dinlediği port. `ecosystem.config.cjs` ile AYNI olmak zorunda.
+#    3000 DEĞİL: bu makinede dört proje barınıyor ve 3000 başka bir projenin
+#    Next sunucusunda. Bir kez 3000 varsayıldı ve nginx bizim adresimizden
+#    KOMŞU PROJENİN panelini servis etti — kimse hata görmedi, sayfa 200 döndü.
+WEB_PORT="${VT_WEB_PORT:-3020}"
+
+# `vt-web` süreci PM2'de yoksa BAŞLATIR, varsa yeniden yükler.
+#
+# ⚠️ VARLIK SEBEBİ BİR HATA: eski tek `vt-worker` topolojisindeki dal yalnızca
+#    `vt-api` ve `vt-worker`ı yeniden yüklüyor, `vt-web`e HİÇ DOKUNMUYORDU.
+#    Sonuç: web derleniyor (BUILD_ID yerinde), dağıtım "başarılı" diyor, ama
+#    süreç hiç açılmıyor. Port boş kaldığı için nginx isteği KOMŞU PROJEYE
+#    düşürdü ve dışarıdan bakınca site ÇALIŞIYOR göründü — 200 dönüyordu.
+web_baslat_veya_yukle() {
+  [ -d "$KOK/apps/web" ] || { bilgi "apps/web yok — web süreci atlandı"; return 0; }
+
+  if pm2 describe vt-web >/dev/null 2>&1; then
+    pm2 reload vt-web --update-env
+  else
+    bilgi "vt-web ilk kez başlatılıyor"
+    pm2 start ecosystem.config.cjs --env production --only vt-web
+  fi
+}
+
 hata_tuzagi() {
   local kod=$?
   [ "$kod" -eq 0 ] && return 0
@@ -105,9 +129,22 @@ cd "$KOK"
 
 # Sunucuda elle yapılmış düzeltmeler `git reset --hard` ile SESSİZCE silinir.
 # Silinmeden önce görünsün.
-if [ -n "$(git status --porcelain)" ]; then
-  uyari "Çalışma ağacı temiz değil — aşağıdakiler KAYBOLACAK:"
-  git status --short | sed 's/^/      /'
+# ⚠️ İKİ FARKLI DURUM, İKİ FARKLI SONUÇ — karıştırmak yanlış alarm üretir.
+#    `git reset --hard` yalnızca İZLENEN dosyalardaki değişiklikleri geri alır;
+#    izlenmeyen (`??`) dosyalara DOKUNMAZ. Burada bir dönem hepsi "KAYBOLACAK"
+#    diye gösteriliyordu ve sunucuda kazara oluşmuş dört boş dosya yüzünden
+#    dağıtım gereksiz yere onay bekledi.
+DEGISEN=$(git status --porcelain | grep -v '^??' || true)
+IZLENMEYEN=$(git status --porcelain | grep '^??' || true)
+
+if [ -n "$IZLENMEYEN" ]; then
+  uyari "İzlenmeyen dosyalar var (KORUNACAK, silinmez):"
+  echo "$IZLENMEYEN" | sed 's/^/      /'
+fi
+
+if [ -n "$DEGISEN" ]; then
+  uyari "İzlenen dosyalarda değişiklik var — BUNLAR KAYBOLACAK:"
+  echo "$DEGISEN" | sed 's/^/      /'
   read -r -p "  Devam edilsin mi? [e/H] " yanit
   [ "$yanit" = "e" ] || [ "$yanit" = "E" ] || { hata "İptal edildi"; exit 1; }
 fi
@@ -116,6 +153,28 @@ fi
 #    `NEXT_PUBLIC_*` değerleri `next build` sırasında pakete GÖMÜLÜR. Bağ
 #    kopukken derlersek paket boş değerlerle çıkar, derleme YEŞİL döner ve hata
 #    ancak kullanıcı kırık görsel gördüğünde anlaşılır. Kontrol build'den önce.
+# ⚠️ PORT ÇAKIŞMASI — BU MAKİNEDE DÖRT PROJE BARINIYOR.
+#    Portu "boş sayıp" nginx'i oraya yönlendirmek, komşu projenin uygulamasını
+#    bizim adresimizden servis etmek demektir. Bu GERÇEKTEN oldu: 3000
+#    varsayıldı, orada başka bir Next sunucusu vardı, site 200 döndü ve
+#    yanlış uygulama görüntülendi. Sessiz arıza; kimse fark etmez.
+#
+#    Kontrol: port ya BOŞ olmalı ya da SAHİBİ BİZ olmalıyız (vt-web zaten
+#    çalışıyor). Başkasınınsa dağıtım DURUR.
+if [ -d "$KOK/apps/web" ]; then
+  PORT_SAHIBI=$(ss -lntp 2>/dev/null | grep -E "[:.]${WEB_PORT}\b" | head -1 || true)
+  if [ -n "$PORT_SAHIBI" ] && ! pm2 describe vt-web >/dev/null 2>&1; then
+    hata "Port $WEB_PORT DOLU ve sahibi vt-web değil:"
+    hata "    $PORT_SAHIBI"
+    hata "Boş bir port seçip İKİ yerde birden güncelleyin:"
+    hata "    ecosystem.config.cjs → vt-web args"
+    hata "    infra/nginx/vt.conf  → proxy_pass (İKİ location)"
+    hata "Ya da geçici olarak: VT_WEB_PORT=<port> $0"
+    exit 1
+  fi
+  bilgi "web portu $WEB_PORT uygun"
+fi
+
 if [ -d "$KOK/apps/web" ]; then
   if [ ! -e "$KOK/apps/web/.env.production" ]; then
     hata "apps/web/.env.production yok. Bir kez kurun:"
@@ -298,6 +357,7 @@ if [ -n "$ESKI_WORKER" ] && [ "$TOPOLOJI_GOCU" -eq 0 ]; then
 
   pm2 reload vt-api --update-env
   pm2 reload vt-worker --update-env
+  web_baslat_veya_yukle
 
 elif [ -n "$ESKI_WORKER" ] && [ "$TOPOLOJI_GOCU" -eq 1 ]; then
   uyari "Topoloji göçü: vt-worker → vt-worker-core + vt-worker-media"
@@ -307,6 +367,7 @@ elif [ -n "$ESKI_WORKER" ] && [ "$TOPOLOJI_GOCU" -eq 1 ]; then
   pm2 delete vt-worker
   pm2 start ecosystem.config.cjs --env production --only vt-worker-core,vt-worker-media
   pm2 reload vt-api --update-env
+  web_baslat_veya_yukle
   pm2 save
 
 else
@@ -334,6 +395,37 @@ if [ "$SAGLIKLI" -ne 1 ]; then
   exit 1
 fi
 bilgi "GET /health → 200"
+
+# ⚠️ WEB DE SORULUR — VE İÇİNE BAKILIR.
+#    "200 döndü" yetmez: yanlış port yüzünden nginx KOMŞU PROJEYE düştüğünde de
+#    200 dönüyordu. Bu yüzden yanıtın BİZİM uygulamamız olduğu, bize özgü bir
+#    işaretle doğrulanır.
+if [ -d "$KOK/apps/web" ]; then
+  WEB_SAGLIKLI=0
+  for _ in $(seq "$SAGLIK_DENEME"); do
+    if curl -s --max-time 10 "http://127.0.0.1:$WEB_PORT/" -o /tmp/vt-web.html; then
+      WEB_SAGLIKLI=1
+      break
+    fi
+    sleep "$SAGLIK_BEKLEME"
+  done
+
+  if [ "$WEB_SAGLIKLI" -ne 1 ]; then
+    hata "Web $((SAGLIK_DENEME * SAGLIK_BEKLEME)) sn içinde yanıt vermedi (port $WEB_PORT)"
+    hata "Log:  pm2 logs vt-web --lines 50 --nostream"
+    exit 1
+  fi
+
+  # `.tema-` sınıf öneki ve Türkçe gezinme metni bu uygulamaya özgüdür.
+  if grep -qE 'tema-|Üzerimde Dene|Sanal deneme|virtual-textile' /tmp/vt-web.html; then
+    bilgi "web :$WEB_PORT → BİZİM uygulama doğrulandı"
+  else
+    hata "Port $WEB_PORT yanıt veriyor ama içerik BİZİM uygulamamız DEĞİL."
+    hata "Büyük ihtimalle port başka bir projeye ait. İlk 200 karakter:"
+    head -c 200 /tmp/vt-web.html >&2; echo >&2
+    exit 1
+  fi
+fi
 
 # Dışarıdan da bak: nginx ile PM2 arasındaki bağ kopmuş olabilir ve bu,
 # yalnızca 127.0.0.1'e sorulduğunda GÖRÜNMEZ.
