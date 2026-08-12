@@ -101,8 +101,127 @@ export const TRYON = {
   watermarkText: 'Yapay zekâ ile oluşturulmuştur; ürünün gerçek kalıbı farklılık gösterebilir.',
 } as const;
 
-/** Try-on desteklenen kategoriler. Listede olmayan ürünlerde buton gösterilmez. */
-export const TRYONABLE_CATEGORIES = ['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR'] as const;
+/**
+ * ═══════════════ SANAL DENEME KATEGORİ YETENEĞİ ═══════════════════════════
+ *
+ * Katalogdaki her kategori denenebilir DEĞİLDİR ve bunun sebebi bizim
+ * tercihimiz değil, SAĞLAYICININ YAPABİLDİĞİdir.
+ *
+ * ⚠️ AŞAĞIDAKİ LİSTE ELLE YAZILMAZ — matristen TÜRETİLİR. Elle yazılsaydı iki
+ *    ayrı gerçek olurdu: sağlayıcının gerçekten giydirebildiği ve listenin
+ *    iddia ettiği. İkisi ayrıştığı gün arada kalan kişi, düğmeye basıp PARA
+ *    HARCAYAN ama sonuç alamayan kullanıcıdır.
+ *
+ * Gerekçe ve araştırma bulgusu: docs/tryon-kategori-destegi.md
+ */
+
+/**
+ * Şemadaki `TryOnCategory` enum'ının TS karşılığı.
+ *
+ * ⚠️ Bu paket `@vt/db`ye BAĞIMLI DEĞİL (config en alt katmandır), bu yüzden
+ *    liste elle aynalanır. Sapma sessiz kalmasın diye
+ *    `apps/api/src/modules/ai/tryon-category.drift.test.ts` içinde DERLEME
+ *    ZAMANINDA karşılaştırılır — iki liste ayrışırsa tsc kırılır.
+ */
+export type TryOnCategoryName =
+  'UPPER_BODY' | 'LOWER_BODY' | 'DRESS' | 'OUTERWEAR' | 'SHOES' | 'JEWELRY' | 'BAG' | 'ACCESSORY';
+
+export type TryOnProviderName = 'fal' | 'gemini';
+
+/**
+ * HANGİ SAĞLAYICI HANGİ KATEGORİYİ GİYDİREBİLİR.
+ *
+ * ⚠️ Boş liste "henüz yapamıyor" demektir, "yapmak istemiyoruz" değil.
+ *
+ * Bugün fal.ai üzerindeki try-on modelleri (FASHN v1.6, Kling Kolors) yalnızca
+ * GİYSİ için eğitilmiştir. Ayakkabı, takı ve çanta ayrı problemlerdir:
+ * ayakkabı ayağın açısını ve zemin gölgesini, takı milimetrik ölçeği, çanta
+ * ise giyilen değil TUTULAN bir nesnenin el pozunu gerektirir.
+ *
+ * ⚠️ Bir kategoriyi buraya eklemeden önce üçü birden sağlanmalı:
+ *      1. sağlayıcının o kategori için gerçek bir API ucu olmalı
+ *         (pazarlama sayfası değil),
+ *      2. birim maliyet ölçülüp komisyon marjıyla karşılaştırılmalı,
+ *      3. kalite ölçülmeli (30 ürün × 10 kişi, ort. ≥ 3,5/5).
+ *    Video try-on kararındaki sıranın aynısı: "istiyorum" bir açma gerekçesi
+ *    değildir.
+ */
+export const TRYON_PROVIDER_CAPABILITIES = {
+  fal: ['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR'],
+  gemini: ['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR'],
+} as const satisfies Record<TryOnProviderName, readonly TryOnCategoryName[]>;
+
+/**
+ * Try-on desteklenen kategoriler — sağlayıcıların BİRLEŞİMİ.
+ *
+ * Birleşim alınır, kesişim değil: fallback zinciri kategoriyi destekleyen ilk
+ * sağlayıcıyı seçer, dolayısıyla TEK bir sağlayıcının yapabilmesi yeterlidir.
+ * Kesişim alınsaydı, yeni ve dar kapsamlı bir sağlayıcı eklemek var olan
+ * kategorileri KAPATIRDI.
+ *
+ * ⚠️ Sıra deterministik tutulur (aşağıdaki referans sıraya göre): bu değer
+ *    API yanıtlarında ve testlerde görünür; `Set` yineleme sırasına bırakmak,
+ *    bir gün sebepsiz görünen bir test kırılması demektir.
+ */
+/**
+ * Katalogdaki TÜM try-on kategorileri — denenebilir olanlar değil, hepsi.
+ *
+ * ⚠️ Dışa açık olması şart: `TryOnCategoryName` bir TİPtir ve çalışma zamanında
+ *    yoktur, dolayısıyla Prisma enum'ıyla karşılaştırılamaz. Sapma testi
+ *    (`tryon-category.drift.test.ts`) bu diziyi okur. Yalnızca tip bırakılsaydı
+ *    config'e şemada olmayan bir değer eklendiği HİÇBİR yerde görünmezdi.
+ */
+export const ALL_TRYON_CATEGORIES: readonly TryOnCategoryName[] = [
+  'UPPER_BODY',
+  'LOWER_BODY',
+  'DRESS',
+  'OUTERWEAR',
+  'SHOES',
+  'JEWELRY',
+  'BAG',
+  'ACCESSORY',
+];
+
+export const TRYONABLE_CATEGORIES: readonly TryOnCategoryName[] = ALL_TRYON_CATEGORIES.filter(
+  (category) =>
+    Object.values(TRYON_PROVIDER_CAPABILITIES).some((supported) =>
+      (supported as readonly TryOnCategoryName[]).includes(category),
+    ),
+);
+
+/** Bu kategoriyi giydirebilen sağlayıcılar — fallback zinciri sırasını daraltır. */
+export function providersForCategory(category: TryOnCategoryName): readonly TryOnProviderName[] {
+  return (Object.keys(TRYON_PROVIDER_CAPABILITIES) as TryOnProviderName[]).filter((provider) =>
+    (TRYON_PROVIDER_CAPABILITIES[provider] as readonly TryOnCategoryName[]).includes(category),
+  );
+}
+
+/**
+ * SAĞLAYICIYA GÖNDERİLEBİLEN KATEGORİ.
+ *
+ * ⚠️ Matristen TÜRETİLİR, elle yazılmaz. `TryOnRequest.category` bu tiptedir
+ *    (bkz. @vt/adapters → TryOnGarmentCategory), dolayısıyla desteklenmeyen bir
+ *    kategoriyi sağlayıcıya göndermek DERLENMİYOR. Kapı çalışma zamanında bir
+ *    `if` ile korunsaydı, o `if`i atlayan yeni bir çağrı yolu eklemek sessizce
+ *    mümkün olurdu ve fatura sağlayıcıdan dönerdi.
+ *
+ * Matrise yeni kategori eklendiğinde bu tip kendiliğinden genişler.
+ */
+export type SupportedTryOnCategory =
+  (typeof TRYON_PROVIDER_CAPABILITIES)[TryOnProviderName][number];
+
+/**
+ * Kategori bugün gerçekten denenebiliyor mu?
+ *
+ * ⚠️ Tip daraltıcıdır (`is`): çağıran taraf bu kapıdan geçmeden sağlayıcıya
+ *    istek kuramaz. `null` da reddedilir — kategorisi olmayan ürün (parfüm,
+ *    hediye kartı) zaten denenemez.
+ */
+export function isTryOnSupported(
+  category: TryOnCategoryName | null | undefined,
+): category is SupportedTryOnCategory {
+  return category != null && TRYONABLE_CATEGORIES.includes(category);
+}
 
 // ── Beden önerisi (MVP: kural motoru) ─────────────────────────────────────
 export const SIZE_ENGINE = {

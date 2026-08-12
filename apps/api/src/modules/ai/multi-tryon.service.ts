@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { appError, toAppError, type ErrorCode } from '@vt/contracts';
-import { estimateCost, SIGNED_URL_TTL_SECONDS, TRYON, TRYONABLE_CATEGORIES } from '@vt/config';
+import { estimateCost, isTryOnSupported, SIGNED_URL_TTL_SECONDS, TRYON } from '@vt/config';
 import {
   isProducibleCategory,
   MAX_OUTFIT_PIECES,
@@ -325,10 +325,17 @@ export class MultiTryOnService {
       if (!variant) throw appError('VARIANT_NOT_FOUND');
       if (!variant.isPurchasable) throw appError('VARIANT_UNAVAILABLE');
 
+      /**
+       * ⚠️ `isTryOnSupported` TİP DARALTIR (`is SupportedTryOnCategory`);
+       *    `TRYONABLE_CATEGORIES.includes(...)` yalnızca `boolean` döndürüyordu.
+       *    Fark katalog enum'u SHOES/JEWELRY/BAG/ACCESSORY ile genişleyince
+       *    ortaya çıktı: kapıdan geçmiş bir kategori aşağıdaki katman
+       *    sözleşmesine (`OutfitLayerCategory`) atanamaz oldu ve modül
+       *    derlenmedi. Kapıyı daraltıcı olana çevirmek, çalışma zamanı
+       *    kontrolüyle tipi AYNI kaynaktan besler.
+       */
       const category = variant.tryOnCategory;
-      if (category === null || !TRYONABLE_CATEGORIES.includes(category)) {
-        throw appError('PRODUCT_NOT_TRYONABLE');
-      }
+      if (!isTryOnSupported(category)) throw appError('PRODUCT_NOT_TRYONABLE');
 
       // ⚠️ Aksesuar katman tablosunda var ama bugün ÜRETİLEMEZ (katalog enum'u
       //    ve sağlayıcı desteği yok). Sessizce atlanırsa kullanıcı şapkasız bir

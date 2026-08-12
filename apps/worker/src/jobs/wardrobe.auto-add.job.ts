@@ -61,6 +61,16 @@ const TRYON_CATEGORY = {
   LOWER_BODY: 'LOWER_BODY',
   DRESS: 'DRESS',
   OUTERWEAR: 'OUTERWEAR',
+  // ⚠️ Bu dördü SANAL DENEMEDE kapalıdır (sağlayıcıda model yok) ama gardıroba
+  //    GİRER. Gardırop "denenebilir parçalar" değil, kullanıcının SAHİP OLDUĞU
+  //    parçalar kümesidir; kombin kural motoru ayakkabıyı gömlekle birlikte
+  //    değerlendirebilir — görselini üretemese bile. Buraya yazılmasaydı
+  //    satın alınan ayakkabı kullanıcının dolabında hiç görünmezdi ve bu,
+  //    deneme yeteneğiyle ilgisi olmayan bir kayıp olurdu.
+  SHOES: 'SHOES',
+  JEWELRY: 'JEWELRY',
+  BAG: 'BAG',
+  ACCESSORY: 'ACCESSORY',
 } as const satisfies Record<PrismaTryOnCategory, TryOnCategory>;
 
 // ── Depo (okuma + yazma, dar port) ────────────────────────────────────────

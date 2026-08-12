@@ -88,6 +88,25 @@ export interface DomainEventJobData {
   aggregateId: string;
   type: string;
   payload: unknown;
+
+  /**
+   * ÖNCEKİ DENEMEDE BAŞARMIŞ İŞLEYİCİLER — tekrar denemede atlanırlar.
+   *
+   * ⚠️ İşin VERİSİNDE taşınır, bellekte değil: tekrar denemeyi başka bir proses
+   *    alabilir. `DomainEventFanout` her başarısız turda `job.updateData` ile
+   *    günceller (bkz. domain-event.fanout.ts → DispatchContext).
+   *
+   * ⚠️ Opsiyonelliği gevşeklik değil: dağıtıcının kuyruğa YENİ yazdığı işte bu
+   *    alan yoktur ve olmamalıdır ("henüz hiçbir işleyici koşmadı" ilk denemenin
+   *    doğru hâlidir). Okuyan tarafta karar unutulamaz — `DispatchContext`
+   *    içinde alan ZORUNLUDUR.
+   *
+   * ⚠️ Tip `string[]`, `DomainEventHandlerName[]` DEĞİL: burası kuyruk
+   *    sözleşmesidir, `domain-event.fanout.ts`i import etmesi çevrim yaratırdı.
+   *    Ayrıca Redis'te bekleyen eski bir işte artık var olmayan bir işleyici adı
+   *    yazılı olabilir; dar tip orada YALAN söylerdi.
+   */
+  completedHandlers?: readonly string[];
 }
 
 export interface NotificationJobData {

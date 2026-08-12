@@ -116,22 +116,16 @@ export async function urunGorseliEkle(productId: string): Promise<string> {
 // ── Sipariş ───────────────────────────────────────────────────────────────
 
 /**
- * Paketi TESLİM EDİLDİ durumuna taşır.
+ * ⚠️ `paketiTeslimEt` BU DOSYADAN ÇIKTI — borç kapandı.
  *
- * NEDEN API YOK: satıcı ucu yalnızca PREPARING / SHIPPED / CANCELLED kabul
- * ediyor (updatePackageStatusSchema). DELIVERED'a geçişi kargo firmasının
- * bildirimi yapmalı; o entegrasyon yazılmadı. İade penceresi teslim
- * tarihinden işlediği için iade senaryosu bu adım olmadan kurulamaz.
+ *    Teslim adımı buradaydı çünkü DELIVERED'a taşıyan hiçbir uç yoktu; artık
+ *    var: `POST /v1/logistics/packages/:id/delivered` (ADMIN). Yeni yeri
+ *    `kurulum.ts` — HTTP'den geçen bir adım kaçış kapısı listesinde durmamalı.
  *
- * ⚠️ `deliveredAt` de yazılıyor: iade penceresi bu alandan hesaplanıyor ve
- *    boş bırakılırsa iade "teslim edilmemiş paket" diye reddedilir.
+ *    Bu fark önemsiz değildi: doğrudan yazma `OutboxEvent` yazmıyor, yani E2E
+ *    "teslim" adımı geçerken üretimde `package.delivered` olayı HİÇ doğmuyordu
+ *    ve testler bunu göremiyordu.
  */
-export async function paketiTeslimEt(packageId: string, teslimZamani = new Date()): Promise<void> {
-  await db().orderPackage.update({
-    where: { id: packageId },
-    data: { status: 'DELIVERED', deliveredAt: teslimZamani },
-  });
-}
 
 /** Rezervasyonun süresini geçmişe çeker — "rezervasyon düştü" senaryosu için. */
 export async function rezervasyonuGecmiseAl(orderId: string): Promise<void> {

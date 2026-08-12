@@ -171,7 +171,24 @@ export const photoPurposeSchema = z.enum(['ONE_TIME', 'SAVED_PROFILE']);
  *    → `TRYON_CATEGORY` (`as const satisfies Record<PrismaTryOnCategory,
  *    TryOnCategory>`, okuma yolunda KULLANILIR).
  */
-export const tryOnCategorySchema = z.enum(['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR']);
+/**
+ * ⚠️ BU LİSTE "DENENEBİLİR KATEGORİLER" DEĞİLDİR. Katalogdaki try-on
+ *    kategorisinin tamamıdır; hangilerinde gerçekten deneme yapılabildiğine
+ *    `@vt/config` → `TRYON_PROVIDER_CAPABILITIES` karar verir. Son dört değer
+ *    bugün KAPALIdır (sağlayıcıda model yok) ama kataloğa girer: mağazada
+ *    ayakkabı ve çanta satılıyor ve bunlar kullanıcının gardırobuna da girer —
+ *    kombin önerisi giysiyle ayakkabıyı birlikte düşünür, üretemese bile.
+ */
+export const tryOnCategorySchema = z.enum([
+  'UPPER_BODY',
+  'LOWER_BODY',
+  'DRESS',
+  'OUTERWEAR',
+  'SHOES',
+  'JEWELRY',
+  'BAG',
+  'ACCESSORY',
+]);
 export type TryOnCategory = z.infer<typeof tryOnCategorySchema>;
 
 export const consentTypeSchema = z.enum([

@@ -249,6 +249,27 @@ export interface RawExportData {
   orders: RawOrder[];
   favorites: Array<{ productId: string; createdAt: Date }>;
   outfits: Array<{ name: string; createdAt: Date }>;
+  /**
+   * ⚠️ DİJİTAL GARDIROP KVKK KAPSAMINDADIR ve arşivde YOKTU.
+   *
+   *    Kanıt tartışmaya kapalı: hesap silme işi (account-deletion.job.ts) bu
+   *    satırları `deleteMany` ile siliyor ve `photoKey` nesnelerini depodan
+   *    kaldırıyor. Aynı veriyi "silinmesi gereken kişisel veri" sayıp
+   *    "kopyası verilmesi gereken kişisel veri" saymamak, KVKK md.11'in iki
+   *    fıkrasını birbirine ters uygulamaktır.
+   *
+   *    Kayıt kullanıcının ne satın aldığını VE bedenine dair tercihlerini
+   *    gösterir; satıcıya ait ticari bir alan taşımaz, o yüzden beyaz listeye
+   *    tümü girer (`sourceOrderItemId` hariç — o bir iç anahtardır).
+   */
+  wardrobe: Array<{
+    source: string;
+    category: string;
+    color: string;
+    label: string | null;
+    variantId: string | null;
+    createdAt: Date;
+  }>;
   tryOnJobs: Array<{ id: string; status: string; mode: string; queuedAt: Date }>;
   photos: Array<{ id: string; purpose: string; createdAt: Date; expiresAt: Date }>;
   stylistMessages: Array<{ role: string; content: string; createdAt: Date }>;
@@ -329,6 +350,15 @@ export function buildExportDocument(
     kombinler: raw.outfits.map((outfit) => ({
       ad: outfit.name,
       tarih: outfit.createdAt.toISOString(),
+    })),
+    dijitalGardirop: raw.wardrobe.map((item) => ({
+      // MANUAL = kullanıcının kendi eklediği parça, PURCHASE = satın alınan.
+      kaynak: item.source,
+      kategori: item.category,
+      renk: item.color,
+      etiket: item.label,
+      urunVaryantId: item.variantId,
+      tarih: item.createdAt.toISOString(),
     })),
     sanalDenemeler: raw.tryOnJobs.map((job) => ({
       id: job.id,
@@ -535,6 +565,7 @@ export class DataExportJob {
       orders,
       favorites,
       outfits,
+      wardrobe,
       tryOnJobs,
       photos,
       stylistMessages,
@@ -623,6 +654,29 @@ export class DataExportJob {
         where: { userId },
         select: { name: true, createdAt: true },
       }),
+      this.prisma.digitalWardrobeItem.findMany({
+        where: { userId },
+        /**
+         * ⚠️ `photoKey` ve `productImageKey` BURADA seçilmiyor. `photoKey`
+         *    kullanıcının kendi fotoğrafıdır ve arşive DOSYA olarak girer
+         *    (bkz. `collectFiles`); depo anahtarını ayrıca JSON'a yazmak,
+         *    kullanıcıya işine yaramayan bir iç adres vermek olurdu.
+         *    `productImageKey` ise satıcının pazarlama görselidir — kullanıcının
+         *    verisi değil.
+         *
+         * ⚠️ `sourceOrderItemId` de yok: iç idempotentlik anahtarı, kişisel veri
+         *    değil. Hangi siparişten geldiği zaten `siparisler` bölümünde.
+         */
+        select: {
+          source: true,
+          category: true,
+          color: true,
+          label: true,
+          variantId: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
       this.prisma.tryOnJob.findMany({
         where: { userId },
         select: { id: true, status: true, mode: true, queuedAt: true },
@@ -652,6 +706,11 @@ export class DataExportJob {
       orders: orders.map((order) => ({ ...order, status: String(order.status) })),
       favorites,
       outfits,
+      wardrobe: wardrobe.map((item) => ({
+        ...item,
+        source: String(item.source),
+        category: String(item.category),
+      })),
       tryOnJobs: tryOnJobs.map((job) => ({
         ...job,
         status: String(job.status),
@@ -683,12 +742,28 @@ export class DataExportJob {
       where: { userId, resultKey: { not: null } },
       select: { id: true, resultKey: true },
     });
+    /**
+     * ⚠️ Gardıroptaki KULLANICI fotoğrafları (MANUAL kayıtların `photoKey`
+     *    alanı, private kova). Hesap silme işi bu nesneleri depodan siliyor —
+     *    yani kişisel veri sayıyor; arşiv de onları vermek zorunda.
+     *
+     *    `productImageKey` BİLİNÇLİ OLARAK ALINMAZ: o satıcının public ürün
+     *    görselidir, kullanıcının verisi değil. Arşive konsaydı kullanıcıya
+     *    kendi verisi diye satıcının pazarlama materyali gönderilirdi.
+     */
+    const wardrobePhotos = await this.prisma.digitalWardrobeItem.findMany({
+      where: { userId, photoKey: { not: null } },
+      select: { id: true, photoKey: true },
+    });
 
     const wanted: Array<{ name: string; key: string }> = [
       ...photos.map((photo) => ({ name: `fotograflar/${photo.id}`, key: photo.storageKey })),
       ...tryOns
         .filter((job): job is { id: string; resultKey: string } => job.resultKey !== null)
         .map((job) => ({ name: `sanal-deneme/${job.id}.webp`, key: job.resultKey })),
+      ...wardrobePhotos
+        .filter((item): item is { id: string; photoKey: string } => item.photoKey !== null)
+        .map((item) => ({ name: `gardirop/${item.id}`, key: item.photoKey })),
     ];
 
     const entries: ZipEntry[] = [];

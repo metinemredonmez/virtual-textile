@@ -57,6 +57,16 @@ function titleFor(pieces: readonly OutfitCandidatePiece[]): string {
   return pieces.map((piece) => `${piece.color} ${categoryLabel(piece.category)}`).join(' + ');
 }
 
+/**
+ * ⚠️ ENUM'IN TAMAMI KARŞILANMAK ZORUNDA. Son dört kategori bugün kombin
+ *    gövdesine GİRMİYOR (aşağıdaki toplama `switch`i onları almıyor), yani bu
+ *    dallara pratikte ulaşılmaz — ama `tsc` eksik dalı "undefined dönebilir"
+ *    diye görür ve derleme kırılır. Prisma enum'ı SHOES/JEWELRY/BAG/ACCESSORY
+ *    ile genişlediğinde tam olarak bu oldu.
+ *
+ *    Etiketler yine de doğru yazılıyor, yer tutucu değil: ayakkabı bir gün
+ *    kombine girdiğinde başlıkta 'ayakkabı' görünmeli.
+ */
 function categoryLabel(category: TryOnCategory): string {
   switch (category) {
     case 'UPPER_BODY':
@@ -67,6 +77,14 @@ function categoryLabel(category: TryOnCategory): string {
       return 'elbise';
     case 'OUTERWEAR':
       return 'dış giyim';
+    case 'SHOES':
+      return 'ayakkabı';
+    case 'JEWELRY':
+      return 'takı';
+    case 'BAG':
+      return 'çanta';
+    case 'ACCESSORY':
+      return 'aksesuar';
   }
 }
 

@@ -20,6 +20,7 @@ import {
   notificationsForEvent,
   type NotificationContacts,
   type OrderContact,
+  type OrderSellerContact,
   type PackageContact,
   type SellerContact,
 } from './notification.processor.js';
@@ -49,7 +50,7 @@ class FakeContacts implements NotificationContacts {
     itemCount: 2,
   };
   sellerContact: SellerContact | null = SELLER;
-  sellers: Array<SellerContact & { itemCount: number }> = [{ ...SELLER, itemCount: 2 }];
+  sellers: OrderSellerContact[] = [{ ...SELLER, sellerId: 'seller-1', itemCount: 2 }];
 
   order(): Promise<OrderContact | null> {
     return Promise.resolve(this.orderContact);
@@ -60,7 +61,7 @@ class FakeContacts implements NotificationContacts {
   seller(): Promise<SellerContact | null> {
     return Promise.resolve(this.sellerContact);
   }
-  sellersForOrder(): Promise<Array<SellerContact & { itemCount: number }>> {
+  sellersForOrder(): Promise<OrderSellerContact[]> {
     return Promise.resolve(this.sellers);
   }
 }
@@ -176,8 +177,8 @@ describe('notificationsForEvent', () => {
   it('çok satıcılı siparişte her satıcı ayrı anahtar alır', async () => {
     const contacts = new FakeContacts();
     contacts.sellers = [
-      { ...SELLER, itemCount: 1 },
-      { ...SELLER, contactEmail: 'iki@ornek.com', itemCount: 3 },
+      { ...SELLER, sellerId: 'seller-1', itemCount: 1 },
+      { ...SELLER, sellerId: 'seller-2', contactEmail: 'iki@ornek.com', itemCount: 3 },
     ];
 
     const jobs = await notificationsForEvent(event({ type: 'order.paid' }), contacts);
@@ -185,6 +186,31 @@ describe('notificationsForEvent', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(jobs.filter((job) => job.template === 'satici-yeni-siparis')).toHaveLength(4);
+  });
+
+  /**
+   * ⚠️ ASIL REGRESYON KAPANI. Anahtar bir zamanlar `satici-${index}` idi ve
+   *    `sellersForOrder` SIRASIZ bir `findMany` döndürüyordu. Sıra değiştiğinde
+   *    aynı olayın ikinci dağıtımında A satıcısının anahtarı B'ye yapışıyor,
+   *    tekilleştirme B'nin bildirimini "zaten gönderildi" sayıp DÜŞÜRÜYORDU.
+   */
+  it('⚠️ satıcı anahtarı liste sırasına DEĞİL, sellerId’ye bağlıdır', async () => {
+    const ilkSira = new FakeContacts();
+    ilkSira.sellers = [
+      { ...SELLER, sellerId: 'seller-a', itemCount: 1 },
+      { ...SELLER, sellerId: 'seller-b', contactEmail: 'b@ornek.com', itemCount: 3 },
+    ];
+    const tersSira = new FakeContacts();
+    tersSira.sellers = [...ilkSira.sellers].reverse();
+
+    const saticiAnahtarlari = async (contacts: FakeContacts): Promise<Set<string>> => {
+      const jobs = await notificationsForEvent(event({ type: 'order.paid' }), contacts);
+      return new Set(
+        jobs.filter((job) => job.template === 'satici-yeni-siparis').map((job) => job.messageId),
+      );
+    };
+
+    expect(await saticiAnahtarlari(ilkSira)).toEqual(await saticiAnahtarlari(tersSira));
   });
 
   it('package.shipped → takip numarasıyla kargo bildirimi', async () => {
@@ -299,7 +325,7 @@ describe('notificationMessageId', () => {
   it('kanal ve alıcı anahtarı ayrıştırır — müşteri ve satıcı ikisi de alır', () => {
     const musteriSms = notificationMessageId('e1', 'siparis-alindi', 'SMS', 'musteri');
     const musteriMail = notificationMessageId('e1', 'siparis-alindi', 'EMAIL', 'musteri');
-    const satici = notificationMessageId('e1', 'siparis-alindi', 'SMS', 'satici-0');
+    const satici = notificationMessageId('e1', 'siparis-alindi', 'SMS', 'satici-seller-1');
 
     expect(new Set([musteriSms, musteriMail, satici]).size).toBe(3);
   });

@@ -364,11 +364,23 @@ model Category {
   @@map("catalog_categories")
 }
 
+/// ⚠️ Bu enum "denenebilir kategoriler" DEĞİL, "katalogdaki try-on kategorisi"dir.
+///    Bir değerin burada bulunması sanal denemenin AÇIK olduğu anlamına gelmez;
+///    açık olup olmadığına sağlayıcı yetenek matrisi karar verir
+///    (@vt/config → TRYON_PROVIDER_CAPABILITIES). Son dört değer bugün
+///    KAPALIdır: fal.ai'de ayakkabı/takı/çanta modeli yok.
+///
+/// ⚠️ PostgreSQL'de enum değeri SİLİNEMEZ; buraya eklenen her değer kalıcıdır.
+///    Açma koşulları: docs/tryon-kategori-destegi.md
 enum TryOnCategory {
   UPPER_BODY
   LOWER_BODY
   DRESS
   OUTERWEAR
+  SHOES
+  JEWELRY
+  BAG
+  ACCESSORY
 }
 
 enum Gender {

@@ -23,6 +23,17 @@ const STALE_THRESHOLD_MS = 60 * 60 * 1000;
  * Outbox ikisini de çözer: yazma atomiktir, teslimat en az bir kez garantidir.
  *
  * ⚠️ EN AZ BİR KEZ teslimat. Tüketiciler idempotent olmalıdır.
+ *
+ * ⚠️⚠️ GARANTİNİN SINIRI: "EN AZ BİR KEZ" yalnızca KUYRUĞA KADAR geçerlidir.
+ *      Olay kuyruğa girdiği an `publishedAt` doldurulur ve bu döngü onu bir daha
+ *      görmez. Tüketici 3 denemede de başarısız olursa iş BullMQ'nun `failed`
+ *      kümesinde kalır, outbox satırı ise "yayınlandı" görünür — yani olay
+ *      SESSİZCE ve KALICI olarak kaybolur: ne bildirim gider, ne gardıroba satır
+ *      düşer, ne de bunu gören bir kayıt olur.
+ *
+ *      `auditDeadLetters()` bu kör noktayı kapatır: deneme hakkı biten her işi
+ *      OUTBOX SATIRINA yazar (`attempts`, `lastError`). Kayıp hâlâ kayıptır ama
+ *      artık GÖRÜNÜRDÜR ve tek bir SQL sorgusuyla listelenebilir.
  */
 @Injectable()
 export class OutboxDispatcher implements OnModuleDestroy {
@@ -113,6 +124,65 @@ export class OutboxDispatcher implements OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * ÖLÜ MEKTUP DENETİMİ — deneme hakkı bitmiş domain olaylarını görünür kılar.
+   *
+   * ⚠️ NEDEN OTOMATİK YENİDEN DENEME YOK: burada `job.retry()` çağırmak, kalıcı
+   *    olarak bozuk tek bir olayın (zehirli mesaj) kuyruğu sonsuza kadar meşgul
+   *    etmesi demekti. Karar insana bırakılır; kaydın işi kararı MÜMKÜN kılmak.
+   *    Elle canlandırma artık güvenlidir: dağıtıcı başarmış işleyicileri işin
+   *    verisine yazıyor, yani tekrar denemede yalnızca DÜŞEN işleyici koşar
+   *    (bkz. domain-event.fanout.ts → DispatchContext).
+   *
+   * ⚠️ AYNI SATIR İKİ KEZ ALARM ÜRETMEZ: yalnızca `lastError` HENÜZ BOŞ olan
+   *    satırlar yazılır. Aksi hâlde bu iş her turda aynı ölü olay için hata
+   *    logu basar ve gerçek alarmı gürültüye boğardı.
+   *
+   * ⚠️ `removeOnFail` başarısız işleri 7 gün tutuyor (queues.ts); denetimin
+   *    penceresi budur. Süre kısaltılırsa burası kör kalır.
+   */
+  async auditDeadLetters(): Promise<{ dead: number }> {
+    const failed = await this.queue.getFailed(0, BATCH_SIZE - 1);
+    if (failed.length === 0) return { dead: 0 };
+
+    // Hâlâ deneme hakkı olan iş ölü değildir; kuyruk onu yeniden alacak.
+    const exhausted = failed.filter((job) => job.attemptsMade >= (job.opts.attempts ?? 1));
+
+    // ⚠️ İş kimliği = outbox kimliği (bkz. `dispatch`). Bağ bu eşitlikten ibaret;
+    //    kimlik üretimi değişirse burası sessizce hiçbir satır bulamaz olur.
+    const byId = new Map(
+      exhausted.filter((job) => typeof job.id === 'string').map((job) => [job.id as string, job]),
+    );
+    if (byId.size === 0) return { dead: 0 };
+
+    const rows = await this.prisma.outboxEvent.findMany({
+      where: { id: { in: [...byId.keys()] }, lastError: null },
+      select: { id: true, type: true },
+    });
+
+    for (const row of rows) {
+      const job = byId.get(row.id)!;
+      const reason = job.failedReason ?? 'bilinmeyen';
+
+      await this.prisma.outboxEvent.update({
+        where: { id: row.id },
+        data: {
+          attempts: job.attemptsMade,
+          // ⚠️ Ön ek KAYNAĞI ayırır: 'kuyruk:' tüketici tarafındaki kalıcı
+          //    hatadır, ön eksiz kayıt bu döngünün kuyruğa yazamadığı hatadır.
+          lastError: `kuyruk: ${reason}`.slice(0, 500),
+        },
+      });
+
+      this.logger.error(
+        { outboxEventId: row.id, type: row.type, attempts: job.attemptsMade, reason },
+        '⚠️ Domain olayı KALICI olarak kaybedildi — yan etkileri hiç çalışmadı',
+      );
+    }
+
+    return { dead: rows.length };
   }
 
   async onModuleDestroy(): Promise<void> {

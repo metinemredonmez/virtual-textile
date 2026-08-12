@@ -10,7 +10,20 @@
  *    Fotoğraf imzalı, kısa ömürlü, TEK KULLANIMLIK URL ile paylaşılır.
  */
 
-export type TryOnGarmentCategory = 'UPPER_BODY' | 'LOWER_BODY' | 'DRESS' | 'OUTERWEAR';
+import type { SupportedTryOnCategory } from '@vt/config';
+
+/**
+ * ⚠️ ELLE YAZILMAZ — sağlayıcı yetenek matrisinden türer
+ *    (@vt/config → TRYON_PROVIDER_CAPABILITIES).
+ *
+ *    Katalogdaki `TryOnCategory` sekiz değerlidir (ayakkabı, takı, çanta,
+ *    aksesuar dahil); bu tip yalnızca EN AZ BİR SAĞLAYICININ giydirebildiği
+ *    alt kümedir. Ayrım tipte tutulur çünkü desteklenmeyen bir kategoriyi
+ *    sağlayıcıya göndermek DERLENMEMELİDİR: çalışma zamanı `if`i ile
+ *    korunsaydı, o kontrolü atlayan yeni bir çağrı yolu eklemek sessizce
+ *    mümkün olur ve hatayı sağlayıcının faturası haber verirdi.
+ */
+export type TryOnGarmentCategory = SupportedTryOnCategory;
 
 export interface TryOnRequest {
   /** İmzalı, kısa ömürlü URL. Kalıcı bağlantı verilmez. */

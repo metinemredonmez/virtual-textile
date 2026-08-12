@@ -540,3 +540,29 @@ export async function odemeyiTamamla(
   const sonuc = geriDonus.veri<{ status: string }>();
   expect(sonuc.status, `3DS geri dönüşü PAID beklenirken ${sonuc.status} döndü`).toBe('PAID');
 }
+
+// ── Kargo & teslim ────────────────────────────────────────────────────────
+
+/**
+ * Paketi TESLİM EDİLDİ durumuna taşır — GERÇEK UÇ.
+ *
+ * ⚠️ ESKİDEN VERİTABANINDAN YAZILIYORDU (`veritabani.ts` → `paketiTeslimEt`) ve
+ *    o kaçış kapısı gerçek bir açığı gizliyordu: DELIVERED'a taşıyan HİÇBİR uç
+ *    yoktu. Doğrudan yazma `OutboxEvent` de yazmadığı için `package.delivered`
+ *    olayı üretimde HİÇ doğmuyor, buna bağlı dört özellik (gardıroba otomatik
+ *    ekleme, iade penceresi, satıcı hakedişi, beden öğrenme) ölü kalıyordu —
+ *    E2E yeşilken.
+ *
+ * ⚠️ Uç ADMIN rolü ister: satıcı kendi paketini teslim işaretleyebilseydi
+ *    hakediş penceresini istediği an açardı.
+ *
+ * ⚠️ Teslim zamanı SUNUCUDA yazılır (`deliveredAt = now`); geçmişe tarih atma
+ *    yolu bilinçli olarak yok. Geçmiş bir teslim tarihi gereken senaryolar
+ *    (ör. hakediş vadesi) bunu ayrıca veritabanından ayarlamalıdır.
+ */
+export async function paketiTeslimEt(yoneticiIstemcisi: Istemci, packageId: string): Promise<void> {
+  const yanit = await yoneticiIstemcisi.post(`/v1/logistics/packages/${packageId}/delivered`, {
+    idempotencyKey: randomUUID(),
+  });
+  basariBekle(yanit, 200);
+}

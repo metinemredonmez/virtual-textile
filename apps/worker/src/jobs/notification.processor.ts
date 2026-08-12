@@ -57,6 +57,17 @@ export interface SellerContact {
 }
 
 /**
+ * Bir siparişteki satıcı kırılımı.
+ *
+ * ⚠️ `sellerId` TEKİLLEŞTİRME ANAHTARININ PARÇASIDIR, süs değil. Bkz.
+ *    `notificationsForEvent` → 'order.paid' dalındaki uyarı.
+ */
+export interface OrderSellerContact extends SellerContact {
+  sellerId: string;
+  itemCount: number;
+}
+
+/**
  * Bildirim için gereken iletişim bilgileri.
  *
  * ⚠️ Neden olay yükünden okunmuyor: `order.paid` yükünde e-posta var ama
@@ -68,7 +79,7 @@ export interface NotificationContacts {
   order(orderId: string): Promise<OrderContact | null>;
   orderPackage(packageId: string): Promise<PackageContact | null>;
   seller(sellerId: string): Promise<SellerContact | null>;
-  sellersForOrder(orderId: string): Promise<Array<SellerContact & { itemCount: number }>>;
+  sellersForOrder(orderId: string): Promise<OrderSellerContact[]>;
 }
 
 /** Prisma ile gerçek okuma. Worker zaten PrismaClient'a doğrudan erişir. */
@@ -129,9 +140,22 @@ export class PrismaNotificationContacts implements NotificationContacts {
     };
   }
 
-  async sellersForOrder(orderId: string): Promise<Array<SellerContact & { itemCount: number }>> {
+  async sellersForOrder(orderId: string): Promise<OrderSellerContact[]> {
     const packages = await this.prisma.orderPackage.findMany({
       where: { orderId },
+      /**
+       * ⚠️ SIRALAMA ZORUNLU. `findMany` sırasız çağrıldığında PostgreSQL
+       *    satırları istediği düzende döndürebilir (plan değişir, satır
+       *    güncellenip sayfa sonuna kayar). Bildirim anahtarı bir zamanlar LİSTE
+       *    SIRASINA gömülüydü; sıra değişince aynı olayın ikinci dağıtımında A
+       *    satıcısının anahtarı B satıcısına yapışır ve tekilleştirme B'nin
+       *    bildirimini "zaten gönderildi" sayıp DÜŞÜRÜRDÜ.
+       *
+       *    Anahtar artık `sellerId`den türüyor (aşağıya bkz.), yani sıralama tek
+       *    başına doğruluk koşulu değil — ama log ve testin okunabilirliği için
+       *    determinizm yine de ucuz ve değerlidir.
+       */
+      orderBy: { sellerId: 'asc' },
       select: {
         sellerId: true,
         _count: { select: { items: true } },
@@ -147,6 +171,7 @@ export class PrismaNotificationContacts implements NotificationContacts {
     });
 
     return packages.map((pkg) => ({
+      sellerId: pkg.sellerId,
       contactEmail: pkg.seller.contactEmail,
       contactPhone: pkg.seller.contactPhone,
       storeName: pkg.seller.store?.name ?? pkg.seller.displayName,
@@ -236,14 +261,33 @@ export async function notificationsForEvent(
 
       // Satıcılara: yeni sipariş kargo süresini (SLA) başlatan olaydır.
       const sellers = await contacts.sellersForOrder(event.aggregateId);
-      for (const [index, seller] of sellers.entries()) {
+      for (const seller of sellers) {
         const sellerVariables = {
           orderNumber: order.orderNumber,
           itemCount: String(seller.itemCount),
         };
-        // ⚠️ Alıcı etiketi sıra numarası içerir: bir siparişte birden çok
-        //    satıcı olabilir ve anahtarlar çakışırsa yalnızca ilkine gider.
-        const tag = `satici-${String(index)}`;
+        /**
+         * ⚠️ ALICI ETİKETİ `sellerId`DEN TÜRER, LİSTE SIRASINDAN DEĞİL.
+         *
+         *    Önceden `satici-${index}` yazılıyordu ve sıra `findMany`in
+         *    döndürdüğü rastgele düzendi. Anahtarın tek işi "aynı alıcıya aynı
+         *    mesaj iki kez gitmesin" demektir; sıraya bağlıyken bunu YANLIŞ
+         *    söylüyordu: aynı olay ikinci kez dağıtıldığında (outbox en az bir
+         *    kez teslim eder) sıra değişirse A satıcısının anahtarı B'ye yapışır
+         *    ve B'nin "yeni siparişiniz var" bildirimi tekilleştirme tarafından
+         *    DÜŞÜRÜLÜR — satıcı siparişten haberdar olmaz, SLA sayacı işlemeye
+         *    devam eder.
+         *
+         *    `sellerId` değişmez ve satıcıya özgüdür: aynı olay + aynı satıcı
+         *    her zaman aynı anahtarı verir, farklı satıcı asla vermez.
+         *
+         * ⚠️ BİÇİM DEĞİŞİKLİĞİNİN BEDELİ ÖLÇÜLDÜ: eski biçimle gönderilmiş bir
+         *    olay tekrar dağıtılırsa satıcıya İKİNCİ bir bildirim gider. Kabul
+         *    edildi — nadir bir mükerrer SMS, kalıcı bir "hiç gitmeyen bildirim"
+         *    karşısında ucuzdur. (Müşteri anahtarları 'musteri' sabitiyle
+         *    kuruluyordu, onlar etkilenmez.)
+         */
+        const tag = `satici-${seller.sellerId}`;
         jobs.push(
           {
             channel: 'SMS',

@@ -211,6 +211,20 @@ describe('WorkerModule kablolaması — domain olay dağıtıcısı', () => {
   it('bildirim işleyicisi notification kuyruğuna YAZABİLİR', () => {
     expect(queueCalls).toContain(QUEUE.NOTIFICATION);
   });
+
+  /**
+   * ⚠️ ZOMBİ PROSES KAPANI DA KABLODA OLMALI. Kod kuralı süreci kontrol edemez:
+   *    bu depoda bir kez aynı kuyrukta ESKİ KODLU beş worker prosesi çalıştı ve
+   *    olayları rastgele böldü — kaynak kusursuzdu, ÜRETİM değildi. Sayaç
+   *    dağıtıcının arkasında değilse çalışma zamanı yine kör kalır.
+   */
+  it('⚠️ tüketici sayacı dağıtıcının arkasında — kuyruk gözleniyor', () => {
+    const fanout = (moduleRef.get(DomainEventQueueConsumer) as unknown as { fanout: unknown })
+      .fanout;
+    const census = (fanout as { census: { count?: unknown } }).census;
+
+    expect(typeof census.count).toBe('function');
+  });
 });
 
 describe('WorkerModule kablolaması — yaş kapısı işleyicinin üzerinde', () => {

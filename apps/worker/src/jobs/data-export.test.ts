@@ -161,6 +161,7 @@ function rawData(overrides: Partial<RawExportData> = {}): RawExportData {
     orders: [orderWithSellerData],
     favorites: [],
     outfits: [],
+    wardrobe: [],
     tryOnJobs: [],
     photos: [],
     stylistMessages: [],
@@ -229,6 +230,7 @@ interface JobOptions {
   lockExists?: boolean;
   photos?: Array<Record<string, unknown>>;
   tryOns?: Array<Record<string, unknown>>;
+  wardrobe?: Array<Record<string, unknown>>;
 }
 
 /**
@@ -247,6 +249,11 @@ function createJob(options: JobOptions = {}, storage = createStorage()) {
     },
   ];
   const tryOns = options.tryOns ?? [];
+  /**
+   * ⚠️ Gardırop satırı da iki `select`in alanlarını birden taşır: iş bu tabloyu
+   *    iki kez okur (manifest için üstveri, arşiv için `photoKey`).
+   */
+  const wardrobe = options.wardrobe ?? [];
 
   const prisma = {
     outboxEvent: {
@@ -284,6 +291,7 @@ function createJob(options: JobOptions = {}, storage = createStorage()) {
     order: { findMany: vi.fn().mockResolvedValue([orderWithSellerData]) },
     favorite: { findMany: vi.fn().mockResolvedValue([]) },
     outfit: { findMany: vi.fn().mockResolvedValue([]) },
+    digitalWardrobeItem: { findMany: vi.fn().mockResolvedValue(wardrobe) },
     tryOnJob: { findMany: vi.fn().mockResolvedValue(tryOns) },
     userPhoto: { findMany: vi.fn().mockResolvedValue(photos) },
     stylistMessage: { findMany: vi.fn().mockResolvedValue([]) },
@@ -404,6 +412,62 @@ describe('DataExportJob', () => {
     const manifest = readFirstEntry(put.body);
     expect(manifest.name).toBe('veriler.json');
     expect(manifest.data.toString('utf8')).toContain('depo-hatasi');
+  });
+
+  /**
+   * ⚠️ KVKK md.11 SİMETRİSİ. Hesap silme işi gardırop satırlarını siliyor ve
+   *    `photoKey` nesnelerini depodan kaldırıyor — yani onları kişisel veri
+   *    sayıyor. Arşiv ise onları HİÇ İÇERMİYORDU: aynı veri silinirken kişisel,
+   *    verilirken değil sayılıyordu.
+   */
+  it('⚠️ dijital gardırop kalemlerini arşive yazar', async () => {
+    const { job, storage } = createJob({
+      wardrobe: [
+        {
+          id: 'w1',
+          source: 'PURCHASE',
+          category: 'UPPER_BODY',
+          color: 'Beyaz',
+          label: 'Keten Gömlek — Beyaz / M',
+          variantId: 'v-1',
+          createdAt: new Date('2026-07-05T00:00:00.000Z'),
+          photoKey: null,
+        },
+      ],
+    });
+
+    await job.run(NOW);
+
+    const put = (storage.put as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { body: Buffer };
+    const manifest = readFirstEntry(put.body).data.toString('utf8');
+    expect(manifest).toContain('dijitalGardirop');
+    expect(manifest).toContain('Keten Gömlek — Beyaz / M');
+  });
+
+  /**
+   * ⚠️ MANUAL kayıtların `photoKey` alanı KULLANICININ kendi fotoğrafıdır
+   *    (private kova) ve silme işi onu depodan siliyor. Arşiv de vermelidir.
+   */
+  it('⚠️ gardıroptaki kullanıcı fotoğrafını arşive ekler', async () => {
+    const { job, storage } = createJob({
+      photos: [],
+      wardrobe: [
+        {
+          id: 'w1',
+          source: 'MANUAL',
+          category: 'DRESS',
+          color: 'Siyah',
+          label: null,
+          variantId: null,
+          createdAt: new Date('2026-07-05T00:00:00.000Z'),
+          photoKey: 'wardrobe/u1/w1',
+        },
+      ],
+    });
+
+    await job.run(NOW);
+
+    expect(storage.get).toHaveBeenCalledWith('wardrobe/u1/w1', 'private');
   });
 
   it('kullanıcı fotoğrafını arşive ekler', async () => {

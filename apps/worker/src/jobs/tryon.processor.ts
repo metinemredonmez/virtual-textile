@@ -4,7 +4,7 @@ import { Worker, type Job } from 'bullmq';
 import type Redis from 'ioredis';
 import type { PrismaClient } from '@vt/db';
 import type { Logger } from 'pino';
-import { SIGNED_URL_TTL_SECONDS, TRYON } from '@vt/config';
+import { SIGNED_URL_TTL_SECONDS, TRYON, isTryOnSupported } from '@vt/config';
 import {
   generateWithFallback,
   isPermanentFailure,
@@ -407,8 +407,27 @@ export class TryOnProcessor implements OnModuleInit, OnModuleDestroy {
     const category = variant?.product.category.tryOnCategory ?? null;
     const garmentKey = variant?.product.images[0]?.storageKey ?? null;
 
-    if (!category || !garmentKey) {
-      throw new Error('Ürün sanal denemeye uygun değil (kategori veya görsel eksik)');
+    if (!garmentKey) {
+      throw new Error('Ürün sanal denemeye uygun değil (görsel eksik)');
+    }
+
+    /**
+     * ⚠️ SON KAPI — VE TİP DARALTICI.
+     *
+     *    Katalog kategorisi sekiz değerlidir; sağlayıcıya yalnızca en az bir
+     *    modelin giydirebildiği alt küme gönderilebilir. `isTryOnSupported`
+     *    tipi daralttığı için, bu satır kaldırılırsa aşağıdaki `return`
+     *    DERLENMEZ — kapı yorumla değil derleyiciyle korunuyor.
+     *
+     *    Buraya normalde hiç gelinmemelidir: API tarafındaki
+     *    `TRYONABLE_CATEGORIES` kontrolü işi kuyruğa almadan önce reddeder
+     *    (tryon.service.ts). Yine de savunma burada da duruyor, çünkü kuyruğa
+     *    ELDEN iş eklenebilir ve o yolda API kontrolü hiç çalışmaz.
+     */
+    if (!isTryOnSupported(category)) {
+      throw new Error(
+        `Ürün sanal denemeye uygun değil (kategori desteklenmiyor: ${category ?? 'yok'})`,
+      );
     }
 
     return { userId: photo.userId, photoKey: photo.storageKey, garmentKey, category };

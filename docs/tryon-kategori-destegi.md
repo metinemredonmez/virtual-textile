@@ -7,16 +7,16 @@
 
 ## Bugünkü durum
 
-| Kategori          | Try-on | Sebep                                    |
-| ----------------- | ------ | ---------------------------------------- |
-| `UPPER_BODY`      | ✅     | FASHN v1.6 destekliyor                   |
-| `LOWER_BODY`      | ✅     | FASHN v1.6 destekliyor                   |
-| `DRESS`           | ✅     | FASHN v1.6 destekliyor                   |
-| `OUTERWEAR`       | ✅     | FASHN v1.6 destekliyor                   |
-| `SHOES`           | ❌     | **sağlayıcıda model yok**                |
-| `JEWELRY`         | ❌     | **sağlayıcıda model yok**                |
-| `BAG`             | ❌     | **sağlayıcıda model yok**                |
-| `ACCESSORY`       | ❌     | **sağlayıcıda model yok**                |
+| Kategori     | Try-on | Sebep                     |
+| ------------ | ------ | ------------------------- |
+| `UPPER_BODY` | ✅     | FASHN v1.6 destekliyor    |
+| `LOWER_BODY` | ✅     | FASHN v1.6 destekliyor    |
+| `DRESS`      | ✅     | FASHN v1.6 destekliyor    |
+| `OUTERWEAR`  | ✅     | FASHN v1.6 destekliyor    |
+| `SHOES`      | ❌     | **sağlayıcıda model yok** |
+| `JEWELRY`    | ❌     | **sağlayıcıda model yok** |
+| `BAG`        | ❌     | **sağlayıcıda model yok** |
+| `ACCESSORY`  | ❌     | **sağlayıcıda model yok** |
 
 Ürünler bu kategorilerde **satılır**; yalnızca sanal deneme kapalıdır.
 

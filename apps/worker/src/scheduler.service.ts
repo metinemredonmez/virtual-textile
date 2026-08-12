@@ -81,6 +81,21 @@ export class SchedulerService {
     await this.guard('outbox', () => this.outbox.dispatch());
   }
 
+  /**
+   * ⚠️ ÖLÜ MEKTUP DENETİMİ — kaybolmuş domain olaylarını görünür kılar.
+   *
+   * Dağıtım turundan AYRI bir cron ve daha seyrek: `dispatch` on saniyede bir
+   * koşuyor, `getFailed` ise Redis'te bir küme taramasıdır. Aynı guard'ın içine
+   * konulsaydı ölü mektup taraması dağıtımın hızını belirlerdi.
+   *
+   * ⚠️ Ayrı isim = ayrı sağlık satırı: bu iş sessizce durursa kayıp olaylar
+   *    yeniden görünmez olur ve DURDUĞU da görünmez olurdu.
+   */
+  @Cron(CronExpression.EVERY_MINUTE, { name: 'outbox-dead-letter' })
+  async auditOutboxDeadLetters(): Promise<void> {
+    await this.guard('outbox-dead-letter', () => this.outbox.auditDeadLetters());
+  }
+
   /** Stok rezervasyonu güvenlik ağı. */
   @Cron(CronExpression.EVERY_MINUTE, { name: 'reservations' })
   async releaseReservations(): Promise<void> {
@@ -156,6 +171,8 @@ export class SchedulerService {
     }
     const expectedIntervalMs: Record<string, number> = {
       outbox: 60_000,
+      // Dakikalık iş için iki tur + sapma payı.
+      'outbox-dead-letter': 5 * 60_000,
       reservations: 5 * 60_000,
       'photo-retention': PHOTO_RETENTION.cleanupIntervalMinutes * 60_000 * 2,
       /**

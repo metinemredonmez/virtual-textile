@@ -1,3 +1,4 @@
+import type { TryOnCategory } from '@vt/contracts';
 import type { ConsentRecordLike } from './consent.rules.js';
 import type { BodyMeasurements, BrandFit, FitFeedbackSummary, SizeChart } from './size-engine.js';
 
@@ -67,8 +68,20 @@ export interface TryOnVariantSnapshot {
   productTitle: string;
   size: string;
   color: string;
-  /** null ise kategori try-on'a uygun DEĞİL. */
-  tryOnCategory: 'UPPER_BODY' | 'LOWER_BODY' | 'DRESS' | 'OUTERWEAR' | null;
+  /**
+   * Katalogdaki try-on kategorisi; null ise kategori hiç eşlenmemiş.
+   *
+   * ⚠️ TİP KATALOĞUN TAMAMIDIR, "denenebilirler" DEĞİL. Buraya elle yazılmış
+   *    dört değerlik bir birleşim duruyordu ve Prisma enum'ı SHOES/JEWELRY/
+   *    BAG/ACCESSORY ile genişleyince köprü derlenmez oldu — ayakkabı satan bir
+   *    katalog, AI portunun tipi yüzünden kırılıyordu.
+   *
+   * ⚠️ Genişletmek kapıyı AÇMAZ: denenebilirlik kararı `TRYONABLE_CATEGORIES`
+   *    ile veriliyor (bkz. tryon.service.ts → loadTryOnableVariant) ve o liste
+   *    sağlayıcı yetenek matrisinden TÜRETİLİYOR. Kapıyı tipe gömmek, bir gün
+   *    kategori açıldığında ilgisiz bir dosyanın da değişmesini gerektirirdi.
+   */
+  tryOnCategory: TryOnCategory | null;
   /** Sağlayıcıya gönderilecek ürün görselinin depo anahtarı. */
   imageKey: string | null;
   sizeChart: SizeChart | null;

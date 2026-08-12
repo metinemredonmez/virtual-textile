@@ -11,10 +11,10 @@
  *   sepet → checkout → ödeme (sahte sağlayıcı) → kargo → teslim → iade
  *   talebi → satıcı onayı → ters defter
  *
- * ⚠️ TEK İSTİSNA: paketin DELIVERED'a geçişi. Satıcı ucu yalnızca
- *    PREPARING/SHIPPED/CANCELLED kabul ediyor; teslim bildirimini kargo
- *    firması entegrasyonu yapmalı ve o entegrasyon yazılmadı. Bu adım
- *    veritabanından atılıyor (bkz. veritabani.ts → paketiTeslimEt).
+ * ⚠️ Paketin DELIVERED'a geçişi de artık GERÇEK UÇTAN geçiyor:
+ *    POST /v1/logistics/packages/:id/delivered (ADMIN). Daha önce bu adım
+ *    veritabanından atılıyordu ve o kaçış kapısı, `package.delivered` olayını
+ *    üreten hiçbir kod yolu olmadığını gizliyordu.
  */
 import { randomUUID } from 'node:crypto';
 import { basariBekle, hataBekle, type Istemci } from '../destek/istemci.js';
@@ -27,11 +27,11 @@ import {
   saticiOlustur,
   sepeteEkle,
   urunYayinla,
+  paketiTeslimEt,
   yoneticiOlustur,
 } from '../destek/kurulum.js';
 import { bicimle, komisyonHesapla, kurus, lira, topla } from '../destek/para.js';
 import { expect, test } from '../destek/test.js';
-import { paketiTeslimEt } from '../destek/veritabani.js';
 
 interface DefterKaydi {
   id: string;
@@ -122,8 +122,9 @@ test.describe('İade ve ters defter', () => {
     });
     basariBekle(kargola, 200);
 
-    // SHIPPED → DELIVERED: kargo firması bildirimi yok, DB'den.
-    await paketiTeslimEt(paket.id);
+    // SHIPPED → DELIVERED: gerçek uç (ADMIN), kargo entegrasyonunun yerini
+    // bugün operatör tutuyor.
+    await paketiTeslimEt(ikinciApi, paket.id);
 
     // ══ İADE TALEBİ ═══════════════════════════════════════════════════════
     const kalem = paket.items[0];
@@ -264,7 +265,7 @@ test.describe('İade ve ters defter', () => {
       govde: { carrier: 'E2E Kargo', trackingNo: `E2E${String(Date.now()).slice(-10)}` },
       idempotencyKey: randomUUID(),
     });
-    await paketiTeslimEt(paket.id);
+    await paketiTeslimEt(ikinciApi, paket.id);
 
     const talep = await musteri.post(`/v1/orders/${siparis.orderId}/returns`, {
       govde: {

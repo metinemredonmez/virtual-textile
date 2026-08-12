@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { appError } from '@vt/contracts';
-import { SIGNED_URL_TTL_SECONDS, TRYON, TRYONABLE_CATEGORIES } from '@vt/config';
+import { isTryOnSupported, SIGNED_URL_TTL_SECONDS, TRYON } from '@vt/config';
 import { outfitIntermediateKey } from '@vt/adapters';
 import { Prisma } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -293,10 +293,11 @@ export class TryOnService {
     if (!variant) throw appError('VARIANT_NOT_FOUND');
     if (!variant.isPurchasable) throw appError('VARIANT_UNAVAILABLE');
 
+    // ⚠️ Tek kapı: `isTryOnSupported` hem null'ı hem de sağlayıcının
+    //    desteklemediği kategoriyi (ayakkabı, takı, çanta) eler ve tipi daraltır
+    //    — kapı bir gün atlanırsa derleme kırılsın diye (bkz. multi-tryon).
     const category = variant.tryOnCategory;
-    if (category === null || !TRYONABLE_CATEGORIES.includes(category)) {
-      throw appError('PRODUCT_NOT_TRYONABLE');
-    }
+    if (!isTryOnSupported(category)) throw appError('PRODUCT_NOT_TRYONABLE');
 
     // Ürün görseli olmadan sağlayıcıya gönderilecek kıyafet yok.
     if (!variant.imageKey) throw appError('PRODUCT_NOT_TRYONABLE');
