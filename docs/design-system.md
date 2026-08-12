@@ -94,10 +94,32 @@ Sayı tek başına eyleme dönüşmez; ne yapılacağı yazılır.
 
 İkiye bölünür çünkü iki ayrı problem var:
 
-### İskelet — Linear / Supabase
+### İskelet — Linear (birincil), Supabase (ikincil)
 
-Koyu tema, tek vurgu rengi, düşük kontrastlı çizgiler, 36px satır yüksekliği,
-klavye öncelikli gezinme. Az öğeyi rahat gösterir.
+Koyu tema, düşük kontrastlı çizgiler, 36px satır yüksekliği, klavye öncelikli
+gezinme. Az öğeyi rahat gösterir.
+
+Sol menü Linear'ın kalıbını izler: başlıklı gruplar (Çalışma alanı, Favoriler),
+gri ikon + gri metin, seçili satırda hafif arka plan — çerçeve yok, parlak
+vurgu yok.
+
+#### ⚠️ Renk yalnızca DURUM taşır
+
+Linear'ın asıl inceliği burada: gezinme ikonları soluk gri, ama **durum ve
+öncelik ikonları renkli**. Renk dekorasyon değil, bilgi taşır.
+
+Bizdeki karşılıkları:
+
+| Renk taşır                                        | Renk taşımaz      |
+| ------------------------------------------------- | ----------------- |
+| Sipariş durumu (ödendi / kargolandı / iade)       | Menü ikonları     |
+| Satıcı onay durumu                                | Bölüm başlıkları  |
+| Payout durumu (bekliyor / gönderildi / başarısız) | Sekmeler          |
+| Try-On Uygunluk Skoru eşiği                       | Kart kenarlıkları |
+| Stok uyarısı                                      | Sayfa başlıkları  |
+
+Bir öğe renkliyse kullanıcı "burada bir durum var" diye okur. Süs amaçlı renk
+bu sinyali harcar; ekrana bakan kişi neyin önemli olduğunu ayırt edemez.
 
 ### Finansal tablolar — Stripe
 
