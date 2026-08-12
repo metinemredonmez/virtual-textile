@@ -13,10 +13,25 @@ import { kategoriAgaci } from '@/lib/kategori';
 export const metadata: Metadata = { title: 'Kategoriler' };
 
 /**
- * ⚠️ Bu sayfa `force-dynamic` DEĞİL. Tek isteği `/categories` ve o uçta hız
- *    limiti yok, `headers()` okunmuyor. Dinamik yapmak, on dakikada bir
- *    değişen 46 KB'lık bir ağacı her ziyarette yeniden çekmek olurdu.
+ * ⚠️ `force-dynamic` — VE BU, ÖNBELLEĞİ KAYBETMEK DEĞİLDİR.
+ *
+ *    Burada bir dönem "dinamik yapmak 46 KB'lık ağacı her ziyarette yeniden
+ *    çekmek olurdu" yazıyordu. Gözlem doğru, ÇIKARIM YANLIŞTI: App Router'da
+ *    önbellek SAYFADA değil `fetch` KATMANINDA durur ve `kategoriAgaci()`
+ *    zaten `next: { revalidate: 600 }` veriyor. Sayfa dinamik olsa da API
+ *    on dakikada bir çağrılır — kazanç aynen yerinde.
+ *
+ *    Statik bırakmanın GERÇEK bedeli şuydu: sayfa DERLEME ANINDA ön-render
+ *    ediliyor, dolayısıyla `next build` AYAKTA BİR API İSTİYORDU.
+ *      · CI'da API yok → derleme ECONNREFUSED ile düştü. Arıza böyle görüldü.
+ *      · Sunucuda API VAR → derleme BAŞARILI olur ve kategori ağacı o anki
+ *        hâliyle pakete GÖMÜLÜRDÜ. Yeni kategori eklendiğinde vitrinde
+ *        görünmez, hiçbir yerde de hata çıkmazdı.
+ *    Tehlikeli olan ikincisi: gürültülü arıza kendini gösterir, sessiz olan
+ *    göstermez.
  */
+export const dynamic = 'force-dynamic';
+
 export default async function KategorilerPage(): Promise<React.ReactElement> {
   const agac = await kategoriAgaci();
 

@@ -8,7 +8,7 @@ import { list } from '@/lib/api/core';
 import { serverFetch } from '@/lib/api/server';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { koleksiyonBul, KOLEKSIYON_SLUGLARI, type Koleksiyon } from '../koleksiyonlar';
+import { koleksiyonBul, type Koleksiyon } from '../koleksiyonlar';
 import { UrunIzgarasi } from '@/components/urun/urun-izgarasi';
 
 /**
@@ -55,13 +55,25 @@ import { UrunIzgarasi } from '@/components/urun/urun-izgarasi';
  *    seçenek arasında SEO tercih edildi: bu sayfaların TEK İŞİ aramadan gelen
  *    ziyaretçi ve 200 dönen bir "bulunamadı" sayfası indekslenir.
  *
- * `generateStaticParams` yine de duruyor — üretim için değil, dört slug'ın bir
- * yerde SAYILMASI için: `koleksiyonlar.ts`e beşinci bir kayıt eklendiğinde
- * ayrıca bir liste güncellenmesin.
+ * ═══ `generateStaticParams` KALDIRILDI — derlemeyi API'ye bağlıyordu ═══
+ *
+ * "Üretim için değil, dört slug'ın bir yerde SAYILMASI için" diye duruyordu.
+ * Amaç zararsız görünüyordu, BEDELİ ölçülmemişti: fonksiyon var olduğu sürece
+ * Next dört slug'ı DERLEME ANINDA ön-render etmeye çalışır ve her biri
+ * `/products` ucuna istek atar. Yani `next build` AYAKTA BİR API İSTİYORDU:
+ *   · CI'da API yok  → derleme ECONNREFUSED ile düştü (arıza böyle görüldü),
+ *   · sunucuda API var → derleme GEÇER ama ürünler o anki hâliyle GÖMÜLÜRDÜ
+ *     ve kimse bir hata görmezdi. Sessiz olan bu ikincisi.
+ *
+ * Sayma amacı zaten karşılanıyordu: tek kaynak `koleksiyonlar.ts` →
+ * `KOLEKSIYON_SLUGLARI`. Bu fonksiyon o listenin kopyası değil TÜKETİCİSİYDİ;
+ * silinmesi ikinci bir liste doğurmuyor.
+ *
+ * ⚠️ Sayfa `headers()` okuduğu için (yukarıdaki 2. madde) HER HÂLÜKÂRDA
+ *    dinamikti — yani bu fonksiyonun üretimde hiçbir kazancı yoktu, yalnızca
+ *    derlemeye bir dış bağımlılık ekliyordu.
  */
-export function generateStaticParams(): Array<{ koleksiyon: string }> {
-  return KOLEKSIYON_SLUGLARI.map((koleksiyon) => ({ koleksiyon }));
-}
+export const dynamic = 'force-dynamic';
 
 type Params = Promise<{ koleksiyon: string }>;
 
