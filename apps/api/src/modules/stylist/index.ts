@@ -136,3 +136,24 @@ export type {
   UserProfilePort,
 } from './stylist.ports.js';
 export { ACTIVE_PROMPT_VERSION } from './prompts/index.js';
+
+/**
+ * ⚠️ KOMBİN KURAL MOTORU DIŞA AÇILIR — gardırop modülü buna ihtiyaç duyuyor ve
+ *    bu kod tabanında modüller arası DERİN import yok (`modules/x/tools/y.js`
+ *    biçiminde hiçbir satır bulunmuyor). Dışa açılmasaydı gardırop ya derin
+ *    import yapacak ya da kendi renk tablosunu yazacaktı; ikincisi kullanıcının
+ *    sohbet ekranında başka, gardırop ekranında başka cevap alması demek.
+ */
+export {
+  suggestOutfitsFromWardrobe,
+  type OutfitCandidatePiece,
+  type OutfitSuggestion,
+} from './tools/outfit-suggest.js';
+export {
+  colorFamily,
+  evaluateColorHarmony,
+  normalizeColor,
+  type ColorFamily,
+  type HarmonyResult,
+  type HarmonyVerdict,
+} from './tools/color-harmony.js';

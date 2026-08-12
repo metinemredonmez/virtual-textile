@@ -5,6 +5,30 @@
 -- taşınmalı VE `schema.prisma` aynı değişikliklerle güncellenmelidir (aksi
 -- hâlde `prisma migrate dev` drift bildirir).
 --
+-- ── KARAR (2026-08-12): ŞİMDİ UYGULANMADI — YAZAN KOD İLE BİRLİKTE GELMELİ.
+--
+-- Fayda gerçek ve aşağıda doğru anlatılmış (geçmiş ekranı üç satır yerine tek
+-- kombin göstermeli). Ama BUGÜN taşınırsa ortaya ÖLÜ ŞEMA çıkar:
+--   • `outfitGroupId` ve `layerIndex` alanlarını YAZAN hiçbir kod yok —
+--     `MultiTryOnService.enqueue` satırları bu alanlar olmadan oluşturuyor.
+--     Kolonlar kalıcı olarak NULL kalır.
+--   • Yeni indeks, hiçbir sorgunun okumadığı NULL bir kolon üzerinde her
+--     `ai_tryon_jobs` INSERT'ine bakım maliyeti bindirir. Bugün yalnızca
+--     gideri var, getirisi yok.
+--   • Bu arada şema "grup var" der, veri "yok" der; sonraki okuyucu için
+--     yanıltıcıdır — geriye dönük veri taşıma gerekmediği hâlde eski
+--     satırların neden boş olduğu tartışılır.
+--
+-- ⚠️ ENUM'DAN FARKI, ERTELEMEYİ BEDAVA KILAN ŞEY: bunlar KOLON; gerekirse
+--    `DROP COLUMN` ile geri alınır. Geri alınamaz olan enum değerinde
+--    "önden ekleyelim" riskliydi, burada beklemenin maliyeti sıfır.
+--
+-- UYGULAMA KOŞULU (üçü AYNI değişiklik setinde):
+--   1. yazma yolu  — `MultiTryOnService.enqueue` her adıma grup kimliği +
+--                    katman sırası yazsın,
+--   2. okuma yolu  — `GET /tryon/history` grup başına tek kayıt döndürsün,
+--   3. bu migration + `schema.prisma` alanları.
+--
 -- ── NEDEN GEREKLİ ──────────────────────────────────────────────────────────
 --
 -- Markalar arası çoklu ürün denemesi, kombindeki HER KATMANI ayrı bir

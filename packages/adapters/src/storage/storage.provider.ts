@@ -76,8 +76,32 @@ export const storageKeys = {
   storeLogo: (storeId: string): string => `stores/${storeId}/logo.webp`,
 } as const;
 
-/** Bir anahtarın hangi kovaya ait olduğunu tek yerden belirler. */
+/**
+ * Bir anahtarın hangi kovaya ait olduğunu tek yerden belirler.
+ *
+ * ⚠️ FONKSİYON BİLİNMEYEN HER ÖNEKİ 'public' SAYAR. Yani bu listeye
+ *    eklenmeyen private bir alan, `publicUrl()` çağrısında hata vermek yerine
+ *    KALICI ve İMZASIZ bir CDN adresi üretir. Yeni bir private ön ek açan
+ *    herkes onu buraya da yazmak zorundadır; unutmanın belirtisi yoktur.
+ *
+ * Aşağıdaki üç ön ek bu turda eklendi:
+ *   wardrobe/ → kullanıcının kendi dolabından çektiği fotoğraf. Ürün görseli
+ *               değildir; evinin içini, bazen kendisini gösterir.
+ *   exports/  → KVKK veri indirme arşivi. Kullanıcının TÜM kişisel verisinin
+ *               tek dosyada toplanmış hâli — public kovaya düşerse tek bir
+ *               adres bütün profili açar.
+ *   staging/  → işlenmemiş HAM yükleme. EXIF'i, dolayısıyla çekildiği yerin
+ *               GPS koordinatını hâlâ taşır (bkz. media.ports.ts → mediaKeys).
+ */
 export function visibilityForKey(key: string): StorageVisibility {
-  const privatePrefixes = ['user-photos/', 'tryon/', 'seller-docs/', 'returns/'];
+  const privatePrefixes = [
+    'user-photos/',
+    'tryon/',
+    'seller-docs/',
+    'returns/',
+    'wardrobe/',
+    'exports/',
+    'staging/',
+  ];
   return privatePrefixes.some((prefix) => key.startsWith(prefix)) ? 'private' : 'public';
 }

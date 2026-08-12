@@ -298,20 +298,22 @@ function secondsUntilMidnight(): number {
 // ── 4. AI maliyet defteri ──────────────────────────────────────────────────
 
 /**
- * ⚠️ ŞEMA BAĞIMLILIĞI: `AiFeature` enum'unda `SEARCH_NL` değeri HENÜZ YOK.
+ * ŞEMA BAĞIMLILIĞI: `AiFeature.SEARCH_NL`.
  *
- * Kayıt bilinçli olarak ham SQL ile yazılıyor — Prisma'nın ürettiği TypeScript
- * enum'u olmayan bir değeri kabul etmez ve derleme kırılırdı. Ham SQL bugün
- * DERLENİR, migration uygulandığı an da ÇALIŞIR; tek satır kod değişmez.
+ * ✅ MIGRATION UYGULANDI: `20260812094700_ai_feature_search_nl`. Bu blok daha
+ *    önce "enum'da değer HENÜZ YOK" diyordu; artık var ve maliyet gerçekten
+ *    `ai_usage_logs` tablosuna yazılıyor.
  *
- * Migration uygulanana kadar INSERT bir kez denenir, başarısız olur ve adaptör
- * kalıcı olarak "yapısal log" moduna geçer: maliyet kaybolmaz, `ai_usage_logs`
- * yerine log akışına yazılır. Her aramada hata loglamamak için uyarı YALNIZCA
- * BİR KEZ basılır — aksi hâlde asıl uyarı gürültüde kaybolurdu.
+ * ⚠️ KAYIT YİNE DE HAM SQL İLE yazılıyor ve bu KASITLI. Dosyanın kendi vaadi
+ *    tuttu ("migration uygulandığı an da ÇALIŞIR; tek satır kod değişmez").
+ *    Prisma'nın ürettiği tipe geçirmek bugün mümkün ama bir kazanç sağlamaz;
+ *    yalnızca bir sonraki özellikte aynı kilidi geri getirir.
  *
- * Gereken migration (bu ajan YAZMADI, uygulamadı — raporda gerekçesiyle var):
- *   ALTER TYPE "AiFeature" ADD VALUE IF NOT EXISTS 'SEARCH_NL';
- * ve `schema.prisma` içindeki `enum AiFeature` bloğuna aynı değer.
+ * Aşağıdaki `ledgerUnavailable` düşüşü hâlâ anlamlıdır: enum bir gün geri
+ * alınırsa ya da tablo erişilemez olursa INSERT bir kez denenir, başarısız olur
+ * ve adaptör kalıcı olarak "yapısal log" moduna geçer — maliyet kaybolmaz,
+ * `ai_usage_logs` yerine log akışına yazılır. Uyarı YALNIZCA BİR KEZ basılır;
+ * her aramada basılsaydı asıl uyarı gürültüde kaybolurdu.
  *
  * ⚠️ Neden mevcut bir değere (ör. STYLIST) yazılmıyor: maliyet paneli
  *    özellik bazlı okunuyor. Aramanın harcaması danışmana yazılsaydı,

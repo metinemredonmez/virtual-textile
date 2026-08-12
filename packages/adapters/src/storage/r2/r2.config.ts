@@ -73,6 +73,12 @@ const KNOWN_KEY_PREFIXES = [
   'tryon/',
   'seller-docs/',
   'returns/',
+  // ⚠️ Üçü de private ve `visibilityForKey` artık öyle biliyor. Buraya da
+  //    yazılmasalardı kontrol onları "tanınmayan önek" sayıp atlar, yani
+  //    `put({ key: 'wardrobe/…', visibility: 'public' })` sessizce çalışırdı.
+  'wardrobe/',
+  'exports/',
+  'staging/',
 ] as const;
 
 /**

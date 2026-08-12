@@ -99,6 +99,35 @@ export interface NotificationJobData {
   messageId: string;
 }
 
+/**
+ * BULLMQ İŞ KİMLİĞİ — tekilleştirme anahtarından türetilir.
+ *
+ * ⚠️ BULLMQ `jobId` İÇİNDE İKİ NOKTA ÜST ÜSTE KABUL ETMEZ ("Custom Id cannot
+ *    contain :"). Redis'te iş anahtarları `bull:<kuyruk>:<jobId>` biçiminde
+ *    kurulduğu için ayırıcı karakterin kimliğin içinde geçmesi anahtar
+ *    uzayını bozar; kütüphane bu yüzden ekleme anında REDDEDER.
+ *
+ * Bizim tekilleştirme anahtarlarımız (`notificationMessageId`, KVKK işlerinin
+ * `kvkk:...` kimlikleri) okunabilir olsun diye iki nokta ile kurulmuştu.
+ * Sonuç: `queue.add` HER ÇAĞRIDA fırlıyordu ve bildirim üretimi tamamen
+ * durmuştu — sipariş onayı, kargo, satıcı bilgilendirmesi, payout, KVKK
+ * e-postaları dahil. Hata outbox dağıtıcısında yakalanıp loglandığı için
+ * süreç ayakta kalıyor, arıza yalnızca log'da görünüyordu.
+ *
+ * ÇÖZÜMÜN YÖNÜ ÖNEMLİ: `messageId`in KENDİSİ değiştirilmedi. O değer
+ * gönderim tekilleştirmesinin anahtarıdır (bkz. redis-dedupe.store.ts) ve
+ * biçimi değişirse daha önce gönderilmiş mesajlar "hiç gönderilmemiş" sayılıp
+ * TEKRAR gönderilir. Yalnızca kuyruk katmanına giden kimlik dönüştürülür.
+ *
+ * Dönüşüm KAÇIŞLIDIR, düz değiştirme değil: önce `_` ikilenir, sonra `:`
+ * tek `_` olur. Düz değiştirme (`:` → `_`) iki FARKLI anahtarı aynı iş
+ * kimliğine düşürebilirdi — bu, ikinci mesajın BullMQ tarafından sessizce
+ * yok sayılması, yani bir bildirimin HİÇ GİTMEMESİ demekti.
+ */
+export function queueJobId(messageId: string): string {
+  return messageId.replace(/_/g, '__').replace(/:/g, '_');
+}
+
 export interface MediaJobData {
   kind: 'PRODUCT_IMAGE' | 'USER_PHOTO';
   storageKey: string;

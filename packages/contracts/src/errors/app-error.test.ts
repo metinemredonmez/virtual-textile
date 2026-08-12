@@ -43,6 +43,47 @@ describe('hata kataloğu', () => {
     });
     expect(noisy).toEqual([]);
   });
+
+  /**
+   * KOMBİN RET KODLARI — üçü de KULLANICI SEÇİMİNİN sonucudur.
+   *
+   * Aile seçimi bilinçli: şema tutuyor (kimlikler geçerli), reddeden şey GİYİM
+   * KURALI. Bu yüzden `domain` + 422; `validation` olsaydı biçim hatalarıyla
+   * aynı kovaya düşer ve panelde ayırt edilemezdi.
+   */
+  it('kombin ret kodları kullanıcı hatasıdır: 422 + domain + tekrarlanamaz', () => {
+    const outfitCodes = ERROR_CODES.filter((code) => code.startsWith('OUTFIT_'));
+    expect(outfitCodes).toEqual([
+      'OUTFIT_LAYER_CONFLICT',
+      'OUTFIT_PIECE_COUNT_INVALID',
+      'OUTFIT_DUPLICATE_PIECE',
+    ]);
+
+    for (const code of outfitCodes) {
+      const def = ERROR_CATALOG[code];
+      expect(def.status, `${code} durum kodu`).toBe(422);
+      expect(def.family, `${code} ailesi`).toBe('domain');
+      // Aynı istek tekrar gönderilse aynı sonucu verir; istemci retry etmemeli.
+      expect(def.retryable, `${code} retry`).toBe(false);
+    }
+  });
+
+  /**
+   * ⚠️ Bu kodların VAR OLMA SEBEBİ, genel `VALIDATION_FAILED` mesajının
+   *    kullanıcıya ne yapacağını söylememesiydi. Mesajın EYLEM içerdiğini
+   *    sınamazsak kodları ekleyip mesajı yine genel bırakmak mümkün olurdu.
+   */
+  it('kombin ret mesajları kullanıcıya bir EYLEM söyler', () => {
+    const actionVerbs = ['bırakın', 'çıkarın', 'seçebilirsiniz', 'seçin', 'değiştirin'];
+
+    for (const code of ERROR_CODES.filter((c) => c.startsWith('OUTFIT_'))) {
+      const { message } = ERROR_CATALOG[code];
+      expect(
+        actionVerbs.some((verb) => message.includes(verb)),
+        `${code} mesajı eylem içermiyor: ${message}`,
+      ).toBe(true);
+    }
+  });
 });
 
 describe('AppError', () => {

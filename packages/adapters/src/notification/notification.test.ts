@@ -212,8 +212,49 @@ describe('şablon doldurma', () => {
     }
   });
 
-  it('dokuz şablonun tamamı tanımlı', () => {
-    expect(Object.keys(TR_TEMPLATES)).toHaveLength(9);
+  /**
+   * ⚠️ Sayı değil, ADLAR sabitlenir. Eskiden `toHaveLength(9)` yazıyordu; o
+   *    biçim yeni şablon eklendiğinde "11 ≠ 9" diyor ama HANGİ şablonun
+   *    eklendiğini ya da kaybolduğunu söylemiyordu. Korunmak istenen şey de
+   *    sayı değil, bir şablonun sessizce DÜŞMEMESİ: metin silinince kullanıcı
+   *    hata almaz, bildirimi hiç gelmez.
+   */
+  it('beklenen şablonların tamamı tanımlı', () => {
+    expect(Object.keys(TR_TEMPLATES).sort()).toEqual([
+      'hosgeldin',
+      'iade-onaylandi',
+      'iade-reddedildi',
+      'kvkk-hesap-silindi',
+      'kvkk-veri-indirme-hazir',
+      'otp-dogrulama',
+      'payout-gonderildi',
+      'satici-onaylandi',
+      'satici-yeni-siparis',
+      'siparis-alindi',
+      'siparis-kargolandi',
+    ]);
+  });
+
+  /**
+   * ⚠️ KVKK şablonları worker'daki iki cron'un GÖNDERİM YÜZEYİDİR
+   *    (account-deletion.job.ts / data-export.job.ts). Şablon adı orada sabit
+   *    bir string olarak duruyor; buradan silinirse TS derlemesi KIRILMAZ, iş
+   *    kuyrukta "şablon bulunamadı" ile kalıcı hataya düşer.
+   */
+  it('KVKK şablonları e-posta kanalını destekler ve kişisel veri taşımaz', () => {
+    const silindi = TR_TEMPLATES['kvkk-hesap-silindi'];
+    expect(silindi.email).toBeDefined();
+    // Silinen kişiye giden metinde doldurulacak alan OLMAMALI: ad ya da
+    // sipariş numarası yazsaydık, az önce sildiğimiz veriyi e-posta
+    // sağlayıcısının kayıtlarında yeniden var ederdik.
+    expect(silindi.variables).toEqual([]);
+    expect(silindi.sms).toBeUndefined();
+
+    const indirme = TR_TEMPLATES['kvkk-veri-indirme-hazir'];
+    expect(indirme.email).toBeDefined();
+    expect(indirme.variables).toEqual(['link', 'hours']);
+    // ⚠️ SMS yok: imzalı URL uzundur, operatör kısaltıcıları imzayı bozar.
+    expect(indirme.sms).toBeUndefined();
   });
 
   /** Türkçe karakter mesajı UCS-2'ye düşürür: segment 160 değil 70 karakter. */

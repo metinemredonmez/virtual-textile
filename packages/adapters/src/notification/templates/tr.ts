@@ -158,4 +158,51 @@ export const TR_TEMPLATES: Readonly<Record<TemplateKey, NotificationTemplate>> =
       text: `{storeName} mağazanız onaylandı.\n\nArtık ürün ekleyebilir ve satışa başlayabilirsiniz.${IMZA_TEXT}`,
     },
   },
+
+  // ── KVKK ────────────────────────────────────────────────────────────────
+
+  /**
+   * HESAP SİLİNDİ — KVKK m.7 / m.11 bildirimi.
+   *
+   * ⚠️ DEĞİŞKENSİZ ve bu bilinçlidir. Bu e-posta, kişisel verisi az önce
+   *    silinmiş bir kişiye gider; içine ad, sipariş numarası veya herhangi
+   *    bir kimlik alanı koymak, silinen veriyi e-posta sağlayıcısının
+   *    kayıtlarında yeniden var etmek olurdu. Alıcı adresi zaten zorunlu
+   *    asgari; ötesi yazılmaz.
+   *
+   * ⚠️ SMS yok: silme kullanıcının kendi talebidir, duyurulması için segment
+   *    (para) harcanmaz — işin kendisi de aynı gerekçeyle SMS göndermiyor.
+   */
+  'kvkk-hesap-silindi': {
+    key: 'kvkk-hesap-silindi',
+    version: 1,
+    variables: [],
+    email: {
+      subject: 'Hesabınız silindi',
+      html: `<p>Hesap silme talebiniz tamamlandı. Hesabınız ve kişisel verileriniz kalıcı olarak silindi.</p><p>Mevzuat gereği saklanması zorunlu olan fatura ve muhasebe kayıtları, kimlik bilgilerinizden ayrıştırılmış biçimde tutulmaya devam eder.</p>${IMZA_HTML}`,
+      text: `Hesap silme talebiniz tamamlandı. Hesabınız ve kişisel verileriniz kalıcı olarak silindi.\n\nMevzuat gereği saklanması zorunlu olan fatura ve muhasebe kayıtları, kimlik bilgilerinizden ayrıştırılmış biçimde tutulmaya devam eder.${IMZA_TEXT}`,
+    },
+  },
+
+  /**
+   * VERİ İNDİRME HAZIR — KVKK m.11 veri taşınabilirliği.
+   *
+   * ⚠️ `link` KISA ÖMÜRLÜ İMZALI bir adrestir ve metne yazılan tek hassas
+   *    alandır. `{hours}` metne AYRICA yazılır: bağlantının ne zaman öleceğini
+   *    söylemeyen bir e-posta, kullanıcıyı çalışmayan bir bağlantıyla baş başa
+   *    bırakır ve ikinci bir talep üretir.
+   *
+   * ⚠️ SMS yok: imzalı URL uzundur, SMS'te birden çok segment tutar ve
+   *    operatör kısaltıcıları imzayı bozabilir.
+   */
+  'kvkk-veri-indirme-hazir': {
+    key: 'kvkk-veri-indirme-hazir',
+    version: 1,
+    variables: ['link', 'hours'],
+    email: {
+      subject: 'Verileriniz indirmeye hazır',
+      html: `<p>Kişisel verilerinizi içeren arşiv hazırlandı.</p><p><a href="{link}">Arşivi indir</a></p><p>Bağlantı <b>{hours} saat</b> geçerlidir; süre dolduğunda yeni bir talep oluşturmanız gerekir. Bağlantıyı kimseyle paylaşmayın.</p>${IMZA_HTML}`,
+      text: `Kişisel verilerinizi içeren arşiv hazırlandı.\n\nArşivi indir: {link}\n\nBağlantı {hours} saat geçerlidir; süre dolduğunda yeni bir talep oluşturmanız gerekir. Bağlantıyı kimseyle paylaşmayın.${IMZA_TEXT}`,
+    },
+  },
 };

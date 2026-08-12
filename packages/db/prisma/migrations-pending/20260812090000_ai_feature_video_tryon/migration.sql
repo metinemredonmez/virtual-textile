@@ -30,6 +30,30 @@
 -- ⚠️ GERİ ALINAMAZ: PostgreSQL'de bir enum değeri KALDIRILAMAZ (tipin
 --    yeniden yaratılması gerekir). Bu yüzden değer, özellik gerçekten
 --    açılmaya karar verildiğinde eklenmelidir — "şimdiden dursun" diye değil.
+--
+-- ── KARAR (2026-08-12): UYGULANMADI, burada kalmaya devam ediyor. ─────────
+--
+-- Yukarıdaki uyarı bugün de geçerli olduğu için aynen korundu:
+--   • `AI_VIDEO_TRYON_ENABLED` varsayılanı FALSE ve `FAL_VIDEO_TRYON_MODEL`
+--     BOŞ → fabrika `Unconfigured` dönüyor (adapters/ai/video-tryon.ts).
+--     Yani bu değeri YAZABİLECEK TEK BİR KOD YOLU BİLE YOK; enum bugün
+--     eklenirse ilk satırını belirsiz bir gelecekte alır.
+--   • Kayıp yok: yazılamayan bir maliyet yok, çünkü harcanan para da yok.
+--   • docs/ozellik-yol-haritasi.md → Faz 3 karar sırasını açıkça yazıyor:
+--     birim ekonomi ölçülmeden video'ya girilmez. Şemayı önden açmak, geri
+--     ALINAMAZ bir adımı ölçümden ÖNCE atmak olurdu.
+--
+-- ⚠️ KARŞILAŞTIRMA — neden SEARCH_NL uygulandı da bu uygulanmadı: doğal dil
+--    aramada para ŞU AN harcanıyor ve deftere yazılamıyordu (gerçekleşen
+--    kayıp). Burada harcama yok; yalnızca gelecekte olma ihtimali var.
+--    Geri alınamaz bir değişikliğin bedeli, ihtimalle değil GERÇEKLEŞEN
+--    ihtiyaçla ödenir.
+--
+-- ⚠️ SONRA TAŞINIRKEN: bu klasörün damgası 20260812090000, oysa
+--    `migrations/20260812094700_ai_feature_search_nl` UYGULANDI. Taşırken
+--    klasörü O ANIN damgasıyla yeniden adlandırın; aksi hâlde uygulanmış bir
+--    migration'ın ÖNÜNE sıralanır (deploy yine çalışır, ama geçmiş yanıltıcı
+--    okunur).
 
 -- PostgreSQL 17 (CI: pgvector/pgvector:pg17) `ALTER TYPE ... ADD VALUE`
 -- ifadesini transaction içinde kabul eder; yeni değer aynı transaction'da

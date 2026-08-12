@@ -1,0 +1,29 @@
+-- ── AiFeature.SEARCH_NL ────────────────────────────────────────────────────
+--
+-- NİÇİN ŞİMDİ: doğal dilde arama CANLI. `NaturalSearchModule` app.module.ts
+-- içinde kayıtlı ve `ANTHROPIC_API_KEY` tanımlıysa her yorumlanan sorgu için
+-- sağlayıcıya para ödeniyor. Ama `PrismaSearchAiUsageAdapter` bu satırı
+-- `ai_usage_logs` tablosuna YAZAMIYOR: enum'da karşılığı yok, INSERT ilk
+-- denemede düşüyor ve adaptör kalıcı olarak "yalnızca log" moduna geçiyor.
+-- Sonuç: harcanan para maliyet panelinde GÖRÜNMÜYOR, yalnızca log akışında
+-- duruyor. Bu, video try-on'dan farklı olarak BUGÜN gerçekleşen bir kayıptır.
+--
+-- ⚠️ NEDEN MEVCUT BİR DEĞERE (ör. STYLIST) YAZILMIYOR: panel özellik bazlı
+--    okunuyor. Aramanın harcaması danışmana yazılsaydı "danışman pahalılaştı"
+--    diye bakılan yerde arama maliyeti bulunurdu; iki farklı birim maliyet tek
+--    ortalamada erirdi.
+--
+-- ⚠️ GERİ ALINAMAZ: PostgreSQL'de enum değeri kaldırılamaz. Burada kabul
+--    edilebilir olmasının sebebi, değerin ŞU AN çalışan bir kod yolunun
+--    ihtiyacı olmasıdır — spekülatif değil.
+--
+-- PostgreSQL 12+ `ALTER TYPE ... ADD VALUE` ifadesini transaction içinde kabul
+-- eder (yerel/CI: pgvector/pgvector:pg17); yeni değer AYNI transaction'da
+-- KULLANILAMAZ — bu migration da kullanmıyor, yalnızca tanımlıyor.
+--
+-- Beraberinde giden değişiklikler (aksi hâlde `migrate status` sapma bildirir
+-- ya da TS derlemesi kırılır):
+--   • packages/db/prisma/schema.prisma      → enum AiFeature + SEARCH_NL
+--   • packages/config/src/ai-budget.ts      → AiFeature birleşimi + tahmini
+--                                             birim maliyet kaydı
+ALTER TYPE "AiFeature" ADD VALUE IF NOT EXISTS 'SEARCH_NL';

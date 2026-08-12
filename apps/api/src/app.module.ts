@@ -17,6 +17,7 @@ import { AdminModule } from './modules/admin/index.js';
 import { MediaModule } from './modules/media/index.js';
 import { AiModule } from './modules/ai/index.js';
 import { StylistModule } from './modules/stylist/index.js';
+import { WardrobeModule } from './modules/wardrobe/index.js';
 import { EnvelopeInterceptor } from './common/interceptors/envelope.interceptor.js';
 import { IdempotencyInterceptor } from './common/interceptors/idempotency.interceptor.js';
 import { RateLimitGuard } from './common/guards/rate-limit.guard.js';
@@ -59,6 +60,13 @@ import { requestContextMiddleware } from './common/middleware/request-context.mi
     MediaModule,
     AiModule,
     StylistModule,
+    // ⚠️ WardrobeModule kökte AÇIKÇA bağlanır. Kendisi MediaModule,
+    //    StylistModule ve AiModule'ü import ediyor ama TERSİ geçerli değil:
+    //    hiçbir modül gardırobu import etmiyor, dolayısıyla burada
+    //    bağlanmasaydı `/v1/wardrobe` uçları hiç yayına çıkmazdı. Bir modülün
+    //    yazılmış, derlenmiş ve test edilmiş olması onu CANLI yapmaz — DI
+    //    grafiğine girmesi yapar.
+    WardrobeModule,
   ],
   controllers: [HealthController],
   providers: [

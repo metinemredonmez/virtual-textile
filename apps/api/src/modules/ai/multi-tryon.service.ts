@@ -1,12 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { appError } from '@vt/contracts';
+import { appError, toAppError, type ErrorCode } from '@vt/contracts';
 import { estimateCost, SIGNED_URL_TTL_SECONDS, TRYON, TRYONABLE_CATEGORIES } from '@vt/config';
 import {
   isProducibleCategory,
+  MAX_OUTFIT_PIECES,
+  MIN_OUTFIT_PIECES,
   orderOutfitPieces,
   outfitStepKeys,
   type OrderedOutfitPiece,
   type OutfitLayerCategory,
+  type OutfitOrderFailureReason,
 } from '@vt/adapters';
 import { Prisma } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -47,6 +50,24 @@ import type { TryOnActor } from './tryon.service.js';
  *    bağlantısı) için gereken şema eklemesi raporda önerilmiştir; bu uç onsuz
  *    da çalışır çünkü istemci adım kimliklerini yanıtta alır.
  */
+
+/**
+ * Sıralama reddinin KULLANICI karşılığı.
+ *
+ * ⚠️ Eşleme burada, katalogda değil: `@vt/adapters` saf sıralama mantığıdır ve
+ *    HTTP/hata kataloğunu tanımaz (worker da aynı fonksiyonu çağırır). Ret
+ *    sebebini kullanıcı diline çevirmek uygulama katmanının işidir.
+ *
+ * `satisfies` sayesinde adapters tarafına yeni bir ret sebebi eklendiğinde
+ * DERLEME KIRILIR — sessizce genel hataya düşülmez.
+ */
+const OUTFIT_ORDER_ERROR_CODE = {
+  LAYER_CONFLICT: 'OUTFIT_LAYER_CONFLICT',
+  /** Alt ve üst sınır aynı koda düşer: kullanıcının eylemi tek — sayıyı düzelt. */
+  TOO_FEW_PIECES: 'OUTFIT_PIECE_COUNT_INVALID',
+  TOO_MANY_PIECES: 'OUTFIT_PIECE_COUNT_INVALID',
+  DUPLICATE_VARIANT: 'OUTFIT_DUPLICATE_PIECE',
+} as const satisfies Record<OutfitOrderFailureReason, ErrorCode>;
 
 /** Kuyruk bekleme tahmini için taban süreler. Timeout değil, TİPİK süre. */
 const TYPICAL_GENERATION_SECONDS: Record<'FAST' | 'QUALITY', number> = {
@@ -244,6 +265,48 @@ export class MultiTryOnService {
     });
   }
 
+  // ── Uygunluk yoklaması (ÜRETİM YOK) ──────────────────────────────────────
+
+  /**
+   * Bu varyantlar bir arada denenebilir mi?
+   *
+   * ⚠️ HİÇBİR ŞEY ÜRETMEZ, HİÇBİR ŞEY YAZMAZ, KOTA HARCAMAZ. Yalnızca
+   *    `create()` yolunun ilk iki kapısını —parça uygunluğu ve katman sırası—
+   *    çalıştırıp sonucu bir cevaba çevirir. Gardırop ekranı "dene" düğmesini
+   *    aktif edip etmeyeceğine buna bakarak karar verir.
+   *
+   * ⚠️ RIZA ve FOTOĞRAF KAPILARI BURADA YOKTUR ve olmamalıdır: ikisi de
+   *    `create()` içinde, sağlayıcıya çağrıdan önce, istisnasız çalışır. Burada
+   *    tekrarlansaydı henüz rıza vermemiş bir kullanıcı düğmeyi hiç göremez ve
+   *    rıza akışına da yönlendirilemezdi — yoklama, kapıların yerine geçmez.
+   *
+   * ⚠️ `appError` FIRLATILMAZ, `{ available:false, reason }` DÖNER. Bu bir
+   *    hata yolu değil, bir sorudur; 4xx'e çevirmek çağıranı try/catch ile
+   *    akış kontrolü yapmaya zorlardı.
+   */
+  async checkOutfitEligibility(
+    variantIds: readonly string[],
+  ): Promise<{ available: boolean; reason?: string }> {
+    if (variantIds.length === 0) {
+      return { available: false, reason: 'Denenecek parça yok.' };
+    }
+
+    try {
+      const snapshots = await this.loadPieces(variantIds);
+      this.orderOrThrow(snapshots);
+      return { available: true };
+    } catch (error) {
+      const appErr = toAppError(error);
+      // ⚠️ Kullanıcıya katalogdaki mesaj gösterilir; iç açıklama (varyant
+      //    kimlikleri taşır) yalnızca logda kalır.
+      this.logger.debug(
+        { variantIds, code: appErr.code },
+        'Gardırop kombini sanal denemeye uygun değil',
+      );
+      return { available: false, reason: appErr.message };
+    }
+  }
+
   // ── Yardımcılar ──────────────────────────────────────────────────────────
 
   /**
@@ -295,12 +358,15 @@ export class MultiTryOnService {
       'Kombin sıralaması reddedildi',
     );
 
-    // ⚠️ Kullanıcı mesajı GENEL kalıyor: katalogda "elbise ile pantolon aynı
-    //    anda denenemez" diyen bir kod yok. Gerekli kodlar raporda önerildi;
-    //    burada yanlış bir mesaj göstermektense genel mesaj tercih edildi.
-    throw appError('VALIDATION_FAILED', {
+    // ⚠️ `details.reason` KORUNUYOR: istemci hangi parçayı işaretleyeceğini
+    //    buradan bilir, kullanıcı mesajı ise katalogdan gelir. İç açıklama
+    //    (`detail`) yalnızca log tarafında kalır — varyant kimlikleri taşır.
+    throw appError(OUTFIT_ORDER_ERROR_CODE[result.reason], {
       internalMessage: `Kombin reddedildi (${result.reason}): ${result.detail}`,
       details: { reason: result.reason, variantIds: result.variantIds },
+      // Sınırlar tek kaynaktan gelir; mesajdaki rakam ile şemadaki (zod) sınır
+      // hiçbir zaman ayrışmaz.
+      params: { min: MIN_OUTFIT_PIECES, max: MAX_OUTFIT_PIECES },
     });
   }
 

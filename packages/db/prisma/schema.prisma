@@ -77,6 +77,7 @@ model User {
   tryOnJobs     TryOnJob[]
   stylistConversations StylistConversation[]
   sellerMemberships SellerUser[]
+  wardrobeItems DigitalWardrobeItem[]
 
   @@index([status, createdAt])
   @@map("user_users")
@@ -377,6 +378,14 @@ enum Gender {
   KIDS
 }
 
+/// Gardıroptaki parçanın nereden geldiği.
+enum WardrobeSource {
+  /// Satın alındı — `package.delivered` olayı ekledi.
+  PURCHASE
+  /// Kullanıcı platformda satılmayan kendi parçasını fotoğrafıyla ekledi.
+  MANUAL
+}
+
 enum ProductStatus {
   DRAFT
   PENDING_REVIEW
@@ -467,6 +476,7 @@ model Variant {
   orderItems     OrderItem[]
   tryOnJobs      TryOnJob[]
   priceHistory   PriceHistory[]
+  wardrobeItems  DigitalWardrobeItem[]
 
   @@unique([productId, color, size])
   @@index([productId, isActive])
@@ -629,6 +639,52 @@ model Outfit {
 
   @@index([userId, createdAt])
   @@map("cart_outfits")
+}
+
+/// KULLANICININ DİJİTAL GARDIROBU.
+///
+/// ⚠️ `photoKey` ÖZEL NİTELİKLİ KİŞİSEL VERİDİR: private kovada durur, yalnızca
+///    kısa ömürlü imzalı URL ile okunur. Ürün görselinden (public kova) FARKLI
+///    muamele görür ve tam olarak bu yüzden AYRI kolondadır — tek kolon olsaydı
+///    bir sorgu ikisini aynı yoldan servis edebilirdi.
+model DigitalWardrobeItem {
+  id                String         @id @default(uuid(7))
+  userId            String
+  source            WardrobeSource
+
+  /// ⚠️ NULL OLABİLİR ve bu bir gereksinimdir: kullanıcı platformda satılmayan
+  ///    kendi parçasını da ekleyebilmelidir, yoksa gardırop onun dolabını değil
+  ///    yalnızca bizden aldıklarını gösterir.
+  variantId         String?
+  category          TryOnCategory
+  color             String
+  label             String?
+
+  /// ⚠️ private kova — kullanıcının kendi fotoğrafı. MANUAL kayıtlarda dolu.
+  photoKey          String?
+  /// public kova — satın alınan ürünün görseli (snapshot).
+  productImageKey   String?
+
+  /// ⚠️ MÜKERRER OTOMATİK EKLEMEYİ ENGELLEYEN DOĞAL ANAHTAR.
+  ///    Teslimat olayı EN AZ BİR KEZ gelir ve iade reddi paketi
+  ///    RETURN_REQUESTED → DELIVERED geri döndürdüğünde `package.delivered`
+  ///    ikinci kez GERÇEKTEN üretilir (bkz. wardrobe.auto-add.ts).
+  sourceOrderItemId String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// ⚠️ SetNull: ürün katalogdan kalkınca kullanıcının dolabındaki ceket yok
+  ///    olmaz, yalnızca denenemez hâle gelir.
+  variant           Variant?       @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  /// ⚠️ İDEMPOTENTLİĞİN TEK GERÇEK DAYANAĞI. PostgreSQL'de NULL'lar birbirinden
+  ///    farklı sayılır; MANUAL kayıtlar (sourceOrderItemId NULL) etkilenmez.
+  @@unique([userId, sourceOrderItemId])
+  @@index([userId, createdAt])
+  @@index([userId, category])
+  @@map("user_wardrobe_items")
 }
 
 // ═══════════════════════════ KAMPANYA & KUPON ════════════════════════════
@@ -1178,6 +1234,13 @@ model TryOnJob {
   @@map("ai_tryon_jobs")
 }
 
+/// Maliyet paneli harcamayı BU alana göre gruplar; her ayrı birim maliyet
+/// kendi değerini ister. İki özellik tek değere yazılırsa ortalama erir ve
+/// "maliyet nereye gidiyor" sorusu cevapsız kalır.
+///
+/// ⚠️ GERİ ALINAMAZ: PostgreSQL'de enum değeri SİLİNEMEZ (tip yeniden
+///    yaratılmadan). Bu yüzden değer, o özelliğin harcaması GERÇEKTEN
+///    başladığında eklenir — "ileride lazım olur" diye değil.
 enum AiFeature {
   TRYON
   STYLIST
@@ -1185,6 +1248,8 @@ enum AiFeature {
   DESCRIPTION
   EMBEDDING
   MODERATION
+  /// Doğal dilde arama niyet çıkarımı — bkz. natural-search.gateway.ts.
+  SEARCH_NL
 }
 
 /// Maliyet paneli bunu okur. Her AI çağrısı — başarılı veya başarısız — buraya yazılır.

@@ -10,8 +10,13 @@ import type { Env } from './env.js';
  * ETKİLENMEZ. Kullanıcı yine gezinir, sepete atar, satın alır.
  */
 
+/**
+ * ⚠️ Prisma enum'ından TÜRETİLMEZ, elle güncellenir: `@vt/config` `@vt/db`
+ *    paketine bağlı değil (yapılandırma katmanı veritabanı istemcisini
+ *    çekmemeli). Şemadaki `enum AiFeature` ile birlikte değişmelidir.
+ */
 export type AiFeature =
-  'TRYON' | 'STYLIST' | 'TAGGING' | 'DESCRIPTION' | 'EMBEDDING' | 'MODERATION';
+  'TRYON' | 'STYLIST' | 'TAGGING' | 'DESCRIPTION' | 'EMBEDDING' | 'MODERATION' | 'SEARCH_NL';
 
 export interface AiBudget {
   dailyPlatformUsd: number;
@@ -91,6 +96,18 @@ export const ESTIMATED_UNIT_COST_MICRO_USD: Record<AiFeature, bigint> = {
   DESCRIPTION: 2_000n,
   EMBEDDING: 200n,
   MODERATION: 500n,
+  /**
+   * ~$0,001 / yorumlanan sorgu.
+   *
+   * Kaynak: `natural-search.constants.ts` → `minWordsForLlm`; LLM'e gitmenin
+   * eşiği tam da bu rakamla gerekçelendiriliyor. Çıktı tek küçük JSON'dur
+   * (`maxOutputTokens: 400`) ve sistem istemi önbelleklenir, bu yüzden maliyet
+   * danışman turundan (8.000) belirgin biçimde düşüktür.
+   *
+   * ⚠️ Yalnızca ÖN KONTROL içindir; deftere yazılan gerçek maliyet her zaman
+   *    sağlayıcının döndürdüğü değerdir (bkz. IntentResponse.costMicroUsd).
+   */
+  SEARCH_NL: 1_000n,
 };
 
 export function estimateCost(feature: AiFeature, units = 1): bigint {

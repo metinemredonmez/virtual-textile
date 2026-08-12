@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@vt/contracts';
-import { resetEnvCache } from '@vt/config';
-import { outfitStepKeys } from '@vt/adapters';
+import { ESTIMATED_UNIT_COST_MICRO_USD, estimateCost, resetEnvCache } from '@vt/config';
+import { MAX_OUTFIT_PIECES, MIN_OUTFIT_PIECES, outfitStepKeys } from '@vt/adapters';
+import { AiFeature } from '@vt/db';
 import { MultiTryOnService } from './multi-tryon.service.js';
 import type { ConsentPort, TryOnCatalogPort, TryOnStoragePort } from './ai.ports.js';
 import type { ConsentRecordLike } from './consent.rules.js';
@@ -257,7 +258,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
 
     await expect(
       service.create({ ...INPUT, variantIds: ['v-elbise', 'v-pantolon'] }, ACTOR),
-    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    ).rejects.toMatchObject({ code: 'OUTFIT_LAYER_CONFLICT' });
 
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
   });
@@ -307,6 +308,133 @@ describe('POST /tryon/outfit — katman sırası', () => {
       code: 'VARIANT_UNAVAILABLE',
     });
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * KOMBİN RET KODLARI
+ *
+ * Önceden üç ret de `VALIDATION_FAILED` dönüyordu; kullanıcı "geçersiz istek"
+ * mesajıyla ne yapacağını bilemediği için aynı kombini tekrar gönderiyordu.
+ * Sınanan şey mesajın EYLEM İÇERMESİ ve kodun ret sebebine göre AYRIŞMASI.
+ */
+describe('POST /tryon/outfit — kombin ret kodları', () => {
+  async function rejectionOf(variantIds: readonly string[]): Promise<AppError> {
+    const { service, tx } = build();
+    const error = await service
+      .create({ ...INPUT, variantIds: [...variantIds] }, ACTOR)
+      .then(() => null)
+      .catch((caught: unknown) => caught as AppError);
+
+    expect(error).toBeInstanceOf(AppError);
+    // Ret her zaman üretimden ÖNCE: reddedilen kombin için para harcanmaz.
+    expect(tx.tryOnJob.create).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
+    return error as AppError;
+  }
+
+  it('aynı katmanda iki parça → OUTFIT_LAYER_CONFLICT ve mesaj çözümü söyler', async () => {
+    // İki ceket: ikisi de DIŞ giyim, aynı bölgeyi kaplar.
+    const error = await rejectionOf(['v-ceket', 'v-ceket-2']);
+
+    expect(error.code).toBe('OUTFIT_LAYER_CONFLICT');
+    expect(error.httpStatus).toBe(422);
+    // `domain` → beklenen bir iş sonucudur, Sentry gürültüsü yaratmaz.
+    expect(error.family).toBe('domain');
+    expect(error.retryable).toBe(false);
+    // Kullanıcı ne yapacağını okuyabilmeli: "bırakın" fiili mesajın çekirdeği.
+    expect(error.userMessage).toContain('bırakın');
+  });
+
+  it('elbise + pantolon da katman çakışmasıdır — mesaj elbiseyi açıkça anar', async () => {
+    const error = await rejectionOf(['v-elbise', 'v-pantolon']);
+
+    expect(error.code).toBe('OUTFIT_LAYER_CONFLICT');
+    /**
+     * ⚠️ Bu senaryo mesajın neden bölge adı vermediğini belgeliyor: "üst
+     *    giyimden birini bırakın" denseydi burada YANLIŞ yönlendirme olurdu —
+     *    çakışan parçalar elbise ve pantolondur.
+     */
+    expect(error.userMessage).toContain('elbise');
+  });
+
+  it('aynı varyant iki kez → OUTFIT_DUPLICATE_PIECE', async () => {
+    const error = await rejectionOf(['v-gomlek', 'v-gomlek']);
+
+    expect(error.code).toBe('OUTFIT_DUPLICATE_PIECE');
+    expect(error.httpStatus).toBe(422);
+    expect(error.family).toBe('domain');
+  });
+
+  it('sınır üstü parça sayısı → OUTFIT_PIECE_COUNT_INVALID, mesajda İKİ SINIR da vardır', async () => {
+    const tooMany = Array.from({ length: MAX_OUTFIT_PIECES + 1 }, (_, i) => `v-fazla-${i}`);
+    const error = await rejectionOf(tooMany);
+
+    expect(error.code).toBe('OUTFIT_PIECE_COUNT_INVALID');
+    expect(error.userMessage).toContain(String(MIN_OUTFIT_PIECES));
+    expect(error.userMessage).toContain(String(MAX_OUTFIT_PIECES));
+    // Parametreler doldurulmazsa yer tutucu kullanıcıya sızardı (bkz. interpolate).
+    expect(error.userMessage).not.toContain('{');
+  });
+
+  it('sınır altı parça sayısı AYNI koda düşer — kullanıcının eylemi tek', async () => {
+    const error = await rejectionOf(['v-gomlek']);
+
+    expect(error.code).toBe('OUTFIT_PIECE_COUNT_INVALID');
+  });
+
+  it('ret sebebi istemciye details ile taşınır, kullanıcı mesajına SIZMAZ', async () => {
+    const error = await rejectionOf(['v-elbise', 'v-pantolon']);
+
+    // İstemci hangi parçayı işaretleyeceğini buradan bilir.
+    expect(error.details).toMatchObject({
+      reason: 'LAYER_CONFLICT',
+      variantIds: ['v-elbise', 'v-pantolon'],
+    });
+    // Varyant kimliği ve iç bölge adı kullanıcıya gösterilmez.
+    expect(error.userMessage).not.toContain('v-elbise');
+    expect(error.userMessage).not.toContain('UPPER');
+  });
+
+  it('artık genel VALIDATION_FAILED dönmez — her ret kendi kodunu taşır', async () => {
+    const codes = await Promise.all(
+      [['v-ceket', 'v-ceket-2'], ['v-gomlek', 'v-gomlek'], ['v-gomlek']].map(
+        async (variantIds) => (await rejectionOf(variantIds)).code,
+      ),
+    );
+
+    expect(codes).not.toContain('VALIDATION_FAILED');
+    expect(new Set(codes).size).toBe(3);
+  });
+});
+
+/**
+ * AI MALİYET DEFTERİ — şema enum'u ile TS tarafının EŞİTLİĞİ.
+ *
+ * ⚠️ `packages/config` `@vt/db`'ye bağlı değil (yapılandırma katmanı veritabanı
+ *    istemcisini çekmemeli), bu yüzden `AiFeature` birleşimi Prisma enum'ından
+ *    TÜRETİLEMEZ ve elle güncellenir. İki liste ayrışırsa maliyet o özellik
+ *    için ya yazılamaz ya da tahmin edilemez — ikisi de sessiz para kaybıdır.
+ *    Bu testin yeri burasıdır çünkü `estimateCost` uygulama tarafında ilk kez
+ *    bu serviste çağrılıyor.
+ */
+describe('AiFeature enum ↔ tahmini birim maliyet tablosu', () => {
+  it('SEARCH_NL şemada tanımlı — doğal dil arama maliyeti deftere yazılabilir', () => {
+    expect(AiFeature.SEARCH_NL).toBe('SEARCH_NL');
+  });
+
+  it('şemadaki HER AiFeature değerinin tahmini birim maliyeti vardır', () => {
+    const missing = Object.values(AiFeature).filter(
+      (feature) => !(feature in ESTIMATED_UNIT_COST_MICRO_USD),
+    );
+
+    expect(missing).toEqual([]);
+  });
+
+  it('arama niyeti çıkarımı danışman turundan ucuzdur', () => {
+    // Tek küçük JSON çıktısı + önbelleklenen sistem istemi (bkz. NATURAL_SEARCH).
+    expect(estimateCost('SEARCH_NL')).toBeGreaterThan(0n);
+    expect(estimateCost('SEARCH_NL')).toBeLessThan(estimateCost('STYLIST'));
   });
 });
 

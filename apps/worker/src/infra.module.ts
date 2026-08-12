@@ -12,6 +12,13 @@ import {
 } from '@vt/adapters';
 import { OutboxDispatcher } from './jobs/outbox.dispatcher.js';
 import { PhotoRetentionJob, ReservationReleaseJob } from './jobs/photo-retention.job.js';
+import {
+  AccountDeletionJob,
+  BullMqKvkkNotifier,
+  KVKK_NOTIFIER,
+  type KvkkNotifier,
+} from './jobs/account-deletion.job.js';
+import { DataExportJob } from './jobs/data-export.job.js';
 
 export const WORKER_LOGGER = 'WORKER_LOGGER';
 export const STORAGE = 'STORAGE';
@@ -234,6 +241,36 @@ function createPlaceholderStorage(logger: Logger): StorageProvider {
       useFactory: (...args: ConstructorParameters<typeof ReservationReleaseJob>) =>
         new ReservationReleaseJob(...args),
     },
+
+    // ── KVKK işleri ────────────────────────────────────────────────────────
+    //
+    // ⚠️ Bu üç kayıt olmadan `SchedulerService` içindeki iki cron her turda
+    //    `@Optional()` boşluğa düşüp hata yazar: silme ve veri indirme
+    //    talepleri işlenmez. Kayıtlar buraya —InfraModule'e— konur çünkü
+    //    `SchedulerService` `WorkerModule` içindedir ve bağımlılıklarını bu
+    //    modülün dışa açtığı sağlayıcılardan alır.
+    {
+      provide: KVKK_NOTIFIER,
+      inject: [RedisConnection],
+      useFactory: (connection: Redis): KvkkNotifier => new BullMqKvkkNotifier(connection),
+    },
+    {
+      // ⚠️ `STORAGE` enjekte edilir, `STORAGE_SELECTION` değil: iş yalnızca
+      //    depoyu kullanır. Yer tutucu depo bağlıysa `deleteMany` nesneyi
+      //    SİLMEZ ama HATA DA VERMEZ — o durumda iş DB'yi anonimleştirmeye
+      //    devam eder. Bu ayrım `STORAGE_STATUS` üzerinden sağlık raporunda
+      //    zaten görünür (bkz. SchedulerService.health → storage.deleteWorks).
+      provide: AccountDeletionJob,
+      inject: [PrismaClient, STORAGE, KVKK_NOTIFIER, WORKER_LOGGER],
+      useFactory: (...args: ConstructorParameters<typeof AccountDeletionJob>) =>
+        new AccountDeletionJob(...args),
+    },
+    {
+      provide: DataExportJob,
+      inject: [PrismaClient, STORAGE, KVKK_NOTIFIER, WORKER_LOGGER],
+      useFactory: (...args: ConstructorParameters<typeof DataExportJob>) =>
+        new DataExportJob(...args),
+    },
   ],
   exports: [
     RedisConnection,
@@ -244,6 +281,9 @@ function createPlaceholderStorage(logger: Logger): StorageProvider {
     OutboxDispatcher,
     PhotoRetentionJob,
     ReservationReleaseJob,
+    KVKK_NOTIFIER,
+    AccountDeletionJob,
+    DataExportJob,
   ],
 })
 export class InfraModule {}

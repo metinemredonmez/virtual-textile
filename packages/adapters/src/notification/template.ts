@@ -23,7 +23,18 @@ export type TemplateKey =
   | 'iade-reddedildi'
   | 'payout-gonderildi'
   | 'satici-yeni-siparis'
-  | 'satici-onaylandi';
+  | 'satici-onaylandi'
+  /**
+   * ⚠️ KVKK şablonları — worker'daki iki cron kuyruğa bunları yazar
+   *    (account-deletion.job.ts / data-export.job.ts).
+   *
+   *    Kayıtlı DEĞİLLERSE `renderNotification` "şablon bulunamadı" ile
+   *    fırlatır; hata `retryable: false` olduğu için iş kalıcı hatayla düşer
+   *    ve kullanıcı kanuni bildirimini hiç almaz. Kuyrukta görünür kalır ama
+   *    gönderilmez — bu yüzden şablonlar işlerle AYNI sette bulunmalıdır.
+   */
+  | 'kvkk-hesap-silindi'
+  | 'kvkk-veri-indirme-hazir';
 
 export interface SmsBody {
   readonly body: string;

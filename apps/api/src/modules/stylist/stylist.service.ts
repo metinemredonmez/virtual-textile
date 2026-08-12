@@ -25,6 +25,11 @@ import {
 } from './stylist.ports.js';
 import { STYLIST_TOOLS, StylistToolExecutor, type ToolContext } from './tools/stylist.tools.js';
 import { findUnknownIdsInText, ProductLedger } from './tools/product-ledger.js';
+import {
+  suggestOutfitsFromWardrobe,
+  type OutfitCandidatePiece,
+  type OutfitSuggestion,
+} from './tools/outfit-suggest.js';
 import type { CreateConversationInput, SendMessageInput } from './stylist.schema.js';
 
 /**
@@ -89,6 +94,32 @@ export class StylistService {
     @Inject(AI_USAGE_PORT) private readonly usage: AiUsagePort,
     @Inject(APP_LOGGER) private readonly logger: Logger,
   ) {}
+
+  // ── Kombin önerisi (akış DIŞI, senkron) ──────────────────────────────────
+
+  /**
+   * Verilen parçalardan kombin önerir.
+   *
+   * ⚠️ BU METOT SOHBET AKIŞINDAN AYRIDIR ve kasten öyledir. Danışmanın geri
+   *    kalanı SSE + LLM + kota üzerine kuruludur; gardırop ekranının ihtiyacı
+   *    ise tek bir senkron cevaptır. `streamTurn` üzerinden geçirilseydi,
+   *    kullanıcı dolabını her açtığında bir LLM turu ve bir kota birimi
+   *    harcanırdı — üstelik cevap her seferinde değişerek.
+   *
+   * ⚠️ Kural motoru (`color-harmony.ts`) DEĞİŞTİRİLMEDEN kullanılıyor: sohbet
+   *    ekranındaki uyum kararı ile gardırop ekranındakinin aynı olması, iki
+   *    yerde iki farklı moda kuralı bulunmamasına bağlı.
+   *
+   * ⚠️ `userId` kota için DEĞİL, log/teşhis için alınır — burada sağlayıcıya
+   *    çağrı yok, dolayısıyla harcanan bir şey de yok.
+   */
+  suggestOutfits(input: {
+    userId: string;
+    items: readonly OutfitCandidatePiece[];
+    limit: number;
+  }): OutfitSuggestion[] {
+    return suggestOutfitsFromWardrobe({ items: input.items, limit: input.limit });
+  }
 
   // ── Konuşma yönetimi ─────────────────────────────────────────────────────
 

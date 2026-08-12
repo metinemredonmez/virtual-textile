@@ -9,6 +9,7 @@ import {
   DEFAULT_JOB_OPTIONS,
   QUEUE,
   QUEUE_OPTIONS,
+  queueJobId,
   type DomainEventJobData,
   type NotificationJobData,
 } from '../queues.js';
@@ -528,9 +529,12 @@ export class DomainEventNotificationBridge {
 
     for (const job of jobs) {
       await this.queue.add(job.template, job, {
-        // ⚠️ İş kimliği = messageId. Aynı olay iki kez dağıtılırsa BullMQ
-        //    ikinci işi sessizce yok sayar.
-        jobId: job.messageId,
+        // ⚠️ İş kimliği = messageId'nin kuyruk için güvenli hâli. Aynı olay iki
+        //    kez dağıtılırsa BullMQ ikinci işi sessizce yok sayar. Ham
+        //    `messageId` iki nokta içerdiği için doğrudan VERİLEMEZ — BullMQ
+        //    reddeder ve bildirim hiç kuyruğa girmez (bkz. queues.ts →
+        //    queueJobId).
+        jobId: queueJobId(job.messageId),
       });
     }
 

@@ -485,6 +485,56 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message: 'Bu ürün için sanal deneme desteklenmiyor.',
   },
+  /**
+   * ÇOKLU DENEME (KOMBİN) RETLERİ — üçü de KULLANICI SEÇİMİNİN sonucudur.
+   *
+   * ⚠️ Neden genel `VALIDATION_FAILED` yetmiyor: üç retten de aynı mesaj
+   *    dönüyordu ("Gönderilen bilgiler geçersiz"), oysa kullanıcının yapması
+   *    gereken üç ayrı şey var — bir parçayı çıkarmak, parça sayısını
+   *    düzeltmek, tekrarı silmek. Kullanıcı ne yapacağını anlamadığı için
+   *    aynı kombini tekrar tekrar gönderiyordu.
+   *
+   * Aile `domain`, `validation` DEĞİL: şema tutuyor (kimlikler geçerli, sayı
+   * sınır içinde), reddeden şey GİYİM KURALI — elbisenin üstüne pantolon
+   * giydirilemez. Zod'un yakaladığı biçim hataları `VALIDATION_FAILED`
+   * kalmaya devam eder.
+   *
+   * 422 + `domain` → Sentry'ye gitmez; beklenen bir iş sonucudur.
+   */
+  OUTFIT_LAYER_CONFLICT: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    /**
+     * ⚠️ Mesaj bölge adı vermiyor (üst/alt/dış): çakışmanın hangi bölgede
+     *    olduğu bilgisi ret sonucunda YAPILANDIRILMIŞ olarak taşınmıyor, yalnız
+     *    log metnindeki serbest açıklamada var. "Üst giyimden birini bırakın"
+     *    demek elbise + pantolon çakışmasında YANLIŞ yönlendirme olurdu.
+     *    Kural cümlesi üç bölgeyi birden anlattığı için her durumda doğrudur.
+     */
+    message:
+      'Aynı vücut bölgesi için iki parça seçilemez. Üst, alt ve dış giyimden yalnızca birer parça bırakın; elbise hem üstü hem altı kapladığı için yanına üst ya da alt giyim eklenemez.',
+  },
+  /**
+   * Alt ve üst sınır TEK KOD: kullanıcı için ikisi de "parça sayısını düzelt"
+   * eylemidir ve mesaj iki sınırı birden söylediği için hangi tarafa taştığı
+   * ayrıca kodlanmasına gerek kalmadan anlaşılır. Ayrım gereken taraf —
+   * log ve panel — `details.reason` alanından okur.
+   */
+  OUTFIT_PIECE_COUNT_INVALID: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    /** Sınırlar parametre: sabit yazılsaydı @vt/adapters'taki değer değişince mesaj yalan söylerdi. */
+    message: 'Kombin denemesi için en az {min}, en fazla {max} parça seçebilirsiniz.',
+  },
+  OUTFIT_DUPLICATE_PIECE: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    message:
+      'Aynı ürünü kombine iki kez ekleyemezsiniz. Tekrar eden parçayı çıkarın veya farklı bir ürünle değiştirin.',
+  },
   TRYON_QUOTA_EXCEEDED: {
     status: 429,
     family: 'domain',
