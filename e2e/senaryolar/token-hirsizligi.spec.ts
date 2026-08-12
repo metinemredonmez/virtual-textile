@@ -137,7 +137,7 @@ test.describe('Refresh rotasyonu ve token hırsızlığı tespiti', () => {
     const digerCihazTokeni = ikinciApi.token;
 
     const degistir = await api.post('/v1/auth/password/change', {
-      govde: { currentPassword: kullanici.sifre, newPassword: 'YepyeniSifre2026x' },
+      govde: { currentPassword: kullanici.sifre, newPassword: 'PLACEHOLDER-NOT-A-SECRET-PW2' },
     });
     basariBekle(degistir, 200);
 

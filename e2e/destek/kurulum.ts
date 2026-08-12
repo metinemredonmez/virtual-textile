@@ -75,7 +75,7 @@ export interface Urun {
   varyantlar: Array<{ id: string; sku: string; renk: string; beden: string; fiyatMinor: bigint }>;
 }
 
-const VARSAYILAN_SIFRE = 'E2eGuclu2026sifre';
+const VARSAYILAN_SIFRE = 'PLACEHOLDER-NOT-A-SECRET-PW1';
 
 // ── Kullanıcı ─────────────────────────────────────────────────────────────
 
