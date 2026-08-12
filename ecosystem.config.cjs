@@ -38,6 +38,33 @@
  */
 const API_ENV_DOSYASI = '--env-file=/etc/virtual-textile/api.env';
 
+/**
+ * ⚠️ BU SUNUCU ÜRETİM DEĞİL, STAGING. VE BU BİLİNÇLİ BİR İLANDIR.
+ *
+ *    `@vt/config` → `env.ts`, `NODE_ENV=production` altında şunları ZORUNLU
+ *    kılıyor: IYZICO_API_KEY / SECRET / WEBHOOK_SECRET, RESEND_API_KEY,
+ *    SENTRY_DSN, sandbox olmayan IYZICO_BASE_URL, localhost içermeyen
+ *    CORS_ORIGINS. Bugün bunların hiçbiri yok:
+ *      · iyzico başvurusu kullanıcı tarafından BİLİNÇLİ ertelendi,
+ *      · Resend ve Sentry hesapları açılmadı,
+ *      · TLS yok — şifreler ağda açık metin gidiyor.
+ *
+ *    ⚠️ ASIL BULGU: bu sunucu bugüne kadar da hiç üretim modunda çalışmadı.
+ *       Kabuktan miras alınan `NODE_ENV=staging` yüzünden yukarıdaki
+ *       kontrollerin TAMAMI sessizce atlanıyordu. Kirlilik temizlenince
+ *       kontrol devreye girdi ve API açılmadı — koruma bozulmadı, ÇALIŞMAYA
+ *       BAŞLADI.
+ *
+ *    Seçenek üçtü: (a) sahte anahtarlarla kontrolü kandırmak, (b) kontrolü
+ *    gevşetmek, (c) ortamın gerçekte ne olduğunu YAZMAK. (a) ve (b) ödeme
+ *    alınan bir sistemde webhook imzasının doğrulanmadığını gizlerdi.
+ *
+ * ⚠️ ÜRETİME GEÇERKEN: `VT_MOD=production` verilir ve yukarıdaki altı anahtar
+ *    `/etc/virtual-textile/api.env` içine yazılır. Kontrol o an gerçekten
+ *    çalışır ve eksik bir şey varsa uygulama AÇILMAZ. İstenen budur.
+ */
+const VT_CALISMA_MODU = process.env.VT_MOD || 'staging';
+
 module.exports = {
   apps: [
     {
@@ -73,7 +100,7 @@ module.exports = {
       time: false, // pino zaten ISO zaman damgası yazıyor
 
       env_production: {
-        NODE_ENV: 'production',
+        NODE_ENV: VT_CALISMA_MODU,
       },
     },
 
@@ -108,7 +135,7 @@ module.exports = {
       merge_logs: true,
       time: false,
 
-      env_production: { NODE_ENV: 'production', WORKER_ROLE: 'core' },
+      env_production: { NODE_ENV: VT_CALISMA_MODU, WORKER_ROLE: 'core' },
     },
 
     {
@@ -139,7 +166,7 @@ module.exports = {
       merge_logs: true,
       time: false,
 
-      env_production: { NODE_ENV: 'production', WORKER_ROLE: 'media' },
+      env_production: { NODE_ENV: VT_CALISMA_MODU, WORKER_ROLE: 'media' },
     },
 
     // ── Web (Next.js) ────────────────────────────────────────────────────
