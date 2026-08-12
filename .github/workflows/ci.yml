@@ -66,6 +66,23 @@ jobs:
 
       - name: Paketleri derle
         run: pnpm build
+        # ⚠️ `apps/web` DERLEME ANINDA ortam ister (src/lib/env.ts → required()).
+        #    Yerelde `.env.local` var ve gitignore'lu; CI'da hiçbir şey yoktu ve
+        #    derleme "APP_URL tanımlı değil" ile düşüyordu. Arıza YALNIZCA CI'da
+        #    görünüyordu — yerelde geçmesi bir şey kanıtlamıyordu.
+        #
+        # ⚠️ BU DEĞERLER SAHTE VE SAHTE KALMALI. Buradaki derleme dağıtılacak bir
+        #    eser ÜRETMEZ; sunucu `.env.production` ile yeniden derliyor
+        #    (scripts/deploy.sh). Gerçek adresleri buraya yazmak, `NEXT_PUBLIC_*`
+        #    değerleri pakete GÖMÜLDÜĞÜ için CI çıktısını dağıtılabilir sanmaya
+        #    davet ederdi. Biçim `PLACEHOLDER-NOT-A-SECRET-*`: gitleaks gerçek
+        #    anahtar sanmasın.
+        env:
+          API_URL: http://127.0.0.1:3001
+          APP_URL: http://127.0.0.1:3000
+          SESSION_REDIS_URL: redis://127.0.0.1:6379
+          SESSION_SECRET: PLACEHOLDER-NOT-A-SECRET-CI
+          NEXT_PUBLIC_MEDIA_URL: http://127.0.0.1:3000/medya
 
       - name: Lint
         run: pnpm lint
