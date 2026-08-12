@@ -4,6 +4,7 @@ import { APP_GUARD, Reflector } from '@nestjs/core';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import { NotificationModule } from '../notification/index.js';
+import { MeModule, MeService } from '../me/index.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { TokenService } from './token.service.js';
@@ -15,7 +16,10 @@ import { JwtAuthGuard, RolesGuard, SellerScopeGuard } from './auth.guard.js';
   // Gizli anahtar imzalama anında env()'den okunur; burada sabitlenmez.
   // ⚠️ NotificationModule: OTP kodunu kullanıcıya ULAŞTIRAN bağ. Bu import
   //    olmadan `/auth/otp/send` kodu üretir ama kimseye göndermez.
-  imports: [JwtModule.register({}), NotificationModule],
+  // ⚠️ MeModule: "başarılı giriş, bekleyen hesap silme talebini iptal eder"
+  //    kuralının tek bağı. Bu import olmadan 30 günlük geri alma penceresinde
+  //    giriş yapan kullanıcının hesabı yine de silinmeye giderdi.
+  imports: [JwtModule.register({}), NotificationModule, MeModule],
   controllers: [AuthController],
   providers: [
     PasswordService,
@@ -28,7 +32,7 @@ import { JwtAuthGuard, RolesGuard, SellerScopeGuard } from './auth.guard.js';
     },
     {
       provide: AuthService,
-      inject: [PrismaService, PasswordService, TokenService, OtpService, APP_LOGGER],
+      inject: [PrismaService, PasswordService, TokenService, OtpService, MeService, APP_LOGGER],
       useFactory: (...args: ConstructorParameters<typeof AuthService>) => new AuthService(...args),
     },
     SellerScopeGuard,

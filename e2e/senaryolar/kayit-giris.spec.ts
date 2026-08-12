@@ -117,7 +117,7 @@ test.describe('Kayıt ve giriş akışı', () => {
     const tekrar = await ikinciApi.post('/v1/auth/register', {
       govde: {
         email: kullanici.eposta,
-        password: 'BaskaBirSifre2026',
+        password: 'PLACEHOLDER-NOT-A-SECRET-PW3',
         firstName: 'Baska',
         lastName: 'Kisi',
         acceptedTerms: true,
@@ -135,7 +135,7 @@ test.describe('Kayıt ve giriş akışı', () => {
     const yanit = await ikinciApi.post('/v1/auth/register', {
       govde: {
         email: `kosulsuz-${String(Date.now())}@e2e.test`,
-        password: 'GecerliSifre2026',
+        password: 'PLACEHOLDER-NOT-A-SECRET-PW4',
         firstName: 'Test',
         lastName: 'Kullanici',
         acceptedTerms: false,

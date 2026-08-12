@@ -174,7 +174,7 @@ test.describe('Hata zarfı tutarlılığı', () => {
           return ikinciApi.post('/v1/auth/register', {
             govde: {
               email: kullanici.eposta,
-              password: 'BaskaBirSifre2026',
+              password: 'PLACEHOLDER-NOT-A-SECRET-PW3',
               firstName: 'Baska',
               lastName: 'Kisi',
               acceptedTerms: true,
@@ -210,7 +210,7 @@ test.describe('Hata zarfı tutarlılığı', () => {
       const yanit = await ikinciApi.post('/v1/auth/register', {
         govde: {
           email: `${benzersiz('limit')}@e2e.test`,
-          password: 'GecerliSifre2026',
+          password: 'PLACEHOLDER-NOT-A-SECRET-PW4',
           firstName: 'Limit',
           lastName: 'Testi',
           acceptedTerms: true,

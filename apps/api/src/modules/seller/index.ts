@@ -175,6 +175,24 @@ export {
 
 export { encryptField, decryptField, maskIban, maskTaxNumber } from './seller-crypto.js';
 
+// Rol senkronizasyonu — saf kural + transaction uygulayıcısı. Yönetim modülü
+// satıcı onay/red/askı akışında `syncSellerMemberRoles`'ü çağırır.
+export {
+  decideRoleChange,
+  decideRoleChanges,
+  isProtectedRole,
+  PROTECTED_ROLES,
+  type RoleChange,
+  type SellerRoleFacts,
+} from './seller-role.js';
+
+export {
+  syncSellerMemberRoles,
+  USER_ROLE_AUDIT_ACTION,
+  type RoleSyncActor,
+  type RoleSyncResult,
+} from './seller-role.service.js';
+
 export * from './seller.ports.js';
 export * from './seller.schema.js';
 export {

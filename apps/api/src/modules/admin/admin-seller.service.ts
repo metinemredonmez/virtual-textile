@@ -5,6 +5,11 @@ import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import type { Logger } from '../../common/logger.js';
 import { AUDIT_ACTION, emitOutbox, writeAuditLog, type AdminActor } from './audit.js';
+// ⚠️ Rol senkronizasyonu satıcı modülünde duruyor: kararın kaynağı `SellerUser`
+//    tablosudur ve o tablo satıcı modülünündür. Buraya DI portu yerine doğrudan
+//    çağrıyla geliyor; gerekçe ve entegrasyon adımı seller-role.service.ts
+//    başındaki nota yazılı.
+import { syncSellerMemberRoles } from '../seller/seller-role.service.js';
 import {
   ADMIN_MODERATION_PORT,
   ADMIN_SELLER_PORT,
@@ -194,6 +199,24 @@ export class AdminSellerService {
         ...(options.setApprovedAt ? { approvedAt: now } : {}),
       });
 
+      // ⚠️ ROL SENKRONİZASYONU — durum yazıldıktan SONRA, aynı transaction'da.
+      //
+      // Onay tek başına satıcıyı satıcı yapmaz: satıcı panelinin tamamı
+      // `@Roles('SELLER_USER')` ile korunuyor ve karar token'daki role bakıyor.
+      // Rol yükseltilmezse "onaylanmış ama paneline giremeyen satıcı" doğar.
+      // Askı/red yönünde de aynı bağ geçerlidir; kural ve gerekçeleri
+      // `seller-role.ts` içinde.
+      //
+      // Sıra tesadüf değil: senkronizasyon "kullanıcının hâlâ APPROVED mağazası
+      // var mı" sorusunu sorar ve bu sorunun doğru yanıtı ancak yeni durum
+      // yazıldıktan sonra alınır.
+      const roleSync = await syncSellerMemberRoles(tx, {
+        sellerId,
+        actor,
+        reason: options.reason,
+        now,
+      });
+
       await writeAuditLog(tx, actor, {
         action: options.action,
         entityType: 'Seller',
@@ -220,6 +243,30 @@ export class AdminSellerService {
         { sellerId, from: current.status, to: options.target, actorId: actor.id },
         'Satıcı durumu değişti',
       );
+
+      if (roleSync.memberCount === 0) {
+        // Mağazanın hiç üyesi yok: başvuru akışı Seller + SellerUser(owner)'ı
+        // tek transaction'da yazdığı için bu normalde İMKÂNSIZ. Görülüyorsa
+        // veri elle kurcalanmış demektir ve o mağazaya kimse giremez.
+        this.logger.error(
+          { sellerId, actorId: actor.id },
+          'Satıcının hiç üyesi yok — rol ataması yapılamadı, mağaza sahipsiz',
+        );
+      } else if (roleSync.changes.length > 0) {
+        this.logger.warn(
+          {
+            sellerId,
+            actorId: actor.id,
+            revokedSessions: roleSync.revokedSessions,
+            changes: roleSync.changes.map((change) => ({
+              userId: change.userId,
+              from: change.from,
+              to: change.to,
+            })),
+          },
+          'Satıcı üyelerinin rolü güncellendi, oturumları düşürüldü',
+        );
+      }
 
       return { sellerId, status: options.target };
     });

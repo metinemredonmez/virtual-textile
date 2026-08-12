@@ -13,6 +13,10 @@ import type { Logger } from '../../common/logger.js';
 import { PasswordService } from './password.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { OtpService, type OtpPurpose } from './otp.service.js';
+// ⚠️ Modül sınırı: `me` modülünün yalnızca yayımlanmış servis yüzeyi alınıyor.
+//    `index.js` üzerinden alınsaydı `MeController` de kimlik modülünün import
+//    grafiğine girerdi; ihtiyaç duyulan tek şey `cancelAccountDeletion`.
+import { MeService } from '../me/me.service.js';
 
 export interface RequestMeta {
   ipAddress: string;
@@ -31,6 +35,10 @@ const userSelect = {
   passwordHash: true,
   emailVerifiedAt: true,
   phoneVerifiedAt: true,
+  // ⚠️ Girişte "silme talebi var mı" sorusunu ayrı bir sorgu açmadan
+  //    cevaplayabilmek için seçiliyor (bkz. startSession). Alan HİÇBİR ZAMAN
+  //    `AuthenticatedUser`'a taşınmıyor — yanıt sözleşmesi değişmedi.
+  deletionRequestedAt: true,
   sellerMemberships: { select: { sellerId: true } },
 } satisfies Prisma.UserSelect;
 
@@ -43,6 +51,9 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly otp: OtpService,
+    // ⚠️ `meService` — sade `me` DEĞİL: bu sınıfta zaten `me(userId)` metodu
+    //    var ve aynı ada sahip bir alan onu gölgeler (TS2300).
+    private readonly meService: MeService,
     private readonly logger: Logger,
   ) {}
 
@@ -148,6 +159,36 @@ export class AuthService {
       userAgent: meta.userAgent,
       deviceLabel: describeDevice(meta.userAgent),
     });
+
+    // ⚠️ KVKK — "30 gün içinde giriş yaparsan hesap silme talebin düşer".
+    //
+    //  • Token ÜRETİLDİKTEN SONRA çağrılıyor: `issue` düşerse kullanıcı
+    //    içeri girememiş demektir, o hâlde talebi de iptal etmiş sayılmaz.
+    //  • Yalnızca gerçekten bekleyen bir talep varsa çağrılıyor; alan zaten
+    //    `userSelect` ile geldiği için normal girişte EK SORGU AÇILMIYOR.
+    //  • Süre dolmuşsa kararı `MeService` verir ve `cancelled: false` döner —
+    //    "penceresi kapanmış talebi giriş diriltir" hatası burada değil,
+    //    tek bir yerde (account-deletion.ts) engellenir.
+    //  • HATA YUTULUYOR: iptal yazımı düşerse giriş DÜŞMEZ. Aksi hâlde silme
+    //    talebi olan kullanıcı hesabına hiç giremez, dolayısıyla vazgeçme
+    //    penceresinin kendisi anlamsız kalırdı.
+    if (user.deletionRequestedAt !== null) {
+      try {
+        const cancellation = await this.meService.cancelAccountDeletion({
+          userId: user.id,
+          role: user.role,
+        });
+        this.logger.info(
+          { userId: user.id, cancelled: cancellation.cancelled },
+          'Girişte hesap silme talebi değerlendirildi',
+        );
+      } catch (error) {
+        this.logger.error(
+          { userId: user.id, err: error },
+          'Girişte hesap silme talebi iptal edilemedi',
+        );
+      }
+    }
 
     return {
       issued,

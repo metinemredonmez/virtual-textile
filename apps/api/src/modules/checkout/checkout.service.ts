@@ -23,6 +23,7 @@ import {
   type Tx,
 } from './checkout.ports.js';
 import { ORDER_NUMBER_MAX_ATTEMPTS } from './checkout.constants.js';
+import { checkoutRejection } from './cart-eligibility.js';
 import {
   assertLedgerBalanced,
   calculateCommission,
@@ -112,21 +113,14 @@ export class CheckoutService {
    */
   async init(input: CheckoutInitInput, actor: CheckoutActor): Promise<CheckoutInitResult> {
     const view = await this.cart.view(cartOwnerOf(actor));
-    if (!view.id || view.packages.length === 0) throw new AppError('CART_EMPTY');
 
     // Sepet görüntüleme satın alınamayan kalemleri toplamdan çıkarır ama
-    // silmez. Checkout bunları SESSİZCE ATLAYAMAZ: kullanıcı sepetinde
-    // gördüğü ürünün siparişte olmadığını fark etmeden ödeme yapardı.
-    if (view.unavailableItems.length > 0) {
-      throw new AppError('VARIANT_UNAVAILABLE', {
-        details: {
-          items: view.unavailableItems.map((item) => ({
-            variantId: item.variantId,
-            reason: item.issue,
-          })),
-        },
-      });
-    }
+    // silmez. Checkout bunları SESSİZCE ATLAYAMAZ (kullanıcı sepetinde gördüğü
+    // ürün siparişte olmadan ödeme yapardı) ama "boş sepet" de sayamaz —
+    // bu ayrımın tamamı `cart-eligibility.ts` içinde, hangi kodun neden
+    // döndüğü orada yazılı.
+    const rejection = checkoutRejection(view);
+    if (rejection) throw rejection;
 
     // ⚠️ Bağlayıcı fiyat sepete eklendiği andaki fiyattır (sepet modülünün
     //    sözleşmesi). Katalog fiyatı değiştiyse tahsil edilecek tutar DEĞİŞMEZ,

@@ -29,6 +29,9 @@ export * from './checkout.ports.js';
 export * from './checkout.schema.js';
 export * from './checkout.constants.js';
 export * from './commission.js';
+// Alınamaz kalem detayının tipi istemci tarafında da kullanılır: hata
+// yanıtındaki `details` bu şekle göre okunuyor.
+export * from './cart-eligibility.js';
 export * from './checkout.service.js';
 export * from './checkout.controller.js';
 export * from './checkout.bridges.js';

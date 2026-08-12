@@ -5,6 +5,7 @@ import { PrismaService } from './infra/prisma.service.js';
 import { RedisService } from './infra/redis.service.js';
 import { HealthController } from './modules/health/health.controller.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { MeModule } from './modules/me/index.js';
 import { NotificationModule } from './modules/notification/index.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { CartModule } from './modules/cart/index.js';
@@ -31,6 +32,12 @@ import { requestContextMiddleware } from './common/middleware/request-context.mi
     //    modülleri tekildir — iki yerde import edilmesi çift örnek üretmez.
     NotificationModule,
     AuthModule,
+    // ⚠️ MeModule kökte AÇIKÇA bağlanır, yalnızca AuthModule üzerinden dolaylı
+    //    olarak değil. AuthModule onu zaten import ediyor (başarılı girişte
+    //    hesap silme talebini iptal etmek için), ama tek bağ o olsaydı KVKK
+    //    md.11 uçları kimlik modülünün bir iç ayrıntısına asılmış olurdu:
+    //    o import bir gün kalkarsa /v1/me/* sessizce 404'e döner.
+    MeModule,
     CatalogModule,
     // ── Ticaret ──
     CartModule,
