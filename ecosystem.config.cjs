@@ -13,12 +13,38 @@
  *
  * systemd altında çalıştırmak için: infra/systemd/vt.service
  */
+/**
+ * ⚠️ SUNUCU ORTAMI — KABUKTAN DEĞİL DOSYADAN.
+ *
+ *    `apps/api` ve `apps/worker` ortamı KENDİLERİ YÜKLEMİYOR: `main.ts` içindeki
+ *    `loadEnv()` yalnızca `process.env`e bakar. Sunucuda o değerler PM2'nin İLK
+ *    BAŞLATILDIĞI KABUKTAN miras alınıyordu — yazılı hiçbir yerde olmayan,
+ *    tamamen tesadüfi bir bağımlılık.
+ *
+ *    ⚠️ BEDELİ ÖLÇÜLDÜ: `pm2 kill` ile daemon yeniden doğduğunda o miras
+ *       kayboldu ve `vt-api` ÇÖKME DÖNGÜSÜNE girdi — ortam doğrulaması
+ *       başarısız, uygulama hiç açılmıyor. Aynı kabuk kirliliği daha önce
+ *       `vt-web`e yanlış `APP_URL` geçirip her POST'u 403 yapmıştı.
+ *
+ *    Artık ortam DOSYADAN okunuyor ve süreç kendi kendine yeter hâle geldi.
+ *
+ * ⚠️ Node `--env-file` VAR OLAN DEĞİŞKENİ EZMEZ: kabukta bir değer varsa o
+ *    kazanır. Yani bu satır kirliliği ÇÖZMEZ, yalnızca EKSİKLİĞİ kapatır.
+ *    Kirliliğe karşı savunma `scripts/deploy.sh` içindeki `env -u` temizliği
+ *    ve ardından gelen `/proc/<pid>/environ` ölçümüdür.
+ *
+ * ⚠️ Dosya yoksa Node BAŞLAMAZ ve bu DOĞRUDUR: eksik ortamla ayakta kalan bir
+ *    API, sağlıklı görünürken yanlış veritabanına yazabilir.
+ */
+const API_ENV_DOSYASI = '--env-file=/etc/virtual-textile/api.env';
+
 module.exports = {
   apps: [
     {
       name: 'vt-api',
       cwd: '/var/www/virtual/apps/api',
       script: 'dist/main.js',
+      node_args: API_ENV_DOSYASI,
 
       // Cluster: CPU başına bir süreç. API stateless olduğu için güvenli —
       // oturum Redis'te, iş kuyruğu Redis'te, hiçbir şey bellekte tutulmuyor.
@@ -62,6 +88,7 @@ module.exports = {
       name: 'vt-worker-core',
       cwd: '/var/www/virtual/apps/worker',
       script: 'dist/main.js',
+      node_args: API_ENV_DOSYASI,
 
       // ⚠️ TEK ÖRNEK. Zamanlanmış işler yalnızca bu rolde çalışır; ikinci bir
       // örnek aynı fotoğrafı iki kez silmeye, aynı rezervasyonu iki kez
@@ -88,6 +115,7 @@ module.exports = {
       name: 'vt-worker-media',
       cwd: '/var/www/virtual/apps/worker',
       script: 'dist/main.js',
+      node_args: API_ENV_DOSYASI,
 
       // Bu rol cron ÇALIŞTIRMAZ, yalnızca kuyruk tüketir — bu yüzden birden
       // fazla örnek güvenlidir. BullMQ işi tek tüketiciye verir.
