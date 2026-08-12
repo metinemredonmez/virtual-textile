@@ -58,3 +58,9 @@ Thumbs.db
 
 # pnpm
 pnpm-lock.yaml.bak
+
+# ⚠️ Next.js bu dosyayı HER DERLEMEDE yeniden yazar (içeriği .next/types
+#    yollarına göre değişir). İzlenirse çalışma ağacı hiçbir zaman temiz
+#    olmaz ve dağıtım betiği her koşumda gereksiz yere onay ister.
+#    Next resmî şablonunda da yok sayılıyor; "bu dosyayı düzenlemeyin" diyor.
+apps/web/next-env.d.ts
