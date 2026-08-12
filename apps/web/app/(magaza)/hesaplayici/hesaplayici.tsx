@@ -1,11 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Money } from '@vt/contracts';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { adetCoz, kurusCoz, yuzdeCoz } from './sayi';
+import { Tutar } from '@/components/fiyat/tutar';
+import { adetCoz, kurusCoz, yuzdeCoz } from '@/lib/sayi';
 import { tabanHesapla, tahminHesapla, type HesapGirdisi } from './hesap';
 import {
   VARSAYIM_DUSUK,
@@ -448,10 +448,6 @@ function Satir({
  *    yerde elle yazılsaydı bir yerde unutulur ve tablo virgülleri kayardı;
  *    `<Fiyat>` de aynı sebeple sınıfı kendi taşıyor.
  */
-function Tutar({ minor }: { minor: bigint }): React.ReactElement {
-  return <span className="rakam">{Money.formatMoney(Money.money(minor))}</span>;
-}
-
 function Adet({ value }: { value: bigint }): React.ReactElement {
   return <span className="rakam">{ADET_BICIMI.format(value)}</span>;
 }

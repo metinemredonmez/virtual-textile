@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adetCoz, kurusCoz, yuzdeCoz } from './sayi';
+import { adetCoz, kurusCoz, yuzdeCoz } from '@/lib/sayi';
 
 /**
  * AYRAÇ SEZGİSELİ — bugüne kadar YALNIZCA tarayıcı gözlemiyle korunuyordu.
