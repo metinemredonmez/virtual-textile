@@ -11,9 +11,29 @@ const nextConfig: NextConfig = {
   compress: false,
   poweredByHeader: false,
 
-  // Ürün görselleri genel R2 kovasından servis ediliyor; imza gerekmiyor.
+  /**
+   * Ürün görselleri genel R2 kovasından servis ediliyor; imza gerekmiyor.
+   *
+   * ⚠️ `images.pexels.com` YALNIZCA DEMO VERİSİ İÇİN. Gerçek satıcı ürün
+   *    yüklediğinde görsel normal yoldan R2'ye gider; dış bir servise
+   *    bağımlılık YOKTUR.
+   *
+   *    Neden gerekti: seed `demo/...` anahtarları yazıyordu ama o dosyalar
+   *    R2'ye hiç yüklenmemişti (canlıda ölçüldü: HTTP 404) ve vitrinde kırık
+   *    ikon çıkıyordu. Depoya ikili dosya koymak git geçmişini şişirir;
+   *    seed sırasında R2'ye yüklemek ise YERELDE ÇALIŞMAZ (yerel geliştirmede
+   *    R2 yapılandırılmamış, fabrika `Unconfigured` döner). Mutlak URL,
+   *    yerelde ve sunucuda AYNI çalışan tek seçenekti — `mediaUrl()` zaten
+   *    `http(s)://` ile başlayan anahtarı olduğu gibi geçiriyor.
+   *
+   * ⚠️ Bu satır silinirse demo görselleri kırılır ama ÜRETİM ETKİLENMEZ.
+   *    Pexels adresleri bir gün ölürse etkilenen tek şey demo verisidir.
+   */
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: '**.r2.dev' }],
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.r2.dev' },
+      { protocol: 'https', hostname: 'images.pexels.com' },
+    ],
     formats: ['image/avif', 'image/webp'],
   },
 
