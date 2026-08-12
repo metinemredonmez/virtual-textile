@@ -290,18 +290,40 @@ test.describe('İade ve ters defter', () => {
       beklenen.saticiNetMinor,
     );
 
-    // ⚠️ Kuruş kontrolü: 1 adet iade edildi, 2 adet kaldı. Kalan bakiye,
-    //    hakedişin üçe bölümünün iki birimi kadar olmalı — birim dağıtımı
-    //    kuruş kaybetmemeli.
-    const birimler = birimlereBol(beklenen.saticiNetMinor, 3);
-    const beklenenKalan = (birimler[1] ?? 0n) + (birimler[2] ?? 0n);
+    // ⚠️ Kuruş kontrolü: 1 adet iade edildi, 2 adet kaldı.
+    //
+    //    BEKLENTİ DÜZELTİLDİ. Burada `saticiNetMinor` doğrudan üçe bölünüyor
+    //    ve ilk birimin geri alındığı varsayılıyordu. Sunucu böyle yapmıyor ve
+    //    yapmamalı: defterde SALE ve COMMISSION AYRI satırlar, ters kayıt da
+    //    ikisini AYRI AYRI çeviriyor (return-ledger.ts → splitPerUnit brüt ve
+    //    komisyon için ayrı çağrılıyor). Net, bu iki dilimin FARKI olarak
+    //    çıkıyor. Türetilmiş tutarı bölmek ile bileşenleri ayrı bölüp farkı
+    //    almak aynı sonucu vermez — iki bağımsız yuvarlama vardır.
+    //
+    //    Eski beklenti 549,99 ₺, sunucu 550,00 ₺ veriyordu ve hata mesajı bunu
+    //    "kuruş kaybı" diye adlandırıyordu. KAYIP YOKTU: iade edilen 274,99 ₺ +
+    //    kalan 550,00 ₺ = 824,99 ₺, yani toplam hakedişin tamamı. Aşağıdaki
+    //    iddia artık bu KORUNAN BÜYÜKLÜĞÜ de açıkça ölçüyor.
+    const brutBirimler = birimlereBol(kalemToplam, 3);
+    const komisyonBirimler = birimlereBol(beklenen.komisyonMinor, 3);
+    const iadeEdilenNet = (brutBirimler[0] ?? 0n) - (komisyonBirimler[0] ?? 0n);
+    const beklenenKalan = beklenen.saticiNetMinor - iadeEdilenNet;
+
     expect(
       kalanBakiye,
-      `⚠️ Kısmi iadede kuruş kaybı: kalan ${bicimle(kalanBakiye)}, beklenen ${bicimle(beklenenKalan)}`,
+      `⚠️ Kısmi iade beklenmedik bakiye bıraktı: kalan ${bicimle(kalanBakiye)}, beklenen ${bicimle(beklenenKalan)}`,
     ).toBe(beklenenKalan);
 
+    // ⚠️ ASIL KORUNAN BÜYÜKLÜK: iade edilen + kalan = toplam hakediş. Kuruş
+    //    kaybı ancak burada görünür; dilim sırası bir politika seçimidir,
+    //    toplamın korunması ise pazarlık edilemez.
+    expect(
+      iadeEdilenNet + kalanBakiye,
+      '⚠️ KURUŞ KAYBI: iade edilen ve kalan tutarların toplamı hakedişi vermiyor',
+    ).toBe(beklenen.saticiNetMinor);
+
     // Müşteriye ödenen tutar da bir birim kadar olmalı.
-    const birimTutarlar = birimlereBol(kalemToplam, 3);
+    const birimTutarlar = brutBirimler;
     expect(
       kurus(iade.refundAmountMinor),
       'Tek adetlik iadede müşteriye ödenen tutar birim tutar kadar olmalı',

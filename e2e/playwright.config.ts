@@ -24,14 +24,28 @@
  *      çevrilmiş olmalı:
  *
  *        IYZICO_BASE_URL=http://127.0.0.1:3999 \
- *        IYZICO_API_KEY=e2e IYZICO_SECRET_KEY=e2e \
+ *        IYZICO_API_KEY=PLACEHOLDER-NOT-A-SECRET-01 \
+ *        IYZICO_SECRET_KEY=PLACEHOLDER-NOT-A-SECRET-02 \
+ *        IYZICO_WEBHOOK_SECRET=PLACEHOLDER-NOT-A-SECRET-03 \
  *        pnpm --filter @vt/api dev
  *
  *   3. pnpm --filter @vt/e2e e2e
  *
+ * ⚠️ IYZICO_WEBHOOK_SECRET İKİ TARAFTA DA, AYNI DEĞERLE bulunmalıdır. Sahte
+ *    sağlayıcı webhook gövdesini bu sırla imzalıyor, API aynı sırla
+ *    doğruluyor. Kök `.env`de bu değişken BOŞ; test tarafı bu yüzden aşağıda
+ *    `E2E_WEBHOOK_SIRRI` varsayılanına düşüyor. Varsayılan olmasaydı
+ *    `sahteIyzico` fixture'ı kurulum anında patlar ve TEK BİR senaryo bile
+ *    koşmazdı — 45 testin tamamı "OrtamHatasi" ile kırmızı yanardı. Değer
+ *    gizli değildir, yalnızca iki sürecin anlaşması gereken bir dizedir;
+ *    sunucuyu elle başlatırken 2. adımdaki satırı atlamayın.
+ *
  *   `E2E_SUNUCUYU_BEN_BASLAT=1` verilirse Playwright API'yi kendisi başlatır
- *   (aşağıdaki `webServer`), doğru env ile. Zaten çalışan bir sunucuya
- *   bağlanmak isteniyorsa bu değişken verilmez.
+ *   (aşağıdaki `webServer`), doğru env ile — o yolda sır iki tarafa da
+ *   otomatik geçirilir. Zaten çalışan bir sunucuya bağlanmak isteniyorsa bu
+ *   değişken verilmez ve sır elle verilmelidir.
+ *
+ *   Başka bir portta koşan sunucuya bağlanmak için: E2E_BASE_URL.
  *
  * ─────────────────────── PAKETLEME ─────────────────────────────────────────
  *
@@ -54,6 +68,15 @@ import { defineConfig } from '@playwright/test';
 const TEMEL_URL = process.env['E2E_BASE_URL'] ?? 'http://localhost:3001';
 const IYZICO_PORT = process.env['E2E_IYZICO_PORT'] ?? '3999';
 const SUNUCUYU_BEN_BASLAT = process.env['E2E_SUNUCUYU_BEN_BASLAT'] === '1';
+
+/**
+ * Webhook imza sırrı — GİZLİ DEĞİL, iki sürecin anlaşması gereken bir dize.
+ * Kabuktan verilirse o kazanır; verilmezse hem `webServer` ile başlatılan API
+ * hem de test süreci bu değeri kullanır, böylece iki taraf sessizce ayrışamaz.
+ * Biçim `PLACEHOLDER-NOT-A-SECRET-NN`: gitleaks'in gerçek anahtar sanmaması için.
+ */
+const E2E_WEBHOOK_SIRRI = process.env['IYZICO_WEBHOOK_SECRET'] ?? 'PLACEHOLDER-NOT-A-SECRET-03';
+process.env['IYZICO_WEBHOOK_SECRET'] = E2E_WEBHOOK_SIRRI;
 
 export default defineConfig({
   testDir: './senaryolar',
@@ -103,8 +126,14 @@ export default defineConfig({
             IYZICO_BASE_URL: `http://127.0.0.1:${IYZICO_PORT}`,
             // Anahtarların BOŞ OLMAMASI yeterli: `isPaymentConfigured` yalnızca
             // doluluk bakıyor, imzayı doğrulayan taraf sahte sunucu.
-            IYZICO_API_KEY: 'e2e-api-key',
-            IYZICO_SECRET_KEY: 'e2e-secret-key',
+            IYZICO_API_KEY: 'PLACEHOLDER-NOT-A-SECRET-01',
+            IYZICO_SECRET_KEY: 'PLACEHOLDER-NOT-A-SECRET-02',
+            // ⚠️ WEBHOOK SIRRI — sunucuya ve test sürecine AYNI değer gitmeli.
+            //    Sahte sağlayıcı gövdeyi bununla imzalıyor, API bununla
+            //    doğruluyor. Kök `.env`de boş olduğu için burada açıkça
+            //    veriliyor; eksik olsaydı `sahteIyzico` fixture'ı kurulumda
+            //    patlar ve TEK BİR senaryo bile koşmazdı.
+            IYZICO_WEBHOOK_SECRET: E2E_WEBHOOK_SIRRI,
           },
         },
       }

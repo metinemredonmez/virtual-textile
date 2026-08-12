@@ -86,6 +86,16 @@ export function uniqueViolationTarget(
  * ⚠️ Number'a çevirmeyin: 2^53'ten büyük kuruş tutarları bozulur.
  */
 export function serializeBigInts<T>(value: T): T {
+  // ⚠️ `undefined` ERKEN DÖNER. `JSON.stringify(undefined)` bir string değil,
+  //    `undefined` DÖNDÜRÜR; onu `JSON.parse`a vermek argümanı "undefined"
+  //    metnine çevirir ve `SyntaxError: "undefined" is not valid JSON` fırlar.
+  //    Bu satır olmadan `Promise<void>` dönen HER denetleyici 500 veriyordu:
+  //    `EnvelopeInterceptor` yanıtı buradan geçiriyor ve 204 uçlarının gövdesi
+  //    tanımsız oluyor (auth/logout, auth/sessions/:id, cart/:id). Hata
+  //    denetleyicide değil, ortak yardımcıda kapatılıyor: aksi hâlde eklenen
+  //    her yeni 204 ucu aynı tuzağa yeniden düşerdi.
+  if (value === undefined) return value;
+
   return JSON.parse(
     JSON.stringify(value, (_key, val: unknown) => (typeof val === 'bigint' ? val.toString() : val)),
   ) as T;

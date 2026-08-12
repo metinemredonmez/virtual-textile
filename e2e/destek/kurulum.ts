@@ -330,11 +330,40 @@ export async function urunYayinla(
   //    GENERATED ALWAYS kolonu (bkz. 20260811095048 migrasyonu), yazılamaz ve
   //    başlık/marka değiştiği anda Postgres tarafından kendiliğinden güncellenir.
 
+  // ⚠️ VARYANTLAR ÇAĞIRANIN VERDİĞİ SIRAYA GERİ DİZİLİR.
+  //
+  //    Sunucu varyantları `orderBy: [{ color: 'asc' }, { sortOrder: 'asc' }]`
+  //    ile döndürüyor (seller.bridges.ts) — yani ÖNCE RENK ADINA göre. Bu
+  //    bilinçli ve tutarlı bir sözleşme, sunucu tarafında bir hata değil.
+  //    Ama senaryolar `varyantlar[0]` / `varyantlar[1]` diye indeksliyor ve
+  //    "birinci verdiğim varyant" bekliyor. Renk adları alfabetik sıraya
+  //    denk gelmediğinde (örn. 'Bej' < 'Siyah') indeksler SESSİZCE takas
+  //    oluyordu: sepet senaryosu 2 × 250 + 3 × 100 = 800,00 ₺ bekleyip
+  //    2 × 100 + 3 × 250 = 950,00 ₺ görüyordu. Test yanlış varyanta iddia
+  //    kurduğu için hata "toplam tutmuyor" diye görünüyor, gerçek sebebi
+  //    gizliyordu.
+  //
+  //    Eşleme SKU üzerinden: `E2E-{ek}-{sıra}` deterministik üretiliyor, yani
+  //    renk/beden çakışsa bile sıra tek anlamlı kalıyor.
+  const sunucuVaryantlari = new Map(urun.variants.map((varyant) => [varyant.sku, varyant]));
+  const siraliVaryantlar = varyantTanimlari.map((_tanim, sira) => {
+    const sku = `E2E-${ek}-${String(sira)}`.toUpperCase();
+    const varyant = sunucuVaryantlari.get(sku);
+    if (varyant === undefined) {
+      throw new Error(
+        `Kurulum tutarsız: ${sku} SKU'lu varyant yanıtta yok. Dönenler: ${urun.variants
+          .map((v) => v.sku)
+          .join(', ')}`,
+      );
+    }
+    return varyant;
+  });
+
   return {
     productId: urun.id,
     slug: urun.slug,
     baslik,
-    varyantlar: urun.variants.map((varyant) => ({
+    varyantlar: siraliVaryantlar.map((varyant) => ({
       id: varyant.id,
       sku: varyant.sku,
       renk: varyant.color,

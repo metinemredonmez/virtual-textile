@@ -105,11 +105,20 @@ test.describe('Çok satıcılı sipariş — komisyon ve defter', () => {
       oranBps: 1800, // %18,00
     });
 
-    // A: 899,90 ₺ × 1 → eşiğin ALTINDA, kargo çıkar. Yuvarlama artığı üretir.
+    // A: 449,96 ₺ × 1 → eşiğin ALTINDA (< 500,00 ₺), kargo çıkar.
+    //
+    // ⚠️ FİYAT DÜZELTİLDİ: burada 899,90 ₺ yazıyordu ve yorumu "eşiğin ALTINDA"
+    //    diyordu — 899,90 ₺, 500,00 ₺ eşiğinin ÜSTÜNDE. Sunucu doğru davranıp
+    //    kargoyu bedava yapıyor, test ise ücret bekliyordu; senaryonun
+    //    "bir paket ücretli, bir paket bedava" kurgusu hiç kurulamıyordu.
+    //
+    // 44.996 seçildi çünkü 44.996 × %12,50 = 5.624,5 → TAM YARIM. Eski değer
+    // (,75 artık) yukarı yuvarlamayı zaten her kuralda geçerdi; bu değer
+    // "yarım yukarı" kuralını gerçekten sınar.
     const urunA = await urunYayinla(saticiA.istemci, yoneticiIstemcisi, {
       kategoriId: kategori.id,
       baslik: 'E2E A Gömlek',
-      varyantlar: [{ renk: 'Siyah', renkHex: '#000000', beden: 'M', fiyat: 899.9, stok: 5 }],
+      varyantlar: [{ renk: 'Siyah', renkHex: '#000000', beden: 'M', fiyat: 449.96, stok: 5 }],
     });
 
     // B: 749,95 ₺ × 2 = 1.499,90 ₺ → eşiğin ÜSTÜNDE, kargo bedava.
@@ -134,7 +143,7 @@ test.describe('Çok satıcılı sipariş — komisyon ve defter', () => {
     await sepeteEkle(musteri, varyantB.id, 2);
 
     // ══ BEKLENEN DEĞERLER — bağımsız hesap ════════════════════════════════
-    const kalemToplamA = lira(899.9) * 1n; // 89.990
+    const kalemToplamA = lira(449.96) * 1n; // 44.996
     const kalemToplamB = lira(749.95) * 2n; // 149.990
 
     const beklenenA = komisyonHesapla(kalemToplamA, {
@@ -146,11 +155,11 @@ test.describe('Çok satıcılı sipariş — komisyon ve defter', () => {
       fixedFeeMinor: kuralB.sabitUcretMinor,
     });
 
-    // 89.990 × 1250 / 10.000 = 11.248,75 → yarım yukarı → 11.249
+    // 44.996 × 1250 / 10.000 = 5.624,5 → TAM YARIM → yarım yukarı → 5.625
     expect(
       beklenenA.komisyonMinor,
       'Test hesabı hatalı — yuvarlama beklentisi yarım yukarı olmalı',
-    ).toBe(11_249n);
+    ).toBe(5_625n);
     expect(beklenenB.komisyonMinor, '149.990 × %18 = 26.998,2 → 26.998').toBe(26_998n);
 
     const kargoA = kalemToplamA >= UCRETSIZ_KARGO_ESIGI ? 0n : KARGO_UCRETI;
