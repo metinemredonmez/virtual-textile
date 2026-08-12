@@ -1,0 +1,37 @@
+-- ═══════════════════════════════════════════════════════════════════════
+--  UYGULANMADI — BEKLEYEN MIGRATION
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ Bu dosya BİLEREK `prisma/migrations/` ALTINDA DEĞİL.
+--    CI `prisma migrate deploy` çalıştırıyor (.github/workflows/ci.yml);
+--    dosya gerçek migration klasöründe olsaydı bir sonraki boru hattında
+--    KENDİLİĞİNDEN uygulanırdı. Oysa bu şema değişikliği, henüz açılmamış
+--    (ve birim ekonomisi hesaplanmamış) bir özelliğe aittir — video sanal
+--    deneme. Bkz. docs/ozellik-yol-haritasi.md → "Faz 3 — video try-on".
+--
+-- NİÇİN GEREKLİ
+-- `AiUsageLog.feature` alanı `AiFeature` enum'ıdır ve maliyet paneli ile
+-- bütçe sorguları bu alana göre gruplanır. Video harcamasını mevcut 'TRYON'
+-- değerine yazmak, iki farklı birim maliyeti (≈0,06 $ ve ≈0,50 $) tek
+-- ortalamada eritirdi: Faz 3 kararının dayanacağı sayı, tam da ölçülmek
+-- istendiği anda bozulmuş olurdu. Video için AYRI günlük bütçe kovası da
+-- (AI_VIDEO_DAILY_BUDGET_USD) yalnızca bu filtre varsa ölçülebilir.
+--
+-- ÖZELLİK AÇILIRKEN YAPILACAKLAR — SIRAYLA
+--   1. packages/db/prisma/schema.prisma → `enum AiFeature` içine VIDEO_TRYON
+--      ekle. (Şema ile migration birlikte gitmezse CI'daki
+--      `prisma migrate status` adımı sapma bildirir.)
+--   2. Bu klasörü `packages/db/prisma/migrations/` altına taşı.
+--   3. packages/config/src/ai-budget.ts → `AiFeature` birleşimine ve
+--      `ESTIMATED_UNIT_COST_MICRO_USD` tablosuna VIDEO_TRYON ekle
+--      (TS tarafı Prisma enum'ından türemiyor, elle güncelleniyor).
+--   4. `pnpm --filter @vt/db migrate` ile uygula.
+--
+-- ⚠️ GERİ ALINAMAZ: PostgreSQL'de bir enum değeri KALDIRILAMAZ (tipin
+--    yeniden yaratılması gerekir). Bu yüzden değer, özellik gerçekten
+--    açılmaya karar verildiğinde eklenmelidir — "şimdiden dursun" diye değil.
+
+-- PostgreSQL 17 (CI: pgvector/pgvector:pg17) `ALTER TYPE ... ADD VALUE`
+-- ifadesini transaction içinde kabul eder; yeni değer aynı transaction'da
+-- KULLANILAMAZ, bu migration da kullanmıyor.
+ALTER TYPE "AiFeature" ADD VALUE IF NOT EXISTS 'VIDEO_TRYON';

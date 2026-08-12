@@ -1,17 +1,39 @@
 import { SIZE_ENGINE } from '@vt/config';
+import {
+  evaluateBrandFitSignal,
+  evaluateFitSignal,
+  feedbackTotal,
+  fitShiftSteps,
+  keptCount,
+  personalWeight,
+  resolveUserSizeEvidence,
+  verdictToBrandFit,
+  type BrandFit,
+  type BrandFitSignal,
+  type FitFeedbackSummary,
+  type FitVerdict,
+  type UserSizeHistory,
+} from './fit-learning.js';
 
 /**
- * BEDEN ÖNERİ MOTORU — MVP'DE ML YOK, ŞEFFAF KURAL MOTORU
+ * BEDEN ÖNERİ MOTORU — ML YOK, ŞEFFAF KURAL + İSTATİSTİK
  *
  * Neden model değil kural: beden önerisi yanlış olduğunda bedeli iade
  * kargosudur ve doğrudan satıcının cebinden çıkar. Bir modelin neden "L"
  * dediğini açıklayamayız; kuralın neden "L" dediğini satır satır gösterebiliriz.
  * Kullanıcı da satıcı da bu gerekçeyi görür, itiraz edebilir, biz de düzeltiriz.
- * Eğitim verisi (iade + fit geri bildirimi) yeterli hacme ulaşana kadar
- * açıklanabilirlik, marjinal doğruluktan daha değerlidir.
+ *
+ * Motor artık saf ölçü karşılaştırması değil: gerçek iade ve yorum verisi de
+ * girdidir. Ama öğrenen bir model DEĞİL — sayım, oran ve güven aralığından
+ * ibaret bir düzeltme (bkz. `fit-learning.ts`). Açıklanabilirlik korunur.
  *
  * ⚠️ ÇIKTI HER ZAMAN "TAHMİN"DİR. `SIZE_DISCLAIMER` metni yanıttan
  *    çıkarılamaz; kesinlik iddiası hem yanlış hem de ticari olarak riskli olur.
+ *
+ * ⚠️ TEK KAYDIRMA KURALI. Giysinin kalıbı için merdivende EN FAZLA BİR adım
+ *    kaydırma yapılır. Beyan edilen kalıp, ürün geri bildirimi ve marka
+ *    eğilimi çoğu zaman AYNI OLGUYU üç kez ölçer; üçünü toplasaydık öneri iki
+ *    beden şaşardı. Bu yüzden aralarında yarışırlar, toplanmazlar.
  */
 
 /** Ürünün beden tablosu: {"M": {"chest": 98, "waist": 78, "length": 70}} */
@@ -27,23 +49,30 @@ export interface BodyMeasurements {
   usualSize?: string | null;
 }
 
-export type BrandFit = 'SLIM' | 'REGULAR' | 'OVERSIZE';
-
-/** İade ve yorumlardan toplanan kalıp geri bildirimi. */
-export interface FitFeedbackSummary {
-  tooSmall: number;
-  trueToSize: number;
-  tooLarge: number;
-}
+/**
+ * Kalıp vokabülerinin sahibi `fit-learning.ts`'tir (kanıt katmanı); motor onu
+ * tüketir. Buradan yeniden dışa açılıyor ki mevcut tüketiciler
+ * (`ai.ports.ts`, `index.ts`) tek bir yerden okumaya devam etsin.
+ */
+export type { BrandFit, FitFeedbackSummary, BrandFitSignal, UserSizeHistory };
 
 export interface SizeEngineInput {
   sizeChart: SizeChart;
   measurements: BodyMeasurements;
-  /** Markanın kalıbı — ürün AI etiketlerinden veya satıcı beyanından gelir. */
+  /** Markanın BEYAN edilen kalıbı — ürün AI etiketlerinden veya satıcıdan. */
   brandFit?: BrandFit | null;
   /** Kullanıcının kalıp TERCİHİ (dar/bol sevme) — markanın kalıbından ayrıdır. */
   fitPreference?: BrandFit | null;
+  /** Bu ÜRÜN için toplanmış iade + yorum sinyali. */
   feedback?: FitFeedbackSummary | null;
+  /** Aynı MARKANIN tüm ürünlerinden toplanmış sinyal. */
+  brandSignal?: BrandFitSignal | null;
+  /**
+   * Kullanıcının kendi satın alma geçmişi.
+   * ⚠️ Yalnızca giriş yapmış kullanıcıda dolu olur; misafirde null'dır ve
+   *    olmaması bir eksiklik değildir — kişisel veri toplamadan öneri veririz.
+   */
+  userHistory?: UserSizeHistory | null;
 }
 
 /** Şeffaflık: öneriyi oluşturan her adım kullanıcıya gösterilir. */
@@ -53,10 +82,22 @@ export interface SizeReason {
     | 'NO_MEASUREMENTS'
     | 'NO_SIZE_CHART'
     | 'AMBIGUOUS'
+    /** Satıcının/AI etiketinin BEYAN ettiği kalıp uygulandı. */
     | 'BRAND_FIT'
+    /** Marka kalıbı iade verisinden ÖĞRENİLDİ ve beyanın yerine geçti. */
+    | 'BRAND_FIT_LEARNED'
     | 'FIT_PREFERENCE'
     | 'RETURN_FEEDBACK'
+    /** ⚠️ Eşik altı veri — kullanılmadı. */
     | 'FEEDBACK_TOO_FEW'
+    /** Geri bildirimler birbiriyle çelişiyor; yön çıkarılamadı. */
+    | 'FEEDBACK_CONFLICTING'
+    /** Kullanıcı bu üründen bu bedeni almış ve iade etmemiş. */
+    | 'USER_KEPT_SIZE'
+    /** Kullanıcı bu üründen bu bedeni beden yüzünden iade etmiş. */
+    | 'USER_RETURNED_SIZE'
+    /** Kullanıcının aynı markadaki geçmişi. */
+    | 'USER_BRAND_HISTORY'
     | 'USUAL_SIZE_AGREES'
     | 'USUAL_SIZE_CONFLICTS';
   message: string;
@@ -211,11 +252,266 @@ function clamp(value: number, min = 0, max = 100): number {
 }
 
 /**
+ * GÜVENİN KANIT KAYNAKLARINA GÖRE TAVANLARI.
+ *
+ * ⚠️ Bunlar TAVANDIR, sabit ekleme değil. Her biri kanıt ağırlığıyla
+ *    (`evidenceWeight`, 0..1) ÇARPILIR. Bu çarpım bu görevin çekirdeğidir:
+ *    eşiği yeni geçen 5 geri bildirim tavanın yarısını, 50 geri bildirim
+ *    %90'ını verir. Sabit bir ekleme yapsaydık 5 kişiyle 500 kişi aynı güveni
+ *    üretirdi — kullanıcı da aradaki farkı göremezdi.
+ *
+ * Sıralamanın gerekçesi: kullanıcının KENDİ tuttuğu giysi > bu ürünün alıcı
+ * verisi > markanın geneli. Kanıt özelleştikçe değeri artar.
+ */
+const CONFIDENCE_CAP = {
+  /** Bu ürünün alıcı verisi. */
+  productFeedback: 20,
+  /** Marka geneli — daha geniş genelleme, daha az güven. */
+  brandFeedback: 10,
+  /**
+   * ⚠️ NEGATİF. Bedenleri tutarsız bir ürün gerçekten daha riskli bir
+   *    alışveriştir; bunu gizlemek yerine güveni düşürüp söylüyoruz.
+   */
+  conflictingFeedback: -10,
+  /** Kullanıcının bu üründen tuttuğu beden — elimizdeki en güçlü kanıt. */
+  userKeptForProduct: 25,
+  /** Beden yüzünden iade — güçlü negatif kanıt, ama yönü kesin. */
+  userReturnedForProduct: 18,
+  /** Aynı markadan tutulan beden; kategori değişince kalıp da değişir. */
+  userKeptForBrand: 6,
+  /** Markadaki geçmişiyle belirgin çelişki. */
+  userBrandConflict: -8,
+} as const;
+
+/** Giysinin kalıbına dair nihai karar ve nereden geldiği. */
+interface GarmentFitDecision {
+  fit: BrandFit;
+  source: 'DECLARED' | 'PRODUCT_FEEDBACK' | 'BRAND_FEEDBACK' | 'NONE';
+  verdict: FitVerdict | null;
+}
+
+/**
+ * KALIP KARARI — ÖLÇÜLEN DAVRANIŞ, BEYANI EZER.
+ *
+ * Öncelik: ürün geri bildirimi → marka eğilimi → satıcı beyanı.
+ *
+ * Neden veri beyanı eziyor: satıcının "regular kalıp" demesi bir iddiadır;
+ * 200 alıcının bir beden büyük alıp tutması ölçümdür. Beyanı ölçümün ÜSTÜNE
+ * eklemek ise aynı olguyu iki kez sayıp öneriyi iki beden şaşırtırdı.
+ *
+ * ⚠️ TRUE_TO_SIZE de bir KARARDIR, bilgisizlik değil: alıcılar "bedenler
+ *    doğru" diyorsa, beyan edilen SLIM kalıp uygulanMAZ. Kalıbın dar olması
+ *    bedenin küçük olduğu anlamına gelmez; alıcı verisi tam da bu ayrımı bilir.
+ */
+function resolveGarmentFit(
+  declared: BrandFit | null,
+  productVerdict: FitVerdict | null,
+  brandVerdict: FitVerdict | null,
+): GarmentFitDecision {
+  const fromProduct = productVerdict ? verdictToBrandFit(productVerdict.kind) : null;
+  if (fromProduct) return { fit: fromProduct, source: 'PRODUCT_FEEDBACK', verdict: productVerdict };
+
+  const fromBrand = brandVerdict ? verdictToBrandFit(brandVerdict.kind) : null;
+  if (fromBrand) return { fit: fromBrand, source: 'BRAND_FEEDBACK', verdict: brandVerdict };
+
+  if (declared) return { fit: declared, source: 'DECLARED', verdict: null };
+
+  return { fit: 'REGULAR', source: 'NONE', verdict: null };
+}
+
+/** Kaydırmanın gerekçesi — hangi KANITTAN geldiği kullanıcıya da görünür. */
+function garmentFitReason(
+  source: GarmentFitDecision['source'],
+  runsSmall: boolean,
+  shifted: string,
+): SizeReason {
+  if (source === 'PRODUCT_FEEDBACK') {
+    return {
+      code: 'RETURN_FEEDBACK',
+      message: runsSmall
+        ? `Alıcıların çoğu bu ürünün küçük geldiğini bildirdi; bir beden büyük (${shifted}) öneriliyor.`
+        : `Alıcıların çoğu bu ürünün büyük geldiğini bildirdi; bir beden küçük (${shifted}) öneriliyor.`,
+    };
+  }
+
+  if (source === 'BRAND_FEEDBACK') {
+    return {
+      code: 'BRAND_FIT_LEARNED',
+      message: runsSmall
+        ? `Bu markanın ürünleri genelde küçük geliyor; bir beden büyük (${shifted}) öneriliyor.`
+        : `Bu markanın ürünleri genelde büyük geliyor; bir beden küçük (${shifted}) öneriliyor.`,
+    };
+  }
+
+  return {
+    code: 'BRAND_FIT',
+    message: runsSmall
+      ? `Ürün dar kalıplı; bir beden büyük (${shifted}) öneriliyor.`
+      : `Ürün bol kalıplı; bir beden küçük (${shifted}) öneriliyor.`,
+  };
+}
+
+/** Etiket eşanlamlılarını (2XL/XXL) hesaba katan merdiven araması. */
+function indexOfSize(ordered: readonly string[], label: string): number {
+  const target = normalizeSizeLabel(label);
+  return ordered.findIndex((s) => normalizeSizeLabel(s) === target);
+}
+
+/**
+ * KULLANICININ KENDİ GEÇMİŞİ.
+ *
+ * İki kanıt türü ve aralarındaki ASİMETRİ:
+ *  - TUTULAN beden pozitif ama yumuşak kanıttır: insanlar biraz bol/dar bir
+ *    şeyi de tutar (iade etmek zahmetlidir).
+ *  - BEDEN YÜZÜNDEN İADE edilen beden sert kanıttır: kimse üstüne olan bir
+ *    şeyi kargoyla geri göndermez. Bu yüzden iade, tutulan bedenin ÜSTÜNE
+ *    uygulanır ve son sözü söyler.
+ *
+ * ⚠️ Bu yüzden bir bedeni "kullanıcı bunu iade etmişti" diye dışarıda
+ *    bırakmak, "kullanıcı bunu tutmuştu" diye önermekten daha önceliklidir.
+ */
+function applyUserHistory(
+  history: UserSizeHistory,
+  orderedSizes: readonly string[],
+  current: string,
+  reasons: SizeReason[],
+): { size: string; confidenceDelta: number } {
+  const evidence = resolveUserSizeEvidence(history);
+  let size = current;
+  let confidenceDelta = 0;
+  let usedProductEvidence = false;
+
+  // ── 1. Bu üründen tutulan beden ─────────────────────────────────────────
+  const keptCandidates = evidence.keptForProduct
+    .map((label) => ({ label, index: indexOfSize(orderedSizes, label) }))
+    .filter((c) => c.index >= 0);
+
+  if (keptCandidates.length > 0) {
+    const currentIndex = indexOfSize(orderedSizes, size);
+    // Birden çok beden tutulmuşsa (ör. iki renk, iki beden) mevcut öneriye en
+    // yakın olanı seçilir: hangisinin "doğru" olduğunu bilmiyoruz, en az
+    // sürprizli olanı tercih ederiz.
+    const chosen = keptCandidates.reduce((best, candidate) =>
+      Math.abs(candidate.index - currentIndex) < Math.abs(best.index - currentIndex)
+        ? candidate
+        : best,
+    );
+    const label = orderedSizes[chosen.index] ?? chosen.label;
+    const weight = personalWeight(keptCount(evidence.keptForProduct, chosen.label));
+
+    confidenceDelta += CONFIDENCE_CAP.userKeptForProduct * weight;
+    usedProductEvidence = true;
+
+    reasons.push({
+      code: 'USER_KEPT_SIZE',
+      message:
+        label === size
+          ? `Bu üründen daha önce ${label} beden almıştınız ve iade etmemiştiniz.`
+          : `Bu üründen daha önce ${label} beden almıştınız ve iade etmemiştiniz; öneri buna göre ${label}.`,
+    });
+    size = label;
+  }
+
+  // ── 2. Beden yüzünden iade edilen bedenler ──────────────────────────────
+  const returns = evidence.returnedForProduct
+    .map((r) => ({ ...r, index: indexOfSize(orderedSizes, r.size) }))
+    .filter((r) => r.index >= 0);
+
+  if (returns.length > 0) {
+    let minAllowed = 0;
+    let maxAllowed = orderedSizes.length - 1;
+
+    for (const item of returns) {
+      if (item.direction === 'TOO_SMALL') minAllowed = Math.max(minAllowed, item.index + 1);
+      else maxAllowed = Math.min(maxAllowed, item.index - 1);
+    }
+
+    const currentIndex = indexOfSize(orderedSizes, size);
+
+    // ⚠️ minAllowed > maxAllowed: kullanıcı aynı üründen hem "küçük geldi" hem
+    //    "büyük geldi" diye iade etmiş ve aralarında geçerli beden kalmamış.
+    //    Böyle bir geçmişten beden çıkarılamaz — kanıt SESSİZCE UYGULANMAZ,
+    //    zorlama bir beden üretmek yerine ölçü kararında kalınır.
+    if (minAllowed <= maxAllowed && currentIndex >= 0) {
+      const bounded = Math.min(maxAllowed, Math.max(minAllowed, currentIndex));
+      const weight = personalWeight(returns.length);
+      const blocking = returns.find((r) =>
+        r.direction === 'TOO_SMALL' ? r.index >= currentIndex : r.index <= currentIndex,
+      );
+
+      confidenceDelta += CONFIDENCE_CAP.userReturnedForProduct * weight;
+      usedProductEvidence = true;
+
+      if (bounded !== currentIndex) {
+        const shifted = orderedSizes[bounded];
+        if (shifted) {
+          reasons.push({
+            code: 'USER_RETURNED_SIZE',
+            message:
+              blocking?.direction === 'TOO_LARGE'
+                ? `Bu üründen aldığınız ${blocking.size} beden size büyük gelmişti; öneri ${shifted} bedene çekildi.`
+                : `Bu üründen aldığınız ${blocking?.size ?? size} beden size küçük gelmişti; öneri ${shifted} bedene çekildi.`,
+          });
+          size = shifted;
+        }
+      } else {
+        const returned = returns[0]!;
+        reasons.push({
+          code: 'USER_RETURNED_SIZE',
+          message:
+            returned.direction === 'TOO_SMALL'
+              ? `Bu üründen aldığınız ${returned.size} beden size küçük gelmişti; öneri onun üzerinde.`
+              : `Bu üründen aldığınız ${returned.size} beden size büyük gelmişti; öneri onun altında.`,
+        });
+      }
+    }
+  }
+
+  // ── 3. Aynı markadaki geçmiş ────────────────────────────────────────────
+  // ⚠️ Yalnızca ÜRÜN düzeyinde kanıt YOKSA bakılır. Aynı markanın montu ile
+  //    tişörtü aynı beden merdivenini paylaşmaz; bu sinyal bedeni KAYDIRMAZ,
+  //    sadece güveni oynatır.
+  if (!usedProductEvidence && evidence.keptForBrand.length > 0) {
+    const currentIndex = indexOfSize(orderedSizes, size);
+    const distances = evidence.keptForBrand
+      .map((label) => indexOfSize(orderedSizes, label))
+      .filter((index) => index >= 0)
+      .map((index) => Math.abs(index - currentIndex));
+
+    if (currentIndex >= 0 && distances.length > 0) {
+      const nearest = Math.min(...distances);
+      const weight = personalWeight(evidence.keptForBrand.length);
+
+      if (nearest === 0) {
+        confidenceDelta += CONFIDENCE_CAP.userKeptForBrand * weight;
+        reasons.push({
+          code: 'USER_BRAND_HISTORY',
+          message: `Bu markadan daha önce aldığınız ${size} bedeni iade etmemiştiniz.`,
+        });
+      } else if (nearest >= 2) {
+        // İki sinyal birbirini tutmuyor; hangisinin doğru olduğunu bilmiyoruz.
+        // Gizlemek yerine güveni düşürüp kullanıcıya söylüyoruz.
+        confidenceDelta += CONFIDENCE_CAP.userBrandConflict * weight;
+        reasons.push({
+          code: 'USER_BRAND_HISTORY',
+          message: `Bu markadan daha önce farklı bir beden almıştınız; öneri (${size}) ondan belirgin biçimde uzak.`,
+        });
+      }
+    }
+  }
+
+  return { size, confidenceDelta };
+}
+
+/**
  * ÖNERİYİ HESAPLAR.
  *
- * Zincir: ölçü eşleşmesi → marka kalıbı → kullanıcı tercihi → iade geri
- * bildirimi. Her adım hem bedeni hem güveni değiştirebilir ve kendi gerekçesini
- * `reasons` içine yazar.
+ * Zincir: ölçü eşleşmesi → giysinin kalıbı (ürün verisi > marka verisi >
+ * satıcı beyanı, TEK kaydırma) → kullanıcı tercihi → kullanıcının kendi
+ * geçmişi → "normalde giydiğim beden" doğrulaması.
+ *
+ * Her adım hem bedeni hem güveni değiştirebilir ve kendi gerekçesini `reasons`
+ * içine yazar. Güven katkıları SABİT DEĞİL, kanıt ağırlığıyla çarpılır.
  */
 export function recommendSize(input: SizeEngineInput): SizeEngineResult {
   const reasons: SizeReason[] = [];
@@ -282,21 +578,60 @@ export function recommendSize(input: SizeEngineInput): SizeEngineResult {
     }
   }
 
-  // ── Marka kalıbı ────────────────────────────────────────────────────────
-  // SLIM +1: dar kalıpta bir beden büyük. OVERSIZE -1: bol kalıpta bir küçük.
-  if (input.brandFit && input.brandFit !== 'REGULAR') {
-    const steps = SIZE_ENGINE.fitAdjustment[input.brandFit];
-    const shifted = shiftSize(orderedSizes, size, steps);
+  // ── Kalıp düzeltmesi: TEK kaydırma ──────────────────────────────────────
+  // Kaynak yarışması `resolveGarmentFit`te yapılır; buraya kazanan gelir.
+  // SLIM +1: küçük gelen/dar kalıpta bir beden büyük. OVERSIZE -1: tersi.
+  const productVerdict = input.feedback ? evaluateFitSignal(input.feedback) : null;
+  const brandVerdict = input.brandSignal ? evaluateBrandFitSignal(input.brandSignal) : null;
+  const garment = resolveGarmentFit(input.brandFit ?? null, productVerdict, brandVerdict);
+
+  if (garment.fit !== 'REGULAR') {
+    const shifted = shiftSize(orderedSizes, size, fitShiftSteps(garment.fit));
     if (shifted !== size) {
-      reasons.push({
-        code: 'BRAND_FIT',
-        message:
-          input.brandFit === 'SLIM'
-            ? `Ürün dar kalıplı; bir beden büyük (${shifted}) öneriliyor.`
-            : `Ürün bol kalıplı; bir beden küçük (${shifted}) öneriliyor.`,
-      });
+      const runsSmall = garment.fit === 'SLIM';
+      reasons.push(garmentFitReason(garment.source, runsSmall, shifted));
       size = shifted;
     }
+  } else if (garment.source === 'PRODUCT_FEEDBACK') {
+    reasons.push({
+      code: 'RETURN_FEEDBACK',
+      message: 'Alıcıların çoğu bu ürünün bedeninin uygun olduğunu bildirdi.',
+    });
+  } else if (garment.source === 'BRAND_FEEDBACK') {
+    reasons.push({
+      code: 'BRAND_FIT_LEARNED',
+      message: 'Bu markanın ürünlerinde alıcılar bedenlerin uygun olduğunu bildiriyor.',
+    });
+  }
+
+  // Kanıt ağırlığıyla ölçeklenen güven. ⚠️ Sabit ekleme YOK: 5 geri bildirim
+  // ile 500 geri bildirim aynı güveni üretemez.
+  if (garment.verdict) {
+    const cap =
+      garment.source === 'PRODUCT_FEEDBACK'
+        ? CONFIDENCE_CAP.productFeedback
+        : CONFIDENCE_CAP.brandFeedback;
+    confidence += cap * garment.verdict.weight;
+  }
+
+  // ── Kullanılamayan / çelişen geri bildirim ──────────────────────────────
+  const productTotal = input.feedback ? feedbackTotal(input.feedback) : 0;
+
+  if (productVerdict?.kind === 'INSUFFICIENT' && productTotal > 0) {
+    // ⚠️ Eşik altı veri güveni ne artırır ne azaltır — YOK SAYILIR. Ama
+    //    kullanıcıya varlığı söylenir; sessizce yutmak şeffaflığı bozar.
+    reasons.push({
+      code: 'FEEDBACK_TOO_FEW',
+      message: 'Bu ürün için henüz yeterli beden geri bildirimi yok.',
+    });
+  } else if (productVerdict?.kind === 'CONFLICTING') {
+    confidence += CONFIDENCE_CAP.conflictingFeedback * productVerdict.weight;
+    reasons.push({
+      code: 'FEEDBACK_CONFLICTING',
+      message:
+        'Bu ürünün bedeni hakkında alıcı geri bildirimleri birbiriyle çelişiyor; ' +
+        'beden tablosunu incelemenizi öneririz.',
+    });
   }
 
   // ── Kullanıcının kalıp tercihi ──────────────────────────────────────────
@@ -318,44 +653,14 @@ export function recommendSize(input: SizeEngineInput): SizeEngineResult {
     }
   }
 
-  // ── İade / yorum geri bildirimi ─────────────────────────────────────────
-  // Gerçek alıcı deneyimi, tablodaki rakamdan daha güçlü bir sinyaldir —
-  // ama yalnızca yeterli sayıda geri bildirim varsa. Üç kişinin görüşü
-  // gürültüdür ve öneriyi savurur.
-  const feedback = input.feedback;
-  const feedbackTotal = feedback ? feedback.tooSmall + feedback.trueToSize + feedback.tooLarge : 0;
-
-  if (feedback && feedbackTotal >= SIZE_ENGINE.minFeedbackCountToUse) {
-    const skew = (feedback.tooSmall - feedback.tooLarge) / feedbackTotal;
-
-    if (skew >= 0.3) {
-      const shifted = shiftSize(orderedSizes, size, 1);
-      reasons.push({
-        code: 'RETURN_FEEDBACK',
-        message: `Alıcıların çoğu bu ürünün küçük geldiğini bildirdi; bir beden büyük (${shifted}) öneriliyor.`,
-      });
-      size = shifted;
-      confidence += 8;
-    } else if (skew <= -0.3) {
-      const shifted = shiftSize(orderedSizes, size, -1);
-      reasons.push({
-        code: 'RETURN_FEEDBACK',
-        message: `Alıcıların çoğu bu ürünün büyük geldiğini bildirdi; bir beden küçük (${shifted}) öneriliyor.`,
-      });
-      size = shifted;
-      confidence += 8;
-    } else {
-      reasons.push({
-        code: 'RETURN_FEEDBACK',
-        message: 'Alıcıların çoğu bu ürünün bedeninin uygun olduğunu bildirdi.',
-      });
-      confidence += 5;
-    }
-  } else if (feedbackTotal > 0) {
-    reasons.push({
-      code: 'FEEDBACK_TOO_FEW',
-      message: 'Bu ürün için henüz yeterli beden geri bildirimi yok.',
-    });
+  // ── Kullanıcının kendi geçmişi ──────────────────────────────────────────
+  // ⚠️ Yabancıların ortalamasından SONRA gelir ve onu ezebilir: bu kişinin
+  //    kendi vücudunda o giysinin nasıl durduğu, yüzlerce yabancının
+  //    ortalamasından daha bilgilendiricidir.
+  if (input.userHistory) {
+    const applied = applyUserHistory(input.userHistory, orderedSizes, size, reasons);
+    size = applied.size;
+    confidence += applied.confidenceDelta;
   }
 
   // ── "Normalde giydiğim beden" doğrulaması ───────────────────────────────

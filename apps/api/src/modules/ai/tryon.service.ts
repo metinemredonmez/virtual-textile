@@ -1,18 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { appError, REQUIRED_TRYON_CONSENTS } from '@vt/contracts';
-import {
-  aiBudgetFromEnv,
-  checkBudget,
-  env,
-  SIGNED_URL_TTL_SECONDS,
-  TRYON,
-  TRYONABLE_CATEGORIES,
-} from '@vt/config';
+import { appError } from '@vt/contracts';
+import { SIGNED_URL_TTL_SECONDS, TRYON, TRYONABLE_CATEGORIES } from '@vt/config';
+import { outfitIntermediateKey } from '@vt/adapters';
 import { Prisma } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import type { Logger } from '../../common/logger.js';
-import { evaluateTryOnConsent } from './consent.rules.js';
+import { assertTryOnConsent, assertTryOnQuotaAndBudget, loadOwnPhoto } from './tryon.guards.js';
 import {
   CONSENT_PORT,
   TRYON_CACHE_KEY_PORT,
@@ -108,10 +102,11 @@ export class TryOnService {
     const startedAt = Date.now();
 
     // 1) ⚠️ RIZA — sağlayıcıya çağrı yapılmadan ÖNCE, istisnasız.
-    await this.assertTryOnConsent(actor.userId);
+    //    Kapı mantığı `tryon.guards.ts`tedir: kombin akışı da AYNI kapıdan geçer.
+    await assertTryOnConsent(this.consents, this.logger, actor.userId);
 
     // 2) Fotoğraf: sahiplik + yaşam süresi + kalite.
-    const photo = await this.loadOwnPhoto(input.userPhotoId, actor.userId);
+    const photo = await loadOwnPhoto(this.prisma, input.userPhotoId, actor.userId);
 
     // 3) Ürün try-on'a uygun mu.
     const variant = await this.loadTryOnableVariant(input.variantId);
@@ -155,7 +150,8 @@ export class TryOnService {
     }
 
     // 5) KOTA ve BÜTÇE — üretim maliyeti burada doğar.
-    await this.assertQuotaAndBudget(actor.userId);
+    //    Tek ürün = 1 birim. (Kombin akışı aynı fonksiyonu parça sayısıyla çağırır.)
+    await assertTryOnQuotaAndBudget(this.prisma, this.logger, { userId: actor.userId, units: 1 });
 
     // 6) İşi ve outbox olayını AYNI transaction'da yaz.
     return this.enqueue({
@@ -252,9 +248,23 @@ export class TryOnService {
 
       if (jobs.length === 0) return { deleted: 0 };
 
-      const resultKeys = jobs
-        .map((job) => job.resultKey)
-        .filter((key): key is string => key !== null);
+      /**
+       * ⚠️ ARA KATMAN GÖRSELLERİ DE SİLİNİR.
+       *
+       * Kombin bestesinde her katman, bir sonrakine taban olsun diye
+       * FİLİGRANSIZ bir ara nesne bırakır (bkz. multi-tryon.ts →
+       * outfitIntermediateKey). Bu nesne de kullanıcının vücut görüntüsüdür;
+       * yalnızca `resultKey` silinseydi "denemelerimi sil" dedikten sonra
+       * depoda kullanıcının filigransız görselleri kalırdı.
+       *
+       * Anahtar iş kimliğinden TÜRETİLİR, kolonda tutulmaz: şema değişikliği
+       * gerektirmez ve hiçbir kayıt "ara nesnesi olduğunu" unutamaz. Var
+       * olmayan bir nesneyi silmek depo tarafında zaten etkisizdir.
+       */
+      const resultKeys = [
+        ...jobs.map((job) => job.resultKey).filter((key): key is string => key !== null),
+        ...jobs.map((job) => outfitIntermediateKey(job.id)),
+      ];
 
       await tx.outboxEvent.create({
         data: {
@@ -278,50 +288,6 @@ export class TryOnService {
 
   // ── Yardımcılar ──────────────────────────────────────────────────────────
 
-  /** ⚠️ Rıza kontrolü. Kararı `consent.rules.ts` verir; burada yalnızca uygulanır. */
-  private async assertTryOnConsent(userId: string): Promise<void> {
-    const records = await this.consents.findRecords(userId, REQUIRED_TRYON_CONSENTS);
-    const decision = evaluateTryOnConsent(records);
-
-    if (!decision.allowed) {
-      // Reddedilen istek de loglanır: rızasız işleme girişiminin denetlenebilir
-      // olması gerekir (ve bir hata varsa erken görülür).
-      this.logger.warn(
-        { userId, missingConsent: decision.missing },
-        'Sanal deneme rıza eksikliği nedeniyle reddedildi',
-      );
-      throw appError(decision.code);
-    }
-  }
-
-  private async loadOwnPhoto(
-    photoId: string,
-    userId: string,
-  ): Promise<{ id: string; contentHash: string }> {
-    const photo = await this.prisma.userPhoto.findFirst({
-      where: {
-        id: photoId,
-        // ⚠️ Sahiplik, süre ve silinmişlik TEK sorguda: ayrı kontrol edilirse
-        // araya giren bir silme işlemiyle yarış oluşur.
-        userId,
-        deletedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      select: { id: true, contentHash: true, qualityScore: true, qualityIssues: true },
-    });
-
-    if (!photo) throw appError('PHOTO_NOT_FOUND');
-
-    // Kalitesiz fotoğrafta üretim neredeyse kesin başarısız olur; parayı
-    // harcamadan önce kullanıcıya somut nedeni söylüyoruz.
-    if (photo.qualityScore !== null && photo.qualityScore < TRYON.minPhotoQualityScore) {
-      const issues = Array.isArray(photo.qualityIssues) ? photo.qualityIssues.join(', ') : 'düşük';
-      throw appError('PHOTO_QUALITY_LOW', { params: { reason: issues } });
-    }
-
-    return { id: photo.id, contentHash: photo.contentHash };
-  }
-
   private async loadTryOnableVariant(variantId: string): Promise<{ variantId: string }> {
     const variant = await this.catalog.findVariant(variantId);
     if (!variant) throw appError('VARIANT_NOT_FOUND');
@@ -336,71 +302,6 @@ export class TryOnService {
     if (!variant.imageKey) throw appError('PRODUCT_NOT_TRYONABLE');
 
     return { variantId: variant.variantId };
-  }
-
-  /**
-   * KOTA VE BÜTÇE
-   *
-   * İki ayrı koruma: kullanıcı kotası kötüye kullanımı, platform bütçesi ise
-   * toplam gideri sınırlar. İkincisi aşıldığında AI kapanır ama TİCARET AKIŞI
-   * ETKİLENMEZ — kullanıcı yine gezer, sepete atar, satın alır.
-   */
-  private async assertQuotaAndBudget(userId: string): Promise<void> {
-    const budget = aiBudgetFromEnv(env());
-    const now = new Date();
-    const dayStart = startOfLocalDay(now);
-    const monthStart = startOfLocalMonth(now);
-
-    const [used, todaySpend, monthSpend] = await Promise.all([
-      this.consumedQuotaToday(userId, dayStart),
-      this.prisma.aiUsageLog.aggregate({
-        _sum: { costMicroUsd: true },
-        where: { createdAt: { gte: dayStart } },
-      }),
-      this.prisma.aiUsageLog.aggregate({
-        _sum: { costMicroUsd: true },
-        where: { createdAt: { gte: monthStart } },
-      }),
-    ]);
-
-    if (used >= budget.perUserDailyTryOn) {
-      throw appError('TRYON_QUOTA_EXCEEDED', {
-        params: { used, limit: budget.perUserDailyTryOn },
-      });
-    }
-
-    const decision = checkBudget(budget, {
-      todayMicroUsd: todaySpend._sum.costMicroUsd ?? 0n,
-      thisMonthMicroUsd: monthSpend._sum.costMicroUsd ?? 0n,
-    });
-
-    if (!decision.allowed) {
-      this.logger.error({ reason: decision.reason }, 'AI bütçesi doldu — üretim durduruldu');
-      throw appError('AI_BUDGET_EXCEEDED');
-    }
-
-    if (decision.warnAtRatio !== undefined) {
-      this.logger.warn({ ratio: decision.warnAtRatio }, 'AI günlük bütçe eşiği aşıldı');
-    }
-  }
-
-  /**
-   * KOTA SAYIMI — ve dolaylı olarak KOTA İADESİ.
-   *
-   * ⚠️ Ayrı bir sayaç tutulmuyor. Kota, "bugün açılmış ve başarısız OLMAMIŞ"
-   *    işlerin sayısıdır. Böylece bir iş FAILED'a düştüğü anda kota kendiliğinden
-   *    geri verilmiş olur — worker çökse, süreç yarıda kesilse bile.
-   *    Sayaç artırıp azaltan bir tasarımda, azaltma adımı kaçırıldığında
-   *    kullanıcı hakkını kalıcı olarak kaybederdi.
-   */
-  private async consumedQuotaToday(userId: string, dayStart: Date): Promise<number> {
-    return this.prisma.tryOnJob.count({
-      where: {
-        userId,
-        queuedAt: { gte: dayStart },
-        status: { in: ['QUEUED', 'RUNNING', 'SUCCEEDED'] },
-      },
-    });
   }
 
   private async enqueue(data: {
@@ -535,25 +436,4 @@ export class TryOnService {
       },
     });
   }
-}
-
-/**
- * Gün ve ay sınırı Türkiye saatine göre hesaplanır (UTC+3, yaz saati yok).
- *
- * ⚠️ UTC kullanılsaydı kullanıcının günlük hakkı gece 03:00'te yenilenirdi;
- *    "yarın tekrar deneyin" mesajı yanlış olurdu.
- */
-const TR_OFFSET_MS = 3 * 60 * 60 * 1000;
-
-function startOfLocalDay(now: Date): Date {
-  const shifted = new Date(now.getTime() + TR_OFFSET_MS);
-  shifted.setUTCHours(0, 0, 0, 0);
-  return new Date(shifted.getTime() - TR_OFFSET_MS);
-}
-
-function startOfLocalMonth(now: Date): Date {
-  const shifted = new Date(now.getTime() + TR_OFFSET_MS);
-  shifted.setUTCDate(1);
-  shifted.setUTCHours(0, 0, 0, 0);
-  return new Date(shifted.getTime() - TR_OFFSET_MS);
 }

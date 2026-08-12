@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { MeModule } from './modules/me/index.js';
 import { NotificationModule } from './modules/notification/index.js';
 import { CatalogModule } from './modules/catalog/catalog.module.js';
+import { NaturalSearchModule } from './modules/catalog/natural-search.module.js';
 import { CartModule } from './modules/cart/index.js';
 import { CheckoutModule } from './modules/checkout/index.js';
 import { OrderModule } from './modules/order/index.js';
@@ -39,6 +40,14 @@ import { requestContextMiddleware } from './common/middleware/request-context.mi
     //    o import bir gün kalkarsa /v1/me/* sessizce 404'e döner.
     MeModule,
     CatalogModule,
+    // ⚠️ NaturalSearchModule, CatalogModule'ün ÜSTÜNDE ayrı bir modüldür ve
+    //    kökte AÇIKÇA bağlanır. Kendi içinde CatalogModule'ü import ediyor
+    //    (arama mantığı `CatalogService.listProducts` içinde kalsın diye), ama
+    //    tek bağ o olsaydı `POST /v1/search/natural` hiç yayına çıkmazdı:
+    //    bir modül yalnızca başka bir modülü import etmekle kendi
+    //    controller'ını kaydettirmez. Nest modülleri tekildir — CatalogModule'ün
+    //    iki yerde import edilmesi ikinci bir CatalogService örneği üretmez.
+    NaturalSearchModule,
     // ── Ticaret ──
     CartModule,
     CheckoutModule,

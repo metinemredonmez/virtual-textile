@@ -78,6 +78,37 @@ export const envSchema = z
     ANTHROPIC_API_KEY: z.string().default(''),
     ANTHROPIC_MODEL: z.string().default('claude-sonnet-5'),
 
+    // ── Video sanal deneme (Faz 3) — VARSAYILAN KAPALI ────────────────
+    /**
+     * ⚠️ VARSAYILAN false. Video üretimi görsel üretiminden kat kat pahalıdır
+     *    (~$0,06-0,08 yerine $0,50-1,00). Yol haritasının kararı: birim ekonomi
+     *    yeniden hesaplanmadan AÇILMAZ (docs/ozellik-yol-haritasi.md → Faz 3).
+     *
+     * ⚠️ `z.coerce.boolean()` KULLANILMADI ve kullanılmamalı: `Boolean('false')`
+     *    JavaScript'te TRUE'dur. Yani `AI_VIDEO_TRYON_ENABLED=false` yazan bir
+     *    .env, özelliği tam tersine AÇARDI — istek başına bir dolarlık bir
+     *    özellik için bu, sessizce ödenen bir faturadır.
+     */
+    AI_VIDEO_TRYON_ENABLED: z
+      .enum(['true', 'false', '1', '0'])
+      .default('false')
+      .transform((value) => value === 'true' || value === '1'),
+    /**
+     * Video modelinin slug'ı. Varsayılan BOŞ bırakıldı: tahmin edilmiş bir
+     * slug üretimde 404'tür ve "açtım ama çalışmıyor" diye okunur. Boşken
+     * fabrika `Unconfigured` döner (bkz. adapters/ai/video-tryon.ts).
+     */
+    FAL_VIDEO_TRYON_MODEL: z.string().default(''),
+    /**
+     * ⚠️ AYRI KOVA — `AI_DAILY_BUDGET_USD` ile aynı yere YAZILMAZ. Tek bir
+     *    video isteği (~$0,50) sekiz statik denemenin parasıdır; ortak kovada
+     *    yüz video, kimsenin talep etmediği bir özellik yüzünden günün tüm
+     *    sanal deneme ve stil danışmanı bütçesini bitirir.
+     *    Varsayılan bilinçli olarak DÜŞÜK: özellik açılsa bile günlük zarar
+     *    tavanı bellidir.
+     */
+    AI_VIDEO_DAILY_BUDGET_USD: z.coerce.number().positive().default(5),
+
     // ── AI bütçe guardrail'leri ───────────────────────────────────────
     AI_DAILY_BUDGET_USD: z.coerce.number().positive().default(50),
     AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(1200),

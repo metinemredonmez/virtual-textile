@@ -18,6 +18,8 @@ import {
   type SizeEngineResult,
   type SizeReason,
 } from './size-engine.js';
+import type { BrandFitSignal, UserSizeHistory } from './fit-learning.js';
+import type { SizeLearningPort } from './fit-learning.gateway.js';
 import type { SizeRecommendInput } from './ai.schema.js';
 
 /**
@@ -50,10 +52,17 @@ export interface SizeRecommendationView {
 
 @Injectable()
 export class SizeService {
+  /**
+   * ⚠️ `learning` OPSİYONELDİR ve varsayılanı `null`'dır. Marka eğilimi ve
+   *    kişisel geçmiş birer İYİLEŞTİRMEDİR; bağlanmamışsa (veya sorgusu
+   *    düşerse) motor eskisi gibi ölçü + ürün geri bildirimiyle çalışır.
+   *    Öğrenme katmanının yokluğu beden önerisini DÜŞÜRMEMELİDİR.
+   */
   constructor(
     @Inject(TRYON_CATALOG_PORT) private readonly catalog: TryOnCatalogPort,
     @Inject(BODY_PROFILE_PORT) private readonly profiles: BodyProfilePort,
     @Inject(FIT_FEEDBACK_PORT) private readonly feedback: FitFeedbackPort,
+    private readonly learning: SizeLearningPort | null = null,
   ) {}
 
   async recommend(
@@ -84,9 +93,16 @@ export class SizeService {
 
     // Geri bildirim yalnızca beden tablosu varsa anlamlı: kaydırılacak bir
     // beden merdiveni yoksa "bir beden büyük al" söylenemez.
-    const feedbackSummary = product.sizeChart
-      ? await this.feedback.summarize(product.productId)
-      : null;
+    const hasChart = product.sizeChart !== null;
+
+    const [feedbackSummary, brandSignal, userHistory] = await Promise.all([
+      hasChart ? this.feedback.summarize(product.productId) : null,
+      hasChart ? this.loadBrandSignal(product.productId) : null,
+      // ⚠️ Kişisel geçmiş yalnızca GİRİŞ YAPMIŞ kullanıcı için okunur.
+      //    Misafirde sorgu bile atılmaz; kimliksiz kullanıcıyı geçmiş bir
+      //    siparişe bağlamaya çalışmak KVKK açısından da yanlış olurdu.
+      hasChart && userId ? this.loadUserHistory(userId, product.productId) : null,
+    ]);
 
     const result: SizeEngineResult = recommendSize({
       sizeChart: product.sizeChart ?? {},
@@ -94,9 +110,44 @@ export class SizeService {
       brandFit: product.brandFit,
       fitPreference,
       feedback: feedbackSummary,
+      brandSignal,
+      userHistory,
     });
 
     return this.toView(product.productId, product.sizeChart, result);
+  }
+
+  /**
+   * ⚠️ Öğrenme sorguları HATA YUTAR ve `null` döner.
+   *
+   * Gerekçe: bu iki sinyal öneriyi İYİLEŞTİRİR, oluşturmaz. Marka toplamı
+   * çıkarılamadığı için ürün sayfasında beden kutusunun tamamen kaybolması,
+   * kullanıcı açısından açık bir gerileme olurdu. Ölçü + ürün geri bildirimi
+   * zaten elimizde ve tek başlarına geçerli bir öneri üretiyorlar.
+   *
+   * ⚠️ Bu, hatanın görünmez olduğu anlamına GELMEZ: `null` dönüşü motorda
+   *    "sinyal yok" olarak ele alınır ve güveni artırmaz — yani sessizce
+   *    fazla iddialı bir öneri üretemez.
+   */
+  private async loadBrandSignal(productId: string): Promise<BrandFitSignal | null> {
+    if (!this.learning) return null;
+    try {
+      return await this.learning.summarizeBrandOfProduct(productId);
+    } catch {
+      return null;
+    }
+  }
+
+  private async loadUserHistory(
+    userId: string,
+    productId: string,
+  ): Promise<UserSizeHistory | null> {
+    if (!this.learning) return null;
+    try {
+      return await this.learning.findUserHistory(userId, productId);
+    } catch {
+      return null;
+    }
   }
 
   private async resolveProductId(input: SizeRecommendInput): Promise<string> {
