@@ -1,0 +1,44 @@
+{
+  "name": "@vt/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "eslint .",
+    "verify:bundle": "! grep -rlE 'JWT_(ACCESS|REFRESH)_SECRET|IYZICO_SECRET_KEY|FIELD_ENCRYPTION_KEY' .next/static",
+    "clean": "rm -rf .next dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@tanstack/react-query": "^5.101.4",
+    "@vt/config": "workspace:*",
+    "@vt/contracts": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "ioredis": "^5.4.2",
+    "lucide-react": "^1.31.0",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.85.0",
+    "@hookform/resolvers": "^5.7.1",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20.17.10",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.7"
+  }
+}

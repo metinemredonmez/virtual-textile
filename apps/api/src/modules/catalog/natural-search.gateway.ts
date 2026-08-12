@@ -5,7 +5,7 @@ import { appError } from '@vt/contracts';
 import type { PrismaService } from '../../infra/prisma.service.js';
 import type { RedisService } from '../../infra/redis.service.js';
 import type { Logger } from '../../common/logger.js';
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+import { NATURAL_SEARCH } from '@vt/config';
 import {
   SEARCH_FILTER_TOOL,
   SEARCH_INTENT_SYSTEM_PROMPT,

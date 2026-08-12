@@ -2,16 +2,29 @@
   "name": "@vt/contracts",
   "version": "0.1.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "browser": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "import": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "default": "./dist/cjs/index.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.cjs.json && tsc -p tsconfig.build.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
+    "dev": "tsc -p tsconfig.build.esm.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",

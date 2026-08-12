@@ -27,7 +27,7 @@ vi.mock('@vt/config', async (importOriginal) => {
 });
 
 const { NaturalSearchService } = await import('./natural-search.service.js');
-const { NATURAL_SEARCH } = await import('./natural-search.constants.js');
+const { NATURAL_SEARCH } = await import('@vt/config');
 
 const BUTCELI = {
   AI_DAILY_BUDGET_USD: 50,

@@ -195,21 +195,49 @@ export class CatalogService {
         )`
       : Prisma.sql`(p."popularityScore"::float / 100)`;
 
+    /**
+     * ⚠️ SIRALAMA ANAHTARI `base` İÇİNDEN OKUNUR, `p.` ön ekiyle DEĞİL.
+     *    Dış sorgu `SELECT * FROM base p` olduğu için `p` artık CTE'nin takma
+     *    adı; `catalog_products` sütunlarının yalnızca base'in SEÇTİKLERİ
+     *    görünür. `newest` dalı `p."publishedAt"` yazdığı için ÜÇ AY boyunca
+     *    HER `sort=newest` isteği `column p.publishedAt does not exist` ile
+     *    500 döndü (ölçüldü). Bu yüzden base artık `published_at` seçiyor ve
+     *    sıralama o takma adı kullanıyor.
+     */
     const orderBy =
       query.sort === 'price_asc'
         ? Prisma.sql`min_price ASC, p.id ASC`
         : query.sort === 'price_desc'
           ? Prisma.sql`min_price DESC, p.id ASC`
           : query.sort === 'newest'
-            ? Prisma.sql`p."publishedAt" DESC NULLS LAST, p.id ASC`
+            ? Prisma.sql`published_at DESC, p.id ASC`
             : Prisma.sql`sort_key DESC, p.id ASC`;
 
+    /**
+     * ⚠️ KEYSET YÜKLEMİ SATIR KARŞILAŞTIRMASIYLA YAZILAMAZ — iki sütunun YÖNÜ
+     *    farklı. `(sort_key, id) < (X, Y)` demek "sort_key < X VEYA (eşitse
+     *    id < Y)" demektir; oysa sıralama `sort_key DESC, id ASC`, yani eşitlik
+     *    dalında `id > Y` gerekir.
+     *
+     *    ÖLÇÜLDÜ (2026-08-12, 289 ürün): varsayılan sıralamada `sort_key` tüm
+     *    satırlarda aynı ("0") olduğu için yüklem tamamen `id < Y`e indirgendi;
+     *    ikinci sayfa BİRİNCİ SAYFANIN 20 ürününü geri verdi (kesişim 20/20) ve
+     *    kullanıcı 289 ürünün 24'ünden ötesine hiç ulaşamadı. Tek yönlü satır
+     *    karşılaştırması yalnızca `price_asc` dalında doğruydu; orada da açık
+     *    yazmak tekrar aynı hataya düşmemek içindir.
+     */
     const cursorFilter = cursor
       ? query.sort === 'price_asc'
-        ? Prisma.sql`AND (min_price, p.id) > (${BigInt(cursor.sort)}, ${cursor.id})`
+        ? Prisma.sql`AND (min_price > ${BigInt(cursor.sort)}
+            OR (min_price = ${BigInt(cursor.sort)} AND p.id > ${cursor.id}))`
         : query.sort === 'price_desc'
-          ? Prisma.sql`AND (min_price, p.id) < (${BigInt(cursor.sort)}, ${cursor.id})`
-          : Prisma.sql`AND (sort_key, p.id) < (${Number(cursor.sort)}, ${cursor.id})`
+          ? Prisma.sql`AND (min_price < ${BigInt(cursor.sort)}
+              OR (min_price = ${BigInt(cursor.sort)} AND p.id > ${cursor.id}))`
+          : query.sort === 'newest'
+            ? Prisma.sql`AND (published_at < ${new Date(cursor.sort)}::timestamptz
+                OR (published_at = ${new Date(cursor.sort)}::timestamptz AND p.id > ${cursor.id}))`
+            : Prisma.sql`AND (sort_key < ${Number(cursor.sort)}
+                OR (sort_key = ${Number(cursor.sort)} AND p.id > ${cursor.id}))`
       : Prisma.empty;
 
     const rows = await this.prisma.$queryRaw<
@@ -227,6 +255,7 @@ export class CatalogService {
         tryOnScore: number | null;
         tryonable: boolean;
         sort_key: number;
+        published_at: Date;
         total: bigint;
       }>
     >(Prisma.sql`
@@ -236,6 +265,11 @@ export class CatalogService {
           st.slug AS "storeSlug",
           c."tryOnCategory" IS NOT NULL AS tryonable,
           ${rankExpr} AS sort_key,
+          /* UYARI: COALESCE, NULLS LAST yerine. Imlec yuklemi NULL ile
+             karsilastirma yapamaz (NULL < X -> NULL -> satir duser) ve
+             yayinlanmamis urunler sayfalamada sessizce kaybolurdu.
+             (Bu yorum SQL sablonunun icinde; ters tirnak kullanilamaz.) */
+          COALESCE(p."publishedAt", p."createdAt") AS published_at,
           (SELECT MIN(v."priceMinor") FROM catalog_variants v
              WHERE v."productId" = p.id AND v."isActive") AS min_price,
           (SELECT MAX(v."listPriceMinor") FROM catalog_variants v
@@ -291,6 +325,12 @@ export class CatalogService {
     return {
       items,
       total: Number(page[0]?.total ?? 0),
+      /**
+       * ⚠️ İmleçteki `sort` değeri `orderBy`ın BİRİNCİ sütunuyla aynı olmalı.
+       *    `newest` dalı eskiden `sort_key` (popülerlik) yazıyordu; sıralama
+       *    tarihe göreyken imleç popülerliği taşıyorsa yüklem hiçbir zaman
+       *    doğru satırı bulamaz.
+       */
       nextCursor:
         hasMore && last
           ? encodeCursor({
@@ -298,7 +338,9 @@ export class CatalogService {
               sort:
                 query.sort === 'price_asc' || query.sort === 'price_desc'
                   ? String(last.min_price)
-                  : String(last.sort_key),
+                  : query.sort === 'newest'
+                    ? last.published_at.toISOString()
+                    : String(last.sort_key),
             })
           : null,
       facets,

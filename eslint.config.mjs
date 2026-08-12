@@ -2,6 +2,23 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
+import nextPlugin from '@next/eslint-plugin-next';
+
+/**
+ * PARA OKUMA YASAĞI — sözdizimsel seçiciler.
+ *
+ * Tip-farkında kural KULLANILMIYOR: kökte `parserOptions.project` yok ve açmak
+ * tüm deponun lint süresini katlar. Sözdizimsel seçici `Minor` sonekini okur —
+ * sonek tesadüf değil, `serializeBigInts`in dokunduğu her alan onu taşıyor.
+ *
+ * ⚠️ SONEK YÜK TAŞIR: bir para alanını frontend'de `total` diye yeniden
+ *    adlandırmak, o alan üzerindeki `Number()` korumasını SESSİZCE kapatır.
+ *    Wire tipinde para alanı adı değiştirilmez.
+ */
+const NUMBER_CALL = 'CallExpression[callee.name=/^(Number|parseInt|parseFloat)$/]';
+const PARA_MESAJI =
+  'Para alanı Number/parseInt ile okunamaz — sessizce yanlış tutar gösterir. lib/money.ts → readMinor/formatMinor kullan.';
 
 export default tseslint.config(
   {
@@ -54,6 +71,54 @@ export default tseslint.config(
     files: ['apps/api/**/*.ts', 'apps/worker/**/*.ts'],
     rules: {
       '@typescript-eslint/consistent-type-imports': 'off',
+    },
+  },
+  {
+    // ⚠️ `consistent-type-imports` apps/web'de KAPATILMAZ. Burada dekoratör/DI
+    //    yok, dolayısıyla yukarıdaki muafiyetin gerekçesi geçerli değil; üstelik
+    //    `import type` bir sunucu-only modülün istemci paketine sızmasını
+    //    engellediği için web'de daha da değerli.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    plugins: {
+      'react-hooks': reactHooks,
+      '@next/next': nextPlugin,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
+
+      // ⚠️ `exhaustive-deps` olmadan try-on yoklama döngüsündeki stale-closure
+      //    hatası (iş SUCCEEDED, arayüz sonsuza kadar RUNNING) hiçbir yerde
+      //    yakalanmaz — testler taklit zamanlayıcıyla yeşil kalır.
+      'react-hooks/exhaustive-deps': 'error',
+
+      'no-restricted-syntax': [
+        'error',
+        { selector: `${NUMBER_CALL} > MemberExpression[property.name=/Minor$/]`, message: PARA_MESAJI },
+        // obj['unitPriceMinor'] — nokta gösterimi kadar geçerli bir kaçış yolu.
+        { selector: `${NUMBER_CALL} > MemberExpression[property.value=/Minor$/]`, message: PARA_MESAJI },
+        // const { totalMinor } = cart;  Number(totalMinor)
+        { selector: `${NUMBER_CALL} > Identifier[name=/Minor$/]`, message: PARA_MESAJI },
+        { selector: "UnaryExpression[operator='+'] > MemberExpression[property.name=/Minor$/]", message: PARA_MESAJI },
+        { selector: "UnaryExpression[operator='+'] > Identifier[name=/Minor$/]", message: PARA_MESAJI },
+      ],
+
+      // ⚠️ `@vt/db` apps/web'in bağımlılık listesinde YOK; bu kural ikinci
+      //    savunma hattı, çünkü pnpm isolated linker bir gün gevşetilirse
+      //    Prisma istemcisi tarayıcı paketine girmeye çalışır.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@vt/db',
+              message:
+                'Veritabanı istemcisi frontend paketine giremez. Veri API üzerinden alınır.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

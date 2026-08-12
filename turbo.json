@@ -6,7 +6,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_*", "API_URL", "APP_URL", "SESSION_REDIS_URL"]
     },
     "dev": {
       "cache": false,

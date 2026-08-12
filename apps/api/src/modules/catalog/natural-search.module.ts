@@ -111,4 +111,4 @@ export type {
   SearchIntentProvider,
   SearchQuotaPort,
 } from './natural-search.ports.js';
-export { NATURAL_SEARCH } from './natural-search.constants.js';
+export { NATURAL_SEARCH } from '@vt/config';

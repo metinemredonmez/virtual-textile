@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { genderSchema } from '@vt/contracts';
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+import { NATURAL_SEARCH } from '@vt/config';
 
 /** POST /v1/search/natural gövdesi. */
 export const naturalSearchBodySchema = z.object({

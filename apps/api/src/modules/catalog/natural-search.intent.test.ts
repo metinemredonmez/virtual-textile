@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+import { NATURAL_SEARCH } from '@vt/config';
 import {
   decideInterpretation,
   fallbackProductListQuery,

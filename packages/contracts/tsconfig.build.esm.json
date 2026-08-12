@@ -1,0 +1,26 @@
+{
+  // ESM ÇIKTISI YALNIZCA TARAYICI İÇİNDİR (`exports` → "browser" koşulu).
+  //
+  // ⚠️ ÖLÇÜLDÜ: ESM'i "import" koşuluna da bağlamak `apps/worker` testini KIRDI.
+  //    Vitest ESM ile çözüyor, Nest/CJS require ile çözüyor; ortaya AppError'ın
+  //    İKİ AYRI SINIFI çıktı ve `isAppError(error)` false döndü —
+  //    `UnrecoverableError` sarmalaması sessizce atlandı, bozuk tek bir bildirim
+  //    işi 5 denemeyi yakmaya başladı. Klasik "dual package hazard".
+  //
+  //    Node tarafı (api, worker, vitest, tsx, e2e) TEK CJS kopyada kalır.
+  //    ESM'in kazandırdığı şey zaten istemci paketiyle ilgiliydi:
+  //    ağaç sarsma → TRYONABLE_CATEGORIES 77.9 kb yerine ~499 B ve
+  //    JWT_ACCESS_SECRET gibi gizli anahtar ADLARININ paketten düşmesi.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist/esm",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": false,
+    "declaration": true,
+    "tsBuildInfoFile": "./dist/esm/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist/cjs",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "declaration": true,
+    // ⚠️ ÇIFT ÇIKTININ TUZAĞI: base'deki tsBuildInfoFile iki derleme için de
+    //    AYNI dosyayı gösteriyordu. İkinci tsc "zaten derledim" deyip ESM'i hiç
+    //    yazmazdı; `exports.import` var olmayan dosyayı gösterir, contracts'ın
+    //    kendi build'i YEŞİL döner ve hata ancak `next build`te görünürdü.
+    "tsBuildInfoFile": "./dist/cjs/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

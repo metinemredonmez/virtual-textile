@@ -5,7 +5,7 @@ import type { Logger } from '../../common/logger.js';
 //    değer olarak alınır; burada da değer olarak alınsaydı servis testi
 //    Prisma istemcisini de yüklemek zorunda kalırdı.
 import type { CatalogService, ProductListResult } from './catalog.service.js';
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+import { NATURAL_SEARCH } from '@vt/config';
 import {
   decideInterpretation,
   fallbackProductListQuery,

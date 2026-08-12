@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+// ⚠️ Kök yol (`@vt/config`), alt yol (`@vt/config/constants`) DEĞİL: bu paketin
+//    `moduleResolution` ayarı `Node` (node10) ve o çözümleyici `exports` alt
+//    yollarını GÖRMEZ. Alt yol yalnızca `apps/web` içindir ve orada zorunludur
+//    (kökten alınınca `env.ts` tarayıcı paketine giriyor).
+import { NATURAL_SEARCH } from '@vt/config';
 import { searchIntentSchema, type SearchIntent } from './natural-search.schema.js';
 import type { CatalogVocabulary } from './natural-search.ports.js';
 import type { ProductListQuery } from './catalog.schema.js';

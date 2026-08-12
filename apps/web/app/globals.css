@@ -1,0 +1,137 @@
+@import 'tailwindcss';
+
+/*
+ * TASARIM TOKENLARI — TEK DOSYA.
+ *
+ * `design-system.md`den türetildi. Palet AKROMATİK ve bu estetik bir tercih
+ * değil: ürün fotoğrafı zaten renkli, arayüz de renkliyse ikisi yarışır ve
+ * platformun ayrıştırıcısı olan try-on görseli kaybeder.
+ *
+ * ⚠️ RENK YALNIZCA DURUM TAŞIR. Menü ikonu, başlık, sekme, kart kenarlığı
+ *    RENKSİZDİR. Aşağıdaki `--renk-olumlu/uyari/tehlike` üçlüsü yalnızca
+ *    sipariş durumu, stok uyarısı, onay durumu gibi BİLGİ taşıyan yerlerde
+ *    kullanılır. Süs amaçlı renk bu sinyali harcar.
+ *
+ * ⚠️ KOYU TEMA YALNIZCA (yonetim) BÖLGESİNDE. `prefers-color-scheme` bilinçli
+ *    olarak DİNLENMİYOR: vitrin ve satıcı paneli her zaman açık temadır, çünkü
+ *    ürün fotoğrafları beyaz fon üzerine çekiliyor ve koyu zeminde kesim
+ *    çizgileri kayboluyor. Koyu tema `.tema-koyu` sınıfıyla AÇIKÇA açılır.
+ */
+
+@theme inline {
+  --color-zemin: var(--zemin);
+  --color-yuzey: var(--yuzey);
+  --color-yuzey-vurgulu: var(--yuzey-vurgulu);
+  --color-kenar: var(--kenar);
+  --color-metin: var(--metin);
+  --color-metin-soluk: var(--metin-soluk);
+  /* İkon rengi: metinden BİR TON soluk. Göz önce yazıyı okur. */
+  --color-ikon: var(--ikon);
+  --color-vurgu: var(--vurgu);
+  --color-vurgu-metin: var(--vurgu-metin);
+
+  --color-olumlu: var(--olumlu);
+  --color-olumlu-zemin: var(--olumlu-zemin);
+  --color-uyari: var(--uyari);
+  --color-uyari-zemin: var(--uyari-zemin);
+  --color-tehlike: var(--tehlike);
+  --color-tehlike-zemin: var(--tehlike-zemin);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+
+  /* Ürün görseli oranı — `aspect-urun` olarak kullanılır. */
+  --aspect-urun: 4 / 5;
+
+  /*
+   * TEK AİLE. Hiyerarşi boyutla değil AĞIRLIKLA kurulur (400 / 500 / 600).
+   * Web fontu bilinçli olarak yüklenmiyor: sayfanın tamamı ürün fotoğrafına
+   * çalışıyor ve font indirmesi ilk boyamayı geciktiriyor. Marka tipografisi
+   * kararı verildiğinde burası `next/font/local` ile tek satırda değişir.
+   */
+  --font-sans:
+    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+:root {
+  --zemin: #ffffff;
+  --yuzey: #fafafa;
+  --yuzey-vurgulu: #f2f2f2;
+  --kenar: #e6e6e6;
+  --metin: #0b0b0b;
+  --metin-soluk: #6b6b6b;
+  --ikon: #8f8f8f;
+  /* TEK vurgu rengi. Birincil düğme SİYAHTIR; vurgu odak halkası, bağlantı ve
+     seçili durum içindir — yani yine bir DURUM göstergesi. */
+  --vurgu: #1d4ed8;
+  --vurgu-metin: #ffffff;
+
+  --olumlu: #15803d;
+  --olumlu-zemin: #eaf5ee;
+  --uyari: #b45309;
+  --uyari-zemin: #fdf3e6;
+  --tehlike: #b91c1c;
+  --tehlike-zemin: #fdecec;
+}
+
+/* Linear iskeleti: düşük kontrastlı çizgiler, parlak vurgu yok. */
+.tema-koyu {
+  --zemin: #0d0e11;
+  --yuzey: #131519;
+  --yuzey-vurgulu: #1b1e24;
+  --kenar: #262a31;
+  --metin: #e8e9ec;
+  --metin-soluk: #9096a1;
+  --ikon: #6f7681;
+  --vurgu: #7c9bf5;
+  --vurgu-metin: #0d0e11;
+
+  --olumlu: #5cc98b;
+  --olumlu-zemin: #14241c;
+  --uyari: #e0a355;
+  --uyari-zemin: #2a2015;
+  --tehlike: #ef6b6b;
+  --tehlike-zemin: #2a1717;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  .tema-koyu {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--zemin);
+    color: var(--metin);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Odak halkası klavye gezinmesi için ZORUNLU — yönetim paneli klavye
+     öncelikli kullanılıyor. `outline: none` yazılmaz. */
+  :focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: 2px;
+  }
+
+  /* Lucide ikonları: 1.5px çizgi, HER ikonda aynı. */
+  svg {
+    stroke-width: 1.5;
+  }
+}
+
+/*
+ * ⚠️ Para gösterilen HER yerde zorunlu. Rakamlar eşit genişlikte olmazsa
+ *    virgüller kayar ve finansal tablo okunamaz hâle gelir. Bu sınıfı elle
+ *    yazmak yerine `<Fiyat>` bileşeni kullanılır — bileşen onu kendi taşır ve
+ *    unutulamaz.
+ */
+@utility rakam {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}

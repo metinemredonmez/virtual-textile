@@ -1,4 +1,4 @@
-import { NATURAL_SEARCH } from './natural-search.constants.js';
+import { NATURAL_SEARCH } from '@vt/config';
 import type { CatalogVocabulary } from './natural-search.ports.js';
 
 /**
