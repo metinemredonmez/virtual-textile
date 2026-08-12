@@ -428,20 +428,55 @@ if [ -d "$KOK/apps/web" ]; then
 fi
 
 # Dışarıdan da bak: nginx ile PM2 arasındaki bağ kopmuş olabilir ve bu,
-# yalnızca 127.0.0.1'e sorulduğunda GÖRÜNMEZ.
-DIS_KOD=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1/health || true)
+# yalnızca doğrudan porta sorulduğunda GÖRÜNMEZ.
+#
+# ⚠️ `Host` BAŞLIĞI ŞART. Burada bir dönem düz `http://127.0.0.1/health`
+#    çağrılıyordu ve HER dağıtımda 404 dönüyordu: nginx sunucu bloğunu
+#    `server_name` ile seçer, bizimki `91.99.183.64` diyor, `127.0.0.1` ona
+#    uymuyor ve istek makinedeki BAŞKA BİR PROJENİN varsayılan bloğuna
+#    düşüyordu. Yani kontrol, kendi kurduğu tuzağa düşüp yanlış alarm üretti —
+#    site çalışırken dağıtım "başarısız" dedi.
+NGINX_HOST=$(grep '^APP_URL=' "$ENV_DOSYASI" | cut -d= -f2- | tr -d '"' | sed -E 's#^https?://##; s#/.*$##')
+NGINX_HOST="${NGINX_HOST:-localhost}"
+
+DIS_KOD=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+  -H "Host: $NGINX_HOST" "http://127.0.0.1/health" || true)
+
 if [ "$DIS_KOD" = "200" ]; then
-  bilgi "nginx :80 → 200"
+  bilgi "nginx :80 (Host: $NGINX_HOST) → 200"
 else
-  uyari "nginx üzerinden /health → ${DIS_KOD:-yanıt yok}  (nginx -t && systemctl reload nginx)"
+  uyari "nginx üzerinden /health → ${DIS_KOD:-yanıt yok}"
+  uyari "  Host: $NGINX_HOST ile soruldu. Sunucu bloğu bu adı tanıyor mu?"
+  uyari "  nginx -t && systemctl reload nginx"
 fi
 
-# Worker gerçekten ayakta mı — 'online' yetmez, ÇÖKÜP DURUYOR olabilir.
-pm2 jlist 2>/dev/null | tr '}' '\n' | grep -o '"name":"vt-[^"]*".*"status":"[^"]*"' | while read -r satir; do
-  ad=$(echo "$satir" | grep -o '"name":"vt-[^"]*"' | cut -d'"' -f4)
-  durum=$(echo "$satir" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-  [ "$durum" = "online" ] || uyari "$ad durumu: $durum"
-done
+# Süreçler gerçekten ayakta mı — 'online' yetmez, ÇÖKÜP DURUYOR olabilir.
+#
+# ⚠️ `set -euo pipefail` ALTINDA GREP'İN BOŞ DÖNMESİ BETİĞİ ÖLDÜRÜR. Buradaki
+#    kırılgan `tr | grep -o` zinciri hiçbir şey eşleştiremediğinde 1 dönüyor,
+#    `pipefail` bunu boru hattının sonucu yapıyor ve `set -e` dağıtımı SON
+#    ADIMDA hataya çeviriyordu — her şey başarıyla bitmişken. Ayrıştırma artık
+#    Python'a bırakıldı ve `|| true` ile hata yolu kapatıldı: bir DURUM RAPORU,
+#    dağıtımı başarısız sayacak bir kapı değildir.
+pm2 jlist 2>/dev/null | python3 -c '
+import json, sys
+try:
+    surecler = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for p in surecler:
+    ad = p.get("name", "")
+    if not ad.startswith("vt-"):
+        continue
+    ortam = p.get("pm2_env", {})
+    durum = ortam.get("status", "?")
+    yeniden = ortam.get("restart_time", 0)
+    if durum != "online":
+        print(f"  \033[1;33m⚠️  {ad} durumu: {durum}\033[0m")
+    elif yeniden > 20:
+        # Çok sayıda yeniden başlatma "ayakta" görünse de çöküp duruyor demektir.
+        print(f"  \033[1;33m⚠️  {ad} online ama {yeniden} kez yeniden başlamış\033[0m")
+' || true
 
 trap - EXIT
 printf '\n\033[1;32m✓ Dağıtım tamam — %s\033[0m\n\n' "$(git log --oneline -1)"
