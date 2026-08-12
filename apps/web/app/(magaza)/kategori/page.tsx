@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import type { CategoryNodeWire } from '@vt/contracts';
-import { kategoriAgaci } from './_veri/kategoriler';
+import { kategoriAgaci } from '@/lib/kategori';
 
 /**
  * TÜM KATEGORİLER.

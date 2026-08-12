@@ -2,7 +2,13 @@ import type { CategoryNodeWire } from '@vt/contracts';
 import { serverFetch } from '@/lib/api/server';
 
 /**
- * KATEGORİ AĞACI — vitrin ve kategori ekranlarının ortak kaynağı.
+ * KATEGORİ AĞACI — vitrin, kategori ekranları VE satıcı ürün formunun ortak
+ * kaynağı.
+ *
+ * ⚠️ Dosya bir dönem `(magaza)/kategori/_veri/` altındaydı ve satıcı paneli ona
+ *    rota grubunun DIŞINDAN göreli yolla ulaşıyordu. Buraya taşındı; ikinci bir
+ *    çekim yazılsaydı 46 KB'lık ağaç iki ayrı önbellek penceresiyle iki kez
+ *    çekilir ve iki ekran farklı bir taksonomi gösterebilirdi.
  *
  * ⚠️ `forwardClientIp` YOK ve olmamalı: `GET /v1/categories` ucunda hız limiti
  *    tanımlı değil (`catalog.controller.ts`), üstelik IP okumak `headers()`

@@ -1,32 +1,58 @@
 import type { ReactNode } from 'react';
-import { Boxes, LineChart, Package } from 'lucide-react';
 import { requireRole } from '@/lib/session/guard';
+import { YanMenuKabugu, type MenuGrubu } from '@/components/panel/yan-menu';
 
 /**
- * ⚠️ BU LİSTEDE `<Link>` YOK, ÇÜNKÜ SAYFA YOK.
+ * SATICI PANELİ MENÜSÜ.
  *
- *    `/satici/urunler`, `/satici/siparisler` ve `/satici/finans` rotalarının
- *    dosya sistemi karşılığı bulunmuyor (`find app/(satici) -name page.tsx` →
- *    yalnızca `satici/page.tsx`) ve Next'in ürettiği rota tipinde de yoklar.
- *    Bağlantı olarak durdukları sürece bunlar "basınca 404 veren üç düğme"ydi
- *    — `AGENTS.md` §9'un açıkça yasakladığı şey ("olmayan sayfaya bağlantı
- *    konmaz") ve `/stil-danismani` bağlantısının kaldırılma gerekçesinin
- *    aynısı. O ölçüt bu kabuğa hiç uygulanmamıştı.
+ * ⚠️ BU LİSTE BİR DÖNEM `<Link>` TAŞIMIYORDU ve haklı olarak taşımıyordu:
+ *    sayfalar yoktu, bağlantı olsalardı "basınca 404 veren üç düğme"ydiler
+ *    (`AGENTS.md` §9.9 — "olmayan sayfaya bağlantı konmaz"). Sayfalar YAZILDI;
+ *    kuralın ikinci yarısı şimdi geçerli: **yazılan sayfa menüde görünür.**
+ *    Aksi hâlde bu deponun klasik hatası olurdu — ekran yazıldı, derlendi,
+ *    hiçbir yerden çağrılmadı. Altı rotanın altısı da `find` ile doğrulandı.
  *
- *    Adlar SİLİNMEDİ, yalnız tıklanabilirlikleri silindi: `design-system.md`
- *    boş durumun ne olacağını söylemesini istiyor, ve satıcı panelinin neyi
- *    kapsayacağı bilgisi bu listede duruyor. Ekran yazıldığı gün ilgili satır
- *    `<Link>`e döner; o güne kadar liste ile rota tablosu arasındaki fark
- *    GÖRÜNÜR kalır.
+ * ⚠️ İKON BİLEŞENİ DEĞİL, İKON ADI YAZILIR. Bu dosya bir SUNUCU BİLEŞENİ
+ *    (`requireRole` çağırıyor) ve dizi `'use client'` olan kabuğa prop olarak
+ *    geçiyor; Lucide ikonu bir `forwardRef` NESNESİ olduğu için RSC sınırından
+ *    geçemiyordu ve rolü olan bir oturumda paneldeki HER rota HTTP 500
+ *    dönüyordu (ölçüldü). Tablo ve gerekçe: `components/panel/yan-menu.tsx`
+ *    → `IKONLAR`.
+ *
+ * ⚠️ GRUPLAMA YÖNETİM MENÜSÜYLE AYNI MANTIK: satıcının işi olan kuyruklar
+ *    ("Satışlar") üstte, katalog altta. İki panelin gezinmesi aynı bileşenden
+ *    (`components/panel/yan-menu.tsx`) çizilir; ikisi ayrı yazılsaydı biri
+ *    düzeltildiğinde diğeri eski kalırdı — nitekim kaldı.
  */
-const BOLUMLER = [
-  { Ikon: Boxes, ad: 'Ürünler' },
-  { Ikon: Package, ad: 'Siparişler' },
-  { Ikon: LineChart, ad: 'Finans' },
-] as const;
+const MENU: readonly MenuGrubu[] = [
+  {
+    baslik: null,
+    satirlar: [{ ad: 'Pano', ikon: 'pano', yol: '/satici' }],
+  },
+  {
+    baslik: 'Satışlar',
+    satirlar: [
+      { ad: 'Siparişler', ikon: 'siparis', yol: '/satici/siparisler', altRotalar: true },
+      { ad: 'İadeler', ikon: 'iade', yol: '/satici/iadeler', altRotalar: true },
+      { ad: 'Finans', ikon: 'finans', yol: '/satici/finans' },
+    ],
+  },
+  {
+    baslik: 'Katalog',
+    satirlar: [
+      { ad: 'Ürünler', ikon: 'urun', yol: '/satici/urunler', altRotalar: true },
+      { ad: 'Kuponlar', ikon: 'kupon', yol: '/satici/kuponlar' },
+    ],
+  },
+];
 
 /**
- * SATICI PANELİ — açık tema, TAMAMI korumalı.
+ * SATICI PANELİ — AÇIK TEMA, TAMAMI korumalı.
+ *
+ * ⚠️ Koyu tema YALNIZCA `(yonetim)` bölgesinde. Buraya `.tema-koyu` konulsaydı
+ *    satıcının ürün fotoğrafları — beyaz fonlu, kesim çizgileri ince — koyu
+ *    zeminde okunamaz hale gelirdi. Varyant matrisindeki renk kutucukları da
+ *    aynı sebeple açık zemin ister.
  *
  * ⚠️ Bu `requireRole` çağrısı ikinci katmandır, güvenliğin kendisi değil: asıl
  *    garanti API guard'larıdır (`auth.guard.ts` varsayılan KAPALI). Burada
@@ -39,30 +65,18 @@ export default async function SaticiLayout({ children }: { children: ReactNode }
   await requireRole(['SELLER_USER', 'ADMIN']);
 
   return (
-    <div className="flex min-h-dvh">
-      <aside className="w-56 shrink-0 border-r border-kenar p-4">
-        <p className="mb-4 text-xs font-medium uppercase tracking-wide text-metin-soluk">
-          Satıcı paneli
-        </p>
+    /*
+      ⚠️ MOBİLDE SÜTUN, md'DEN İTİBAREN SATIR — yönetim kabuğuyla AYNI kalıp ve
+         aynı ölçülmüş sebep: sabit `w-56` yan sütun + `p-8` içerik, 375px'te
+         içerik alanını 87px'e indiriyor ve sabit genişlikli tek bir alan
+         SAYFANIN TAMAMINI yatay kaydırtıyordu. Gerekçenin tamamı
+         `panel/yan-menu.tsx` → `YanMenuKabugu` başlığında; iki kabuk aynı
+         bileşeni çağırıyor ki biri düzeltilip diğeri eski kalmasın.
+    */
+    <div className="flex min-h-dvh flex-col md:flex-row">
+      <YanMenuKabugu baslik="Satıcı paneli" gruplar={MENU} etiket="Satıcı paneli bölümleri" />
 
-        {/* ⚠️ `<nav>` DEĞİL: içinde gezinilecek bir hedef yok. Ekran okuyucuya
-            gezinme bölgesi diye sunmak, boş bir menüye yönlendirmek olurdu. */}
-        <ul className="flex flex-col gap-1 text-sm">
-          {BOLUMLER.map(({ Ikon, ad }) => (
-            <li
-              key={ad}
-              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-metin-soluk"
-            >
-              {/* ⚠️ Menü ikonları RENKSİZ ve metinden soluk. */}
-              <Ikon className="size-4 text-ikon" />
-              {ad}
-              <span className="ml-auto text-xs text-metin-soluk">yakında</span>
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-      <main className="flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
 }

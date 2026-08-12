@@ -21,8 +21,19 @@ const buttonVariants = cva(
         ikincil: 'border border-kenar bg-zemin text-metin hover:bg-yuzey-vurgulu',
         sessiz: 'text-metin hover:bg-yuzey-vurgulu',
         bag: 'text-vurgu underline-offset-4 hover:underline',
-        /** Yalnızca yıkıcı eylemler (sil, iptal et) — burada renk DURUM taşıyor. */
-        tehlike: 'bg-tehlike text-white hover:bg-tehlike/90',
+        /**
+         * Yalnızca yıkıcı eylemler (sil, reddet) — burada renk DURUM taşıyor.
+         *
+         * ⚠️ `text-white` DEĞİL, `text-tehlike-metin`. Sabit renk sınıfı olması
+         *    bir yana, ÖLÇÜLDÜ: koyu temada beyaz/#ef6b6b **3,01:1** ediyordu
+         *    (AA eşiği 4,5:1; 14px font-medium metin "büyük metin" muafiyetine
+         *    girmiyor) ve bu düğme payout reddi, satıcı reddi ve ürün reddi
+         *    ekranlarının HEPSİNDE çıkıyor — geri alınamaz kararların düğmesi
+         *    okunmuyordu. Token tema başına dallanıyor: açıkta beyaz (6,47:1),
+         *    koyuda zemin rengi (6,42:1); `hover` durumunda 5,58 / 5,37.
+         *    Gerekçenin tamamı `globals.css` → `--color-tehlike-metin`.
+         */
+        tehlike: 'bg-tehlike text-tehlike-metin hover:bg-tehlike/90',
       },
       size: {
         sm: 'h-8 px-3',

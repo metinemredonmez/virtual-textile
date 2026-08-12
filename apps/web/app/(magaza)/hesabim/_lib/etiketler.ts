@@ -1,91 +1,36 @@
-import type { BadgeProps } from '@/components/ui/badge';
-import type {
-  ConsentTypeWire,
-  OrderStatusWire,
-  PackageStatusWire,
-  ReturnReasonWire,
-  ReturnStatusWire,
-  WardrobeCategoryWire,
-} from '@vt/contracts';
+import type { ConsentTypeWire } from '@vt/contracts';
 
 /**
- * DURUM → METİN + RENK.
+ * HESAP EKRANLARININ ETİKETLERİ.
  *
- * ⚠️ TÜM TABLOLAR `satisfies Record<…>` İLE KAPALI. Sunucuya yeni bir durum
- *    eklendiği gün bu dosya DERLENMEZ. Varsayılan bir dal (`?? 'notr'`)
- *    yazılsaydı yeni durum sessizce gri bir rozet olurdu ve kimse fark etmezdi
- *    — bu depoda üç kez yaşanan "kopuk bağlantı" hatasının tam deseni.
- *
- * ⚠️ RENK YALNIZCA DURUM TAŞIR (design-system.md). Buradaki renkler sipariş,
- *    paket, iade ve rıza DURUMLARIDIR — yani tam olarak rengin izinli olduğu
- *    yer. Başlık, ikon, sekme, kart kenarlığı bu dosyadan renk ALMAZ.
+ * ⚠️ RENK YALNIZCA DURUM TAŞIR (design-system.md). Başlık, ikon, sekme, kart
+ *    kenarlığı bu dosyadan renk ALMAZ.
  */
-type Rozet = NonNullable<BadgeProps['durum']>;
-
-interface Durum {
-  metin: string;
-  rozet: Rozet;
-}
 
 /**
- * ⚠️ `PENDING_PAYMENT` "uyari": kullanıcının YAPACAK bir işi var (ödeme).
- *    "notr" olsaydı ekranda bekleyen ödeme, tamamlanmış siparişle aynı sessiz
- *    tonda görünürdü ve rezervasyon süresi dolardı.
+ * ⚠️ SİPARİŞ / PAKET / İADE DURUMU VE İADE SEBEBİ BURADA TANIMLI DEĞİL.
+ *    `src/lib/durum-etiketleri.ts`e taşındılar çünkü yönetim paneli de AYNI
+ *    metinleri okuyor (destek çağrısında yönetici müşterinin GÖRDÜĞÜ cümleye
+ *    bakmak zorunda) ve iki kopya vardı. Buradan yeniden dışa vuruluyorlar:
+ *    hesap ekranları tek yerden okusun, ama tanım tek yerde kalsın.
  */
-export const SIPARIS_DURUMU = {
-  PENDING_PAYMENT: { metin: 'Ödeme bekleniyor', rozet: 'uyari' },
-  PAYMENT_FAILED: { metin: 'Ödeme başarısız', rozet: 'tehlike' },
-  EXPIRED: { metin: 'Süresi doldu', rozet: 'tehlike' },
-  PAID: { metin: 'Ödendi', rozet: 'olumlu' },
-  PARTIALLY_SHIPPED: { metin: 'Kısmen kargoda', rozet: 'notr' },
-  SHIPPED: { metin: 'Kargoda', rozet: 'notr' },
-  DELIVERED: { metin: 'Teslim edildi', rozet: 'olumlu' },
-  COMPLETED: { metin: 'Tamamlandı', rozet: 'olumlu' },
-  CANCELLED: { metin: 'İptal edildi', rozet: 'tehlike' },
-  REFUNDED: { metin: 'İade edildi', rozet: 'uyari' },
-} satisfies Record<OrderStatusWire, Durum>;
+export {
+  IADE_DURUMU,
+  IADE_SEBEBI,
+  PAKET_DURUMU,
+  SIPARIS_DURUMU,
+  type DurumGorunumu,
+} from '@/lib/durum-etiketleri';
 
-export const PAKET_DURUMU = {
-  AWAITING_APPROVAL: { metin: 'Satıcı onayı bekleniyor', rozet: 'uyari' },
-  PREPARING: { metin: 'Hazırlanıyor', rozet: 'notr' },
-  SHIPPED: { metin: 'Kargoda', rozet: 'notr' },
-  DELIVERED: { metin: 'Teslim edildi', rozet: 'olumlu' },
-  CANCELLED: { metin: 'İptal edildi', rozet: 'tehlike' },
-  RETURN_REQUESTED: { metin: 'İade talebi açık', rozet: 'uyari' },
-  RETURNED: { metin: 'İade alındı', rozet: 'uyari' },
-} satisfies Record<PackageStatusWire, Durum>;
-
-export const IADE_DURUMU = {
-  REQUESTED: { metin: 'Talep alındı', rozet: 'uyari' },
-  APPROVED: { metin: 'Onaylandı', rozet: 'notr' },
-  REJECTED: { metin: 'Reddedildi', rozet: 'tehlike' },
-  IN_TRANSIT: { metin: 'Yolda', rozet: 'notr' },
-  RECEIVED: { metin: 'Satıcıya ulaştı', rozet: 'notr' },
-  REFUNDED: { metin: 'Ücret iadesi yapıldı', rozet: 'olumlu' },
-  CANCELLED: { metin: 'İptal edildi', rozet: 'tehlike' },
-} satisfies Record<ReturnStatusWire, Durum>;
-
-export const IADE_SEBEBI = {
-  SIZE_TOO_SMALL: 'Beden küçük geldi',
-  SIZE_TOO_LARGE: 'Beden büyük geldi',
-  NOT_AS_DESCRIBED: 'Ürün açıklamaya uymuyor',
-  DAMAGED: 'Ürün hasarlı geldi',
-  WRONG_ITEM: 'Yanlış ürün gönderildi',
-  CHANGED_MIND: 'Vazgeçtim',
-  QUALITY: 'Kalitesi beklediğim gibi değil',
-  OTHER: 'Diğer',
-} satisfies Record<ReturnReasonWire, string>;
-
-export const GARDIROP_KATEGORISI = {
-  UPPER_BODY: 'Üst giyim',
-  LOWER_BODY: 'Alt giyim',
-  DRESS: 'Elbise',
-  OUTERWEAR: 'Dış giyim',
-  SHOES: 'Ayakkabı',
-  JEWELRY: 'Takı',
-  BAG: 'Çanta',
-  ACCESSORY: 'Aksesuar',
-} satisfies Record<WardrobeCategoryWire, string>;
+/**
+ * GARDIROP KATEGORİSİ — ⚠️ AYNI SEKİZ ANAHTARI ÇEVİREN TABLO ÜÇ YERDEYDİ
+ *    (burası, hesaplayıcı, yönetim kategori ekranı). Tek ev
+ *    `components/tryon/kategori-etiketleri.ts`; burada yalnız yeniden dışa
+ *    vurum var, çünkü gardırop ekranı bu tabloyu `WardrobeCategoryWire` ile
+ *    indeksliyor ve o tip bugün `TryOnCategoryName` ile aynı sekiz değeri
+ *    taşıyor. Ayrıştıkları gün DERLEME KIRILIR — istenen davranış budur.
+ */
+export { TRYON_KATEGORI_ETIKETI as GARDIROP_KATEGORISI } from '@/components/tryon/kategori-etiketleri';
 
 /**
  * RIZA METİNLERİ.

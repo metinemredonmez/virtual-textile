@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Layers, ShoppingBag, Shirt, User } from 'lucide-react';
+import { Layers, ShoppingBag, Shirt, Sparkles, User } from 'lucide-react';
 
 /**
  * MÜŞTERİ VİTRİNİ — açık tema, SSR, SEO açık.
@@ -18,10 +18,18 @@ import { Layers, ShoppingBag, Shirt, User } from 'lucide-react';
  *    yüzden gizlenen şey ETİKET, hedef değil — ikon `aria-label` ile erişilebilir
  *    kalıyor.
  *
- * ⚠️ `/stil-danismani` BAĞLANTISI YOK ve bu bilinçli: o ekran henüz YAZILMADI
- *    (akış vekili `app/api/stylist/.../messages/route.ts` hazır, ekranı yok).
- *    Olmayan sayfaya götüren bir menü girdisi, basınca hata veren bir düğmenin
- *    aynısıdır. Ekran açıldığı gün buraya bir satır eklenir.
+ * ⚠️ `/stil-danismani` BAĞLANTISI ARTIK VAR. Bir dönem BİLEREK yoktu: ekran
+ *    yazılmamıştı (akış vekili hazırdı, çağıranı yoktu) ve olmayan sayfaya
+ *    götüren bir menü girdisi basınca hata veren bir düğmedir. Ekran yazıldı;
+ *    kuralın ikinci yarısı şimdi geçerli — **yazılan sayfa menüde görünür.**
+ *    ⚠️ Vitrin gezinmesi `panel/yan-menu.test.ts`in kapsamında DEĞİL
+ *    (bağlantılar burada dizide değil, düz JSX'te); bu kural el ile uygulanıyor.
+ *
+ * ⚠️ Danışman GİRİŞİN ARKASINDA (uçların hiçbiri `@Public()` değil, kota
+ *    kullanıcı başına) ama bağlantı yine de herkese gösteriliyor: sayfa kendi
+ *    kapısını taşıyor ve oturumsuz ziyaretçiyi `?next=` ile girişe atıyor.
+ *    Bağlantıyı gizlemek, özelliğin varlığını henüz üye olmamış ziyaretçiden
+ *    saklamak olurdu — oysa üye olmasının sebeplerinden biri bu.
  */
 export default function MagazaLayout({ children }: { children: ReactNode }) {
   return (
@@ -35,6 +43,7 @@ export default function MagazaLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-4 text-sm sm:gap-6">
             <GezinmeBaglantisi href="/urunler" etiket="Ürünler" Ikon={Shirt} />
             <GezinmeBaglantisi href="/koleksiyon" etiket="Koleksiyonlar" Ikon={Layers} />
+            <GezinmeBaglantisi href="/stil-danismani" etiket="Danışman" Ikon={Sparkles} />
             <GezinmeBaglantisi href="/sepet" etiket="Sepet" Ikon={ShoppingBag} />
             <GezinmeBaglantisi href="/hesabim" etiket="Hesabım" Ikon={User} />
           </div>

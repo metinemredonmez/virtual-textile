@@ -26,28 +26,71 @@ listeyi okumadan hiçbir yardımcı yeniden yazılmaz** — bu depoda iki kopyan
 ayrışması teorik değil, ÖLÇÜLMÜŞ bir olay (ürün kartının bir kopyasında
 `flex-wrap` düzeltmesi vardı, diğerinde yoktu).
 
-| İhtiyaç                                      | Tek yer                                                    |
-| -------------------------------------------- | ---------------------------------------------------------- |
-| Para gösterimi                               | `components/fiyat/fiyat.tsx`                               |
-| Para okuma / "sıfırdan büyük mü"             | `lib/money.ts` (`readMinor`, `formatMinor`, `paraPozitif`) |
-| Ürün kartı / ızgara / boş sonuç              | `components/urun/`                                         |
-| Genel (kimliksiz) sunucu isteği              | `lib/api/server.ts` → `serverFetch`                        |
-| **Kimlikli** Sunucu Bileşeni isteği          | `lib/api/server-authed.ts` (`kimligiCoz`, `hesapFetch`)    |
-| Vekil (tarayıcıdan gelen her kimlikli istek) | `lib/api/proxy.ts`                                         |
-| Hata kodu → yeniden deneme davranışı         | `lib/api/retry-policy.ts`                                  |
-| Hata kodu → hangi alanın altına basılır      | `lib/api/hata-kapsami.ts`                                  |
-| Sunucu hatasını istemciye taşıma             | `components/hata/hata-koprusu.ts` + `sunucu-hatasi.tsx`    |
-| Hata gösterimi                               | `components/hata/hata-gosterimi.tsx`                       |
-| 404 gövdesi                                  | `components/hata/bulunamadi.tsx`                           |
-| Tarih biçimi (sabit `Europe/Istanbul`)       | `lib/tarih.ts`                                             |
-| `?next=` temizleme (açık yönlendirme kapısı) | `lib/donus-yolu.ts`                                        |
-| Bekleyen ödeme (sunucu tarafı akış durumu)   | `lib/session/bekleyen-odeme.ts`                            |
-| Tel tipleri                                  | `@vt/contracts` → `wire/`                                  |
-| Tarayıcıda kullanılacak sabitler             | `@vt/config/constants` (⚠️ kökten DEĞİL)                   |
+| İhtiyaç                                       | Tek yer                                                    |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| Para gösterimi                                | `components/fiyat/fiyat.tsx`                               |
+| Para okuma / "sıfırdan büyük mü"              | `lib/money.ts` (`readMinor`, `formatMinor`, `paraPozitif`) |
+| Ürün kartı / ızgara / boş sonuç               | `components/urun/`                                         |
+| Genel (kimliksiz) sunucu isteği               | `lib/api/server.ts` → `serverFetch`                        |
+| **Kimlikli** Sunucu Bileşeni isteği           | `lib/api/server-authed.ts` (`kimligiCoz`, `hesapFetch`)    |
+| Vekil (tarayıcıdan gelen her kimlikli istek)  | `lib/api/proxy.ts`                                         |
+| Hata kodu → yeniden deneme davranışı          | `lib/api/retry-policy.ts`                                  |
+| Hata kodu → hangi alanın altına basılır       | `lib/api/hata-kapsami.ts`                                  |
+| Sunucu hatasını istemciye taşıma              | `components/hata/hata-koprusu.ts` + `sunucu-hatasi.tsx`    |
+| Hata gösterimi                                | `components/hata/hata-gosterimi.tsx`                       |
+| 404 gövdesi                                   | `components/hata/bulunamadi.tsx`                           |
+| Tarih biçimi (sabit `Europe/Istanbul`)        | `lib/tarih.ts`                                             |
+| `?next=` temizleme (açık yönlendirme kapısı)  | `lib/donus-yolu.ts`                                        |
+| Bekleyen ödeme (sunucu tarafı akış durumu)    | `lib/session/bekleyen-odeme.ts`                            |
+| Tel tipleri                                   | `@vt/contracts` → `wire/`                                  |
+| Tarayıcıda kullanılacak sabitler              | `@vt/config/constants` (⚠️ kökten DEĞİL)                   |
+| **Kullanıcının yazdığı** tutar gösterimi      | `components/fiyat/tutar.tsx` (⚠️ `<Fiyat>` DEĞİL — §3)     |
+| Metin → tam sayı (tutar / adet / yüzde)       | `lib/sayi.ts` (`kurusCoz`, `adetCoz`, `yuzdeCoz`)          |
+| Para OLMAYAN sayı biçimi (bps, oran, µUSD)    | `lib/sayi-bicim.ts`                                        |
+| Kategori ağacı çekme / arama                  | `lib/kategori.ts`                                          |
+| URL sorgusu okuma / bağlantı üretme           | `lib/sorgu.ts` (`tekil`, `baglanti`)                       |
+| Durum → etiket + rozet rengi                  | `lib/durum-etiketleri.ts`                                  |
+| Sanal deneme kategori etiketleri              | `components/tryon/kategori-etiketleri.ts`                  |
+| Try-on uygunluk önerisi ve eşiği              | `components/tryon/tryon-oneriler.ts`                       |
+| Hata `details`inden tutar okuma               | `lib/api/hata-tutari.ts`                                   |
+| **Panel** okuması (`Okuma<T>`, liste/tekil)   | `lib/api/okuma.ts`                                         |
+| **Panel** iskeleti (başlık, sekme, sayfalama) | `components/panel/duzen.tsx`                               |
+| **Panel** sol menüsü                          | `components/panel/yan-menu.tsx`                            |
+| **Panel** karar formu (onay/ret + gerekçe)    | `components/panel/karar-kutusu.tsx`                        |
 
-⚠️ `app/(magaza)/**/_lib/` ve `_bilesenler/` klasörleri **o ekrana özgü** şeyler
+⚠️ `app/**/_lib/` ve `_bilesenler/` klasörleri **o ekrana özgü** şeyler
 içindir. İkinci bir ekran aynı şeye ihtiyaç duyduğu anda dosya yukarıdaki
 tabloya taşınır; ikinci kopya yazılmaz.
+
+⚠️ **BU TABLONUN ALT YARISI BİR BÜTÜNLEME TURUNUN ÜRÜNÜ, ve neyin yanlış
+gittiğini bilmek onu tekrarlamamanın tek yolu.** Dört ajan paralel panel yazdı,
+dördü de kendi klasöründe kaldı, dördü de "paylaşılana taşıyın" notu bıraktı.
+Ortaya çıkan ayrışmalar teorik değildi:
+
+- Aynı uç için **iki tip**: `SellerPackageSummaryWire` ↔ `SaticiPaketOzetiWire`,
+  `SellerBalanceWire` ↔ `SaticiBakiyeWire`.
+- **Farklı uçlar için aynı ad**: `PayoutTalebiWire` hem satıcının talep yanıtı
+  hem yönetimin payout kuyruk satırıydı — şekilleri farklı.
+- Aynı işi yapan **iki `Okuma<T>`**: `{ok, veri, govde}` ↔ `{tamam, veri, hata}`.
+  Derleme kırılmıyor; yalnızca `if` yanlış dala giriyordu.
+- Sekmelerin **üç ayrı görünümü** (dolgulu hap · alt çizgi · düz liste) ve
+  sayfalamanın **iki ayrı metni** ("Sonraki sayfa" ↔ "Daha eski hareketler").
+- Aynı oran **iki farklı biçimde**: kuponlarda `%10`, komisyon tablosunda
+  `%10,00` — iki ayrı bps çeviricisi.
+- Aynı sekiz kategori etiketi **dört yerde**.
+- Aynı try-on eşiği (60) **üç yerde**: backend sabiti, `TRYON_ESIK`,
+  `TRYON_UYGUNLUK_ESIGI`. Artık `@vt/config` → `TRYON.minProductReadinessScore`.
+
+Hepsi tek yere indirildi, kopyalar SİLİNDİ.
+
+⚠️ **KOPYA İLE KARŞILIK AYNI ŞEY DEĞİLDİR** — ve bu ayrım tabloyu okurken en
+kolay kaçırılan şey. `AWAITING_APPROVAL` müşteriye "Satıcı onayı bekleniyor",
+satıcıya "Onayınız bekleniyor"dur; `REQUESTED` satıcıya "Talep alındı" (bilgi),
+yöneticiye "Karar bekliyor" (İŞ). Bunları tek tabloya indirmek, kime
+seslendiğini bilmeyen bir ekran üretir. Bu yüzden müşteri dilindeki tablolar
+`lib/durum-etiketleri.ts`te, satıcı/yönetim dilindekiler kendi `_lib`lerinde —
+ve **hepsi aynı wire enum'ıyla `satisfies` ile kapalı**, yani sunucuya yeni bir
+durum eklendiğinde hepsi birden derlemeyi kırar.
 
 ---
 
@@ -108,10 +151,26 @@ sabitler de öyle; gerekiyorsa sunucuda `.toString()`.
 yapmak lint korumasını sessizce kapatır).
 
 ⚠️ **Kullanıcının yazdığı tutar para değildir.** `MinorString` markası "bu para
-API yanıtından doğdu" güvencesidir; hesaplayıcı/filtre girdilerine
-`unsafeMinorString` ile marka basmak o güvenceyi bütün depo için deler. O
-değerler `hesaplayici/sayi.ts` kalıbıyla metin → `bigint` çözülür ve `rakam`
-sınıfını kendi taşır (bkz. `hesaplayici/hesaplayici.tsx`, `secili-filtreler.tsx`).
+API yanıtından doğdu" güvencesidir; hesaplayıcı/filtre/payout girdilerine
+`unsafeMinorString` ile marka basmak o güvenceyi bütün depo için deler.
+Yol ikiye ayrılır ve **ikisi karıştırılmaz**:
+
+```
+API yanıtından gelen tutar   →  <Fiyat value={...Minor} />
+kullanıcının yazdığı tutar   →  lib/sayi.ts (kurusCoz) → bigint → <Tutar minor={...} />
+```
+
+Her iki bileşen de `rakam` sınıfını KENDİ taşır; çağıran unutamaz.
+
+⚠️ **Bu ayrım ters yönde de ihlal edilebilir ve edildi:** payout formu sunucudan
+dönen `sonuc.amountMinor`ı elle `Money.formatMoney(...)` ile basıyordu — yani
+telden gelen para için ekranda ikinci bir biçimleme yolu vardı. Kural tek
+cümleyle: **telden gelen tutar `<Fiyat>`e, kullanıcının yazdığı `<Tutar>`a.**
+`Money.formatMoney` çağrısı ekran kodunda HİÇ görünmez.
+
+⚠️ Yüzde/oran/mikro-USD **para değildir** ve `<Fiyat>`e verilmez (`₺` ile
+biçimlenip doğru görünen yanlış rakam üretir). Biçimleri `lib/sayi-bicim.ts`te;
+`yuzdeBps` iki hane SABİT basar (`%10,00`) çünkü tabloda virgüller hizalanmalı.
 
 ## 4. Hata
 
@@ -139,10 +198,22 @@ sınıfını kendi taşır (bkz. `hesaplayici/hesaplayici.tsx`, `secili-filtrele
     hata üç ayrı iade/sipariş açar.
 - ⚠️ Tek istisna `details.fields[].message`: Türkçe olmayabilir,
   `components/hata/alan-hatalari.ts` üzerinden eşlenir.
+  ⚠️ **SIRA DÜZELTİLDİ (ölçüldü):** eşleme önce `rule` tablosuna bakıyordu ve
+  sunucunun ÖZELLİKLE yazdığı Türkçe cümleyi çöpe atıyordu — gönderilen
+  `{rule:'too_small', message:'Gerekçe en az 10 karakter olmalı.'}` ekranda
+  "Girilen değer çok kısa." oluyordu, yani kaç karakter gerektiği kayboluyordu.
+  Artık sunucu metni İngilizce Zod varsayılanı DEĞİLSE olduğu gibi kazanır;
+  kural tablosu yalnızca varsayılan cümleler için yedektir.
 - ⚠️ **`ApiFailure` RSC sınırından GEÇEMEZ** (sınıf örneği). Sunucu Bileşeninde
   yakalanan hatayı prop olarak vermek sayfanın tamamını düşürür — yani hatayı
   göstermeye çalışmak hatadan büyük bir hata üretir. Yol:
   `hataYuku(error)` → `<SunucuHatasi govde={...} />`.
+- ⚠️ **`redirect()` VE `notFound()` HATA DEĞİLDİR — `hataYuku` onları yeniden
+  fırlatır.** Next bu ikisini `throw` ile yapıyor; panel sayfaları veriyi
+  `try/catch` içinde okuduğu için sinyal `catch`e düşüyordu ve oturumu düşmüş
+  kullanıcı `/giris` yerine "Beklenmeyen bir hata oluştu" kutusu görüyordu.
+  Kapı tek yerde (`hata-koprusu.ts`, `digest` öneki kontrolü); her `catch`
+  bloğuna ayrı yazılsaydı bir sonraki ekranda unutulurdu.
 - Özel davranışlar: `CONSENT_REQUIRED` ve `CONSENT_CROSS_BORDER_REQUIRED`
   **ayrı** modallar.
 - ⚠️ **`INSUFFICIENT_STOCK` DÜZELTMESİ (ölçüldü, eski kural yanlıştı):**
@@ -197,8 +268,20 @@ sınıfını kendi taşır (bkz. `hesaplayici/hesaplayici.tsx`, `secili-filtrele
   `<Button variant="birincil" size="lg" className="w-full">`. HTML'de sınıf
   dizgileri BİREBİR aynı olmalı; bu ölçülebilir bir kuraldır.
 - ⚠️ Koyu tema **yalnızca** `(yonetim)` bölgesinde (`.tema-koyu` sınıfı).
+  ⚠️ **PORTAL TUZAĞI:** `Dialog`/`Sheet` içeriği `document.body`ye taşır, yani
+  `.tema-koyu` kabuğunun DIŞINA — koyu panelde açılan bir modal AÇIK temada
+  çizilir. Bugün hiçbir panel ekranı bu ikisini kullanmıyor, o yüzden arıza
+  görünmüyor; ilk kullananla birlikte görünür. Gerekçe ve düzeltme yönü
+  `components/ui/dialog.tsx` başlığında. Sabit renk sınıfı (`bg-white`,
+  `text-gray-*`) panelde HİÇ kullanılmaz — hepsi anlamsal token.
 - ⚠️ **Öğe bütçesi**: ana sayfa 3 bölüm, ürün detay 3 blok. Dördüncü bir blok
   gerekiyorsa yeni bir EKRAN gerekiyordur, sıkıştırma değil.
+- ⚠️ **Panel ekranı elle iskelet çizmez.** Sayfa başlığı, süzgeç sekmeleri, boş
+  sonuç, özet şeridi ve sayfalama `components/panel/duzen.tsx`ten gelir. Bu bir
+  üslup tercihi değil: dört ajan kendi iskeletini yazdığında sekmelerin üç ayrı
+  görünümü oldu ve aynı panelde ekran değiştiren kullanıcı her seferinde başka
+  bir uygulama kullandığını sandı. `OzetSeridi` tip düzeyinde **3 veya 4** kart
+  dayatır (`design-system.md`); beşinciyi eklemek derlenmez.
 
 ## 8. `loading.tsx` ve 404 — birbirine bağlıdır
 
@@ -273,15 +356,37 @@ Node`, `exports` alt yollarını görmez) ve kökten import eder. Aynı sabit ik
 9. Gezinme çubuğuna bağlantı eklemeyi unutmayın. ⚠️ Bu depoda üç kez yaşanan
    hatanın frontend karşılığı: sayfa yazıldı, derlendi, hiçbir yerden
    çağrılmadı. Tersi de geçerli — **olmayan sayfaya bağlantı konmaz.**
+   ⚠️ **PANELDE BU ARTIK TESTLE KAPALI:** `components/panel/yan-menu.test.ts`
+   menü dizilerini `app/**/page.tsx` taramasıyla karşılaştırıyor ve İKİ YÖNÜ de
+   kırıyor — menüde olup sayfası olmayan da, sayfası olup menüde olmayan da.
+   Test kırık yolun ADINI yazar. Yeni panel sayfası eklerken ilgili menü
+   dizisine (`(satici)/layout.tsx` ya da `yonetim/_kabuk/yan-menu.tsx`) satır
+   eklemek zorunludur; eklemezseniz `vitest` kırmızı olur.
+   ⚠️ Vitrin (`(magaza)`) gezinmesi bu testin kapsamında DEĞİL — bağlantılar
+   orada düz metin içinde geçiyor, dizide değil. Oradaki kural hâlâ elle
+   uygulanıyor.
 
 ## 10. Bugün EKSİK olan, bilerek yapılmayan
 
 Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
 
-- **`/stil-danismani` ekranı YOK.** Akış vekili (`app/api/stylist/.../messages/route.ts`)
-  hazır ve `text/event-stream` taşıyor, ama onu çağıran ekran yazılmadı. Gezinme
-  çubuğundaki bağlantı bu yüzden KALDIRILDI. Ekran açıldığı gün
-  `(magaza)/layout.tsx`e bir satır eklenir.
+- ~~**`/stil-danismani` ekranı YOK.**~~ **YAZILDI.** Ekran
+  `(magaza)/stil-danismani/`; akış `fetch` + `ReadableStream` ile okunuyor
+  (`EventSource` gövdeli `POST` atamaz), SSE çözücü `_lib/akis.ts`te ve orada
+  test ediliyor. Gezinme bağlantısı `(magaza)/layout.tsx`e eklendi.
+  **ÖLÇÜLDÜ** (üretim derlemesi, canlı API, gerçek oturum):
+  oturumsuz `307 → /giris?next=%2Fstil-danismani`; oturumla `200`;
+  `POST /api/stylist/conversations` → `201`;
+  `POST /api/stylist/conversations/:id/messages` → `200 text/event-stream`,
+  `x-accel-buffering: no`, 7 çerçeve (`start` · 5×`delta` · `done`) ve gerçek
+  Türkçe yanıt. Kaydedilen gövde 37 baytlık parçalara bölünüp `AkisCozucu`ya
+  verildiğinde aynı yanıt yeniden kuruldu — parça sınırında bölünen çerçeve
+  arızası kapalı.
+  ⚠️ AÇIK KALAN: `done.suggestedProductIds` ürün KARTINA çevrilemiyor ve
+  `action: tryon.open` doğrudan deneme ekranına bağlanamıyor; ikisinin de tek
+  sebebi aynı eksik uç — kataloğun `GET /products/:slug` dışında kimlikle ürün
+  döndüren bir ucu yok. Ekran bugün ürün ADIYLA aramaya bağlanıyor; uydurma
+  adres kurulmadı.
 - **`/magaza/[slug]` (satıcı vitrini) YOK.** Ürün detayında mağaza adı görünür
   ama bağlantı değildir. ⚠️ **Sepet paketi başlığı bu kurala uymuyordu**
   (`sepet/paket.tsx` → `href="/magaza/${storeSlug}"`, canlıda 404); bağlantı
@@ -291,21 +396,48 @@ Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
   metnin yayınlanmadığını söylüyor ve `robots: noindex` taşıyor.
   ⚠️ **KVKK'da metnin gösterilmiş olması rızanın geçerlilik şartıdır** — yani
   bu, açılış öncesi kapatılması gereken bir eksiktir, kozmetik değil.
-- **`(satici)` ve `(yonetim)` bölgeleri yalnız iskelet — TEK sayfa, sıfır alt
-  ekran.** `/satici/urunler`, `/satici/siparisler`, `/satici/finans`,
-  `/yonetim/saticilar`, `/yonetim/komisyon`, `/yonetim/payout`,
-  `/yonetim/raporlar` YOK.
-  ⚠️ Bu yedi ad kabuklarda **`<Link>` olarak duruyordu**, yani "basınca 404
-  veren yedi düğme"ydi — `/stil-danismani` bağlantısının kaldırılma
-  gerekçesinin aynısı, aynı ölçüt uygulanmadan. Bağlantılar kaldırıldı;
-  adlar "yakında" işaretiyle düz metin olarak duruyor. Ekran yazıldığı gün
-  ilgili satır `<Link>`e döner.
+- **`(satici)` ve `(yonetim)` panelleri artık YAZILDI** (satıcı 8 rota, yönetim
+  11 rota) ve menüleri `<Link>` taşıyor; "yakında" düz metni kalmadı. Kaldırılan
+  yedi kırık bağlantının hikâyesi §9.9'da duruyor çünkü kuralın ikinci yarısı
+  hâlâ geçerli.
+  ⚠️ **PANELLER ARTIK GERÇEK ROLLE ÖLÇÜLDÜ — VE İLK ÖLÇÜM 19/19 HTTP 500
+  BULDU.** Kabul kapısı aylarca açık kaldığı için arıza hiç görünmemişti:
+  `MenuSatiri.Ikon` bir Lucide bileşeni taşıyordu ve menü dizileri SUNUCU
+  bileşeni olan kabuklarda tanımlıydı; `forwardRef` nesnesi RSC sınırından
+  geçemiyor ("Functions cannot be passed directly to Client Components").
+  `next build`, `tsc` ve `vitest` üçü de sessizdi — arıza YALNIZCA rolü olan
+  bir oturumla sayfa açıldığında görünüyor. İkon artık ADLA taşınıyor
+  (`components/panel/yan-menu.tsx` → `IKONLAR`); dizgi her zaman serileşir.
+  **BUGÜN ÖLÇÜLEN** (üretim derlemesi + canlı API + gerçek oturum çerezi):
+  satıcı 8 rota `200`, yönetim 11 rota `200`, oturumsuz 19/19 `307 → /giris?next=…`.
+  Dolu ekran: satıcı panosu "İncelemedeki ürün 1", yönetim moderasyon kuyruğu
+  dolu tablo, "Defter toplamı ₺0,00". Yazma yolları: kupon `PATCH` (`200`,
+  `usageLimit` kalıcı) ve ürün moderasyon reddi gerekçeyle (`200`, `REJECTED`).
+  ⚠️ HÂLÂ ÖLÇÜLMEDİ: kargo bildirimi, iade kararı ve payout kararı — üçü de
+  önce sipariş/defter verisi gerektiriyor.
+  ⚠️ Rol kapısı artık kod: `packages/db/scripts/rol-ata.ts`
+  (`pnpm --filter @vt/db rol:ata -- --eposta=… --rol=…`). Kullanıcı NORMAL
+  yoldan (`POST /v1/auth/register`) açılır, betik yalnız rolü yükseltir ve
+  SELLER_USER için APPROVED mağaza + üyelik kurar; parola özeti ikinci bir
+  yerde uygulanmaz. Üretimde çalışmayı reddediyor.
+  **"Panel çalışıyor" YAZILMADAN önce rolü olan bir oturumla dolu ekran
+  ölçülmelidir** — bu kural yerinde duruyor; yukarıdaki 500 tam olarak neden
+  durduğunu gösteriyor.
 - **Bileşen testi yok.** `apps/web/vitest.config.ts` VAR ve kök projeye
-  bağlı (`environment: 'node'`); bugün SAF modüller test ediliyor —
-  `lib/money.ts`, `lib/api/retry-policy.ts`, `hesaplayici/sayi.ts`,
-  `hesaplayici/hesap.ts`, `urunler/_liste/liste-sorgusu.ts`.
-  ⚠️ jsdom + testing-library kurulmadı; render testi yok. Yarım bir kurulum
-  "bileşenler test ediliyor" yanılsaması üretirdi.
+  bağlı (`environment: 'node'`); SAF modüller ve dosya sistemi sapması test
+  ediliyor — `lib/money.ts`, `lib/sayi.ts`, `lib/tarih.ts`,
+  `lib/api/retry-policy.ts`, `hesaplayici/hesap.ts`,
+  `urunler/_liste/liste-sorgusu.ts`, `satici/siparisler/_lib/sorgu.ts`,
+  `stil-danismani/_lib/akis.ts`, `components/panel/yan-menu.test.ts`.
+  ⚠️ jsdom + testing-library kurulmadı; **render testi yok**. Yarım bir kurulum
+  "bileşenler test ediliyor" yanılsaması üretirdi. Yani `components/panel/`
+  altındaki iskelet bileşenlerinin ÇİZİMİ test edilmiyor — yalnızca menü
+  içeriğinin rota tablosuyla tutarlılığı ediliyor.
+  ⚠️ `yan-menu.test.ts` artık İKİ tarama yapıyor: menü dizileri **ve** panel
+  ekranlarında SABİT yazılmış her `href`. İkincisi eklendi çünkü ilkinin
+  yapısal kör noktası ölçüldü — yönetim panosu, VAR OLAN `/yonetim/payout`
+  ekranı için `href: null` taşıyor ve ekranda "Payout ekranı yok" yazıyordu;
+  menü testi yeşildi çünkü pano kartlarının `href`ine hiç bakmıyordu.
   ⚠️ Bu dosya YOKKEN `pnpm exec vitest run` yeşildi ama `grep -c '|web|'`
   sıfır dönüyordu: kök yapılandırma projeleri `apps/*/vitest.config.ts`
   glob'uyla topluyor. Kapının kendisi sessizce eksikti.
@@ -348,7 +480,7 @@ Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
 
 ```bash
 pnpm exec turbo run build typecheck lint --force
-pnpm exec vitest run          # ⚠️ 1230'dan AŞAĞI DÜŞMEMELİ
+pnpm exec vitest run          # ⚠️ 1245'ten AŞAĞI DÜŞMEMELİ
 pnpm format && pnpm format:check
 pnpm --filter @vt/web verify:bundle
 ```
@@ -359,7 +491,7 @@ yoktu ve 1175 testin TAMAMI api/worker/packages'a aitti. Frontend'in
 ölçüldüğünü görmek için sayıya değil PROJE ADINA bakın:
 
 ```bash
-pnpm exec vitest run --project web     # bugün 55 test, 5 dosya
+pnpm exec vitest run --project web     # bugün 86 test, 9 dosya
 ```
 
 ⚠️ **"Derleniyor" ≠ "çalışıyor".** Geliştirme sunucusunu gerçekten kaldırın,

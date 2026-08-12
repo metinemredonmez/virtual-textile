@@ -1,4 +1,4 @@
-import { MEDIA } from '@vt/config';
+import { MEDIA, TRYON } from '@vt/config';
 
 /**
  * TRY-ON UYGUNLUK SKORU (0-100)
@@ -29,11 +29,18 @@ export const TRYON_READINESS_WEIGHTS = {
 /**
  * Bu skorun altındaki üründe satıcıya iyileştirme önerisi gösterilir.
  *
- * ⚠️ Değer burada duruyor çünkü bu ajanın `@vt/config` yazma yetkisi yok.
- *    Kalıcı yeri `packages/config/src/constants.ts` içindeki `TRYON` bloğudur
- *    (ör. `minProductReadinessScore`); taşındığında bu sabit silinmeli.
+ * ⚠️ DEĞER ARTIK BURADA DEĞİL: `@vt/config` → `TRYON.minProductReadinessScore`.
+ *    Taşınma sebebi ölçülmüş bir ayrışma riski — aynı eşiğin satıcı panelinde
+ *    (`TRYON_ESIK`) ve yönetim moderasyon kuyruğunda (`TRYON_UYGUNLUK_ESIGI`)
+ *    ikişer kopyası vardı ve web `apps/api`den import EDEMEZ. Bu ad yalnızca
+ *    var olan çağıranlar için duruyor; yeni kod sabiti config'ten okur.
+ *
+ * ⚠️ `apps/api` alt yol kullanamaz (`moduleResolution: Node`, `exports` alt
+ *    yollarını görmez) — bu yüzden kökten import ediliyor, web ise
+ *    `@vt/config/constants`tan okuyor. Aynı sabitin iki farklı yolla okunması
+ *    bu depoda normaldir (AGENTS.md §9.8).
  */
-export const MIN_TRYON_READINESS_SCORE = 60;
+export const MIN_TRYON_READINESS_SCORE = TRYON.minProductReadinessScore;
 
 /** `Product.tryOnIssues` içine yazılan kodlar. */
 export type TryOnReadinessIssue =

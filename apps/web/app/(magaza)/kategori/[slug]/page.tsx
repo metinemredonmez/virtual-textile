@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { sorguyuOku, type AramaParametreleri } from '../../urunler/_liste/liste-sorgusu';
 import { UrunListesi } from '../../urunler/_liste/urun-listesi';
-import { kategoriAgaci, kategoriBul } from '../_veri/kategoriler';
+import { kategoriAgaci, kategoriBul } from '@/lib/kategori';
 
 /**
  * KATEGORİ LİSTESİ — `/urunler` ile AYNI liste bileşeni, kategori sabitlenmiş.

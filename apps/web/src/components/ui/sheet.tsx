@@ -10,6 +10,18 @@ import { cn } from '@/lib/utils';
  *
  * Radix Dialog üzerine kuruludur: odak tuzağı, ESC ve `aria-modal` davranışını
  * ikinci kez yazmamak için. Görsel olarak yandan girer, anlamsal olarak modaldır.
+ *
+ * ⚠️ **YÖNETİM PANELİNDE KULLANILMADAN ÖNCE OKUYUN — TEMA TUZAĞI.**
+ *    `Portal` içeriği `document.body`ye taşır, yani `.tema-koyu` sınıfını
+ *    taşıyan `(yonetim)` kabuğunun DIŞINA. Koyu panelde açılan bir modal bugün
+ *    AÇIK temada çizilir: beyaz zemin, siyah metin, kenarlıklar kaybolur.
+ *    Bugün yönetim ve satıcı ekranlarının hiçbiri bu bileşeni kullanmıyor, o
+ *    yüzden arıza CANLIDA GÖRÜNMÜYOR — ilk kullanan ekranla birlikte görünür.
+ *    Kullanmadan önce doğru düzeltme: `Portal`a `container` verip temalı
+ *    ağacın içine çizdirmek (ya da içeriğe `tema-koyu` sınıfını taşıtmak).
+ *    ⚠️ Karar `next build && next start` üzerinde GÖZLE doğrulanmadan
+ *       "çalışıyor" YAZILMAZ; bu bir CSS değişkeni kapsamı sorunu, tip sistemi
+ *       yakalamaz.
  */
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;

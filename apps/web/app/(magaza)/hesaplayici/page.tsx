@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+// ⚠️ Kategori etiketleri TEK tablodan (bu dosyada dördüncü kopyaydı).
+import { kategoriCumlesi } from '@/components/tryon/kategori-etiketleri';
 import { ALL_TRYON_CATEGORIES, TRYONABLE_CATEGORIES } from '@vt/config/constants';
-import type { TryOnCategoryName } from '@vt/config/constants';
 import { Button } from '@/components/ui/button';
 import { Hesaplayici } from './hesaplayici';
 import { VARSAYIM_TANIMLARI } from './varsayimlar';
@@ -24,28 +25,6 @@ import { VARSAYIM_TANIMLARI } from './varsayimlar';
  */
 
 const YOL = '/hesaplayici';
-
-/**
- * ⚠️ `Record<TryOnCategoryName, string>` — TAM kapsam zorunlu. Sağlayıcı
- *    matrisine yeni bir kategori eklendiğinde bu tablo DERLENMEZ ve eksik etiket
- *    hemen görünür. Kategori adlarını düz metin olarak yazmak, matris
- *    değiştiğinde sayfanın eski listeyi göstermesi demekti — `TRYONABLE_CATEGORIES`
- *    zaten tam da bu yüzden elle yazılmıyor, matristen türetiliyor.
- */
-const KATEGORI_ETIKETLERI: Record<TryOnCategoryName, string> = {
-  UPPER_BODY: 'üst giyim',
-  LOWER_BODY: 'alt giyim',
-  DRESS: 'elbise',
-  OUTERWEAR: 'dış giyim',
-  SHOES: 'ayakkabı',
-  JEWELRY: 'takı',
-  BAG: 'çanta',
-  ACCESSORY: 'aksesuar',
-};
-
-function etiketle(kategoriler: readonly TryOnCategoryName[]): string {
-  return kategoriler.map((k) => KATEGORI_ETIKETLERI[k]).join(', ');
-}
 
 const KAPALI_KATEGORILER = ALL_TRYON_CATEGORIES.filter((k) => !TRYONABLE_CATEGORIES.includes(k));
 
@@ -159,10 +138,11 @@ export default function HesaplayiciPage() {
         <h2 className="text-sm font-semibold">Denemenin bugünkü kapsamı</h2>
         <p className="mt-2 text-sm text-metin-soluk">
           Sanal deneme bugün <span className="rakam">{TRYONABLE_CATEGORIES.length}</span> kategoride
-          açık: {etiketle(TRYONABLE_CATEGORIES)}. {etiketle(KAPALI_KATEGORILER)} denenemiyor —
-          sebebi tercih değil, kullandığımız modellerin bu kategoriler için eğitilmemiş olması. Bu
-          ürünler mağazanızda satılmaya devam eder; yalnızca deneme düğmesi çıkmaz. Hesaplayıcıya
-          yazacağınız ziyaretçi sayısını buna göre daraltmanız, sonucu gerçeğe yaklaştırır.
+          açık: {kategoriCumlesi(TRYONABLE_CATEGORIES)}. {kategoriCumlesi(KAPALI_KATEGORILER)}{' '}
+          denenemiyor — sebebi tercih değil, kullandığımız modellerin bu kategoriler için
+          eğitilmemiş olması. Bu ürünler mağazanızda satılmaya devam eder; yalnızca deneme düğmesi
+          çıkmaz. Hesaplayıcıya yazacağınız ziyaretçi sayısını buna göre daraltmanız, sonucu gerçeğe
+          yaklaştırır.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-3">

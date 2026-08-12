@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Fiyat } from '@/components/fiyat/fiyat';
 import { AramaKutusu } from './urunler/_liste/arama-kutusu';
 import { UrunIzgarasi } from '@/components/urun/urun-izgarasi';
-import { kategoriAgaci, vitrinKategorileri } from './kategori/_veri/kategoriler';
+import { kategoriAgaci, vitrinKategorileri } from '@/lib/kategori';
 
 /**
  * VİTRİN — ÜÇ BÖLÜM, DAHA FAZLASI DEĞİL.

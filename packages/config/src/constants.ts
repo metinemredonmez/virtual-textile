@@ -93,6 +93,22 @@ export const TRYON = {
   minPhotoQualityScore: 40,
   /** Bu skorun altındaki güven sonucu kullanıcıya uyarı ile gösterilir. */
   lowConfidenceThreshold: 60,
+  /**
+   * ÜRÜN GÖRSELLERİNİN denemeye hazırlık skoru eşiği (0-100). Altında kalan
+   * üründe satıcıya iyileştirme önerisi gösterilir, yönetim kuyruğunda uyarı
+   * rozeti çıkar.
+   *
+   * ⚠️ `lowConfidenceThreshold` İLE AYNI ŞEY DEĞİL; bugün yalnızca aynı sayıyı
+   *    taşıyorlar. O, ÜRETİLMİŞ görselin güven skoru; bu, ürünün KAYNAK
+   *    fotoğraflarının hazırlık skoru. Birini diğerinin yerine kullanmak bugün
+   *    doğru sonuç verir, biri değiştiği gün sessizce yanlış olur.
+   *
+   * ⚠️ Buraya taşındı çünkü ÜÇ kopyası vardı: `apps/api`de sabitin kendisi
+   *    (`MIN_TRYON_READINESS_SCORE`), satıcı ürün ekranında `TRYON_ESIK`,
+   *    yönetim moderasyonunda `TRYON_UYGUNLUK_ESIGI`. Ayrıştıkları gün satıcı,
+   *    backend'in "iyileştirme gerekli" dediği üründe uyarı GÖRMEZ.
+   */
+  minProductReadinessScore: 60,
   timeoutMs: { FAST: 25_000, QUALITY: 60_000 },
   /** Kuyruk önceliği — küçük sayı önce işlenir. */
   priority: { QUALITY: 1, FAST: 5, GUEST: 10 },

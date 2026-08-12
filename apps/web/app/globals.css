@@ -36,6 +36,20 @@
   --color-uyari-zemin: var(--uyari-zemin);
   --color-tehlike: var(--tehlike);
   --color-tehlike-zemin: var(--tehlike-zemin);
+  /*
+   * ⚠️ YIKICI DÜĞMENİN ÜSTÜNDEKİ METİN — ve tema başına DEĞİŞMEK ZORUNDA.
+   *    `button.tsx` burada `text-white` yazıyordu. Açık temada beyaz/#b91c1c
+   *    6,47:1 ile geçiyor; KOYU temada beyaz/#ef6b6b **3,01:1** ediyor ve 14px
+   *    font-medium metin "büyük metin" muafiyetine girmiyor (18,66px kalın ya
+   *    da 24px gerekir). WCAG 1.4.3 AA ihlali — üstelik payout reddi, satıcı
+   *    reddi ve ürün reddi gibi GERİ ALINAMAZ eylemlerin düğmesinde.
+   *    Koyu temada dolgu parlak olduğu için metin koyulaşıyor (#0d0e11 üstünde
+   *    6,42:1; `hover:bg-tehlike/90` durumunda 5,37:1). Kalıp zaten depoda
+   *    var: `birincil` düğme de `bg-metin text-zemin`.
+   *    ⚠️ İkinci sebep: sabit renk sınıfı (`text-white`) panelde HİÇ
+   *    kullanılmaz — hepsi anlamsal token.
+   */
+  --color-tehlike-metin: var(--tehlike-metin);
 
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -68,12 +82,16 @@
   --vurgu: #1d4ed8;
   --vurgu-metin: #ffffff;
 
-  --olumlu: #15803d;
+  /* ⚠️ #15803d idi ve `--olumlu-zemin` üstünde 4,49:1 çıkıyordu — 12px rozet
+     metninde AA eşiğinin (4,5:1) binde biri altı, yani ÖLÇÜLEBİLİR şekilde
+     kalıyordu. #146c34 aynı zeminde 5,83:1. */
+  --olumlu: #146c34;
   --olumlu-zemin: #eaf5ee;
   --uyari: #b45309;
   --uyari-zemin: #fdf3e6;
   --tehlike: #b91c1c;
   --tehlike-zemin: #fdecec;
+  --tehlike-metin: #ffffff;
 }
 
 /* Linear iskeleti: düşük kontrastlı çizgiler, parlak vurgu yok. */
@@ -94,6 +112,9 @@
   --uyari-zemin: #2a2015;
   --tehlike: #ef6b6b;
   --tehlike-zemin: #2a1717;
+  /* ⚠️ BEYAZ DEĞİL. Dolgu koyu temada parlak (#ef6b6b); beyaz metin 3,01:1
+     ederdi. Zemin rengiyle 6,42:1. Gerekçenin tamamı `@theme inline` içinde. */
+  --tehlike-metin: #0d0e11;
 }
 
 @layer base {

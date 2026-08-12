@@ -1,13 +1,22 @@
 /**
- * KULLANICI GİRDİSİ → TAM SAYI.
+ * KULLANICI GİRDİSİ → TAM SAYI. Kullanıcının yazdığı her tutar, adet ve oran
+ * bu dosyadan geçer.
  *
- * ⚠️ `parseFloat`/`Number` KULLANILMAZ. Sepet ortalaması bir para tutarıdır ve
- *    kayan noktaya uğrayan para sessizce yanlış tutar üretir (`lib/money.ts`
- *    başındaki gerekçenin aynısı). Burada dönüşüm metin üzerinde yapılır ve
- *    doğrudan `bigint`e çıkılır: metin → basamak → BigInt.
+ * ⚠️ `parseFloat`/`Number` KULLANILMAZ. Kullanıcının yazdığı tutar da bir para
+ *    tutarıdır ve kayan noktaya uğrayan para sessizce yanlış tutar üretir
+ *    (`lib/money.ts` başındaki gerekçenin aynısı). Dönüşüm metin üzerinde
+ *    yapılır ve doğrudan `bigint`e çıkılır: metin → basamak → BigInt.
  *
  * ⚠️ Yüzdeler de tam sayıdır: `%2,15` → 215 **basis point**. Yüzdeyi 0.0215
  *    diye taşımak, ilerideki her çarpımı kayan noktaya sokardı.
+ *
+ * ⚠️ BURASI ORTAK KATMAN, bir ekranın `_lib`i DEĞİL — ve bu bir yer değiştirme
+ *    değil, bir arıza önleme. Dosya bir dönem `(magaza)/hesaplayici/` altındaydı
+ *    ve YEDİ tüketicisi ona rota grubunun DIŞINDAN, göreli yolla ulaşıyordu
+ *    (satıcı payout formu, varyant matrisi, yeni ürün, kuponlar; yönetim
+ *    komisyon ×2, manuel iade). İkinci bir ayrıştırıcı yazılsaydı bedeli
+ *    ölçülebilirdi: "1.000" girdisi bir uygulamada 1.000,00 ₺, diğerinde
+ *    10,00 ₺ olurdu. Testi `sayi.test.ts` ile birlikte taşındı.
  */
 
 const YALNIZ_RAKAM = /^\d+$/;

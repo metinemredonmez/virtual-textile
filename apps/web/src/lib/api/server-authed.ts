@@ -130,3 +130,31 @@ function girise(donusYolu: string, sebep: 'guvenlik' | 'suresi-doldu' | null): n
   if (sebep === 'guvenlik') arama.set('sebep', 'guvenlik');
   redirect(`/giris?${arama.toString()}`);
 }
+
+/**
+ * SUNUCUDAN VERİ ÇEKMEYEN ama GİRİŞ İSTEYEN ekranın kapısı.
+ *
+ * ⚠️ `hesapFetch`in yönlendirme yarısı, isteğin kendisi olmadan. Stil
+ *    danışmanı gibi bütün verisini istemciden alan bir ekranda kapı
+ *    olmasaydı ziyaretçi boş sohbet kutusuna yazar ve ancak GÖNDERDİKTEN
+ *    sonra girişe atılırdı — yazdığı da kaybolurdu.
+ *
+ * ⚠️ Çağıran taraf `redirect('/giris?next=…')` yazmasın diye burada: `?next=`
+ *    kaçırma ve `sebep=guvenlik` ayrımı TEK yerde kalmalı, ikisi de sessizce
+ *    yanlış yazılabilecek şeyler (açık yönlendirme kapısı `lib/donus-yolu.ts`
+ *    tarafında kapalı ve o kapı yalnız bu biçimi bekliyor).
+ *
+ * ⚠️ BU BİR GÜVENLİK KATMANI DEĞİL, ARAYÜZ KAPISI — `guard.ts` başlığındaki üç
+ *    katman ayrımının aynısı. Gerçek koruma API guard'larında: danışman
+ *    uçlarının hiçbiri `@Public()` değil, çünkü her mesaj sağlayıcıya para
+ *    ödetiyor ve kota kullanıcı başına tanımlı.
+ */
+export async function girisGerekli(donusYolu: string): Promise<void> {
+  const kimlik = await kimligiCoz();
+
+  // ⚠️ `girise` `redirect()` çağırıyor, yani FIRLATIYOR (`NEXT_REDIRECT`);
+  //    hiçbir `try` bloğunun içinde olmamalı.
+  if (kimlik.kind !== 'uye') {
+    girise(donusYolu, kimlik.kind === 'dustu' ? kimlik.sebep : null);
+  }
+}

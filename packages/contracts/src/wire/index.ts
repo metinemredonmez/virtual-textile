@@ -22,3 +22,8 @@ export * from './size.js';
 export * from './media.js';
 export * from './search.js';
 export * from './account.js';
+// ⚠️ Panel tel tipleri. `seller.js` ÖNCE gelir: `admin.js` ondan
+//    `ProductStatusWire`/`SellerStatusWire`/`PayoutStatusWire` okuyor ve iki
+//    panel bu enum'ların TEK kopyasını paylaşıyor.
+export * from './seller.js';
+export * from './admin.js';
