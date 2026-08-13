@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import type { ProductListItemWire, ProductListPayloadWire } from '@vt/contracts';
 import { list } from '@/lib/api/core';
 import { serverFetch } from '@/lib/api/server';
@@ -49,6 +50,7 @@ const VITRIN_URUN_SAYISI = 9;
 const VITRIN_KATEGORI_SAYISI = 8;
 
 export default async function VitrinPage(): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
   const [urunSonucu, agac] = await Promise.all([
     serverFetch<ProductListPayloadWire, '/products'>('/products', {
       // Varsayılan `relevance` sıralaması popülerlik + tazelik + mağaza
@@ -69,7 +71,7 @@ export default async function VitrinPage(): Promise<React.ReactElement> {
       <NasilCalisir />
 
       {izgara.length > 0 ? (
-        <Ray baslik="Öne çıkanlar" tumuAdres="/products" tumuEtiket="Tümünü gör">
+        <Ray baslik={t('oneCikanlar')} tumuAdres="/products" tumuEtiket={t('tumunuGor')}>
           {izgara.map((urun) => (
             <RayKarti key={urun.id}>
               <UrunKarti urun={urun} />
@@ -103,46 +105,26 @@ export default async function VitrinPage(): Promise<React.ReactElement> {
  *    (`docs/tryon-kategori-destegi.md`, ölçülerek yazıldı). "Yakında" demek
  *    bile taahhüttür; ölçülmemiş bir tarihi buraya yazmayız.
  */
-function Ozellikler(): React.ReactElement {
-  const ozellikler = [
-    {
-      baslik: 'Sanal deneme',
-      metin: 'Kendi fotoğrafınızda, üst giyim · alt giyim · elbise · dış giyim.',
-    },
-    {
-      baslik: 'Markalar arası kombin',
-      metin: 'Bir mağazanın ceketi, diğerinin pantolonu — aynı görselde, tek sepette.',
-    },
-    {
-      baslik: 'Beden önerisi',
-      metin: 'Ölçüleriniz ve iade geri bildirimleriyle; güven düşükse öneri değil ölçü tablosu.',
-    },
-    {
-      baslik: 'Stil danışmanı',
-      metin: 'Dolabınızı ve beğenilerinizi okuyup kombin öneren yapay zekâ.',
-    },
-    {
-      baslik: 'Dijital gardırop',
-      metin: 'Satın aldığınız parçalar dolabınıza otomatik eklenir.',
-    },
-    {
-      baslik: 'Doğal dilde arama',
-      metin: '"Düğüne gidecek bir şey" yazın; filtrelerle uğraşmayın.',
-    },
-  ];
+async function Ozellikler(): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
+
+  // ⚠️ Anahtarlar ÇİFTLER hâlinde: başlık + metin. Biri sözlükte yoksa
+  //    derleme kırılır (en.ts `satisfies typeof tr`), yani yarım çeviri
+  //    ekrana ham anahtar olarak DÜŞEMEZ.
+  const anahtarlar = ['Deneme', 'Kombin', 'Beden', 'Danisman', 'Gardirop', 'Arama'] as const;
 
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold tracking-tight">Neler yapabilirsiniz</h2>
-      <p className="mb-6 max-w-xl text-sm text-metin-soluk">
-        Hepsi bugün çalışıyor — yakında gelecek olanlar bu listede yok.
-      </p>
+      <h2 className="mb-2 text-sm font-semibold tracking-tight">{t('ozellikler')}</h2>
+      <p className="mb-6 max-w-xl text-sm text-metin-soluk">{t('ozelliklerNot')}</p>
 
       <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-        {ozellikler.map((ozellik) => (
-          <li key={ozellik.baslik} className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-semibold tracking-tight">{ozellik.baslik}</h3>
-            <p className="text-sm leading-relaxed text-metin-soluk">{ozellik.metin}</p>
+        {anahtarlar.map((anahtar) => (
+          <li key={anahtar} className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold tracking-tight">{t(`ozellik${anahtar}`)}</h3>
+            <p className="text-sm leading-relaxed text-metin-soluk">
+              {t(`ozellik${anahtar}Metin`)}
+            </p>
           </li>
         ))}
       </ul>
@@ -162,34 +144,19 @@ function Ozellikler(): React.ReactElement {
  * ⚠️ Numaralar RENKSİZ. `design-system.md`: renk yalnızca DURUM taşır; adım
  *    numarası bir durum değil, sıradır.
  */
-function NasilCalisir(): React.ReactElement {
-  const adimlar = [
-    {
-      baslik: 'Fotoğrafınızı yükleyin',
-      metin:
-        'Tek bir boy fotoğrafı yeterli. Yalnızca bu deneme için kullanılmasını ya da profilinizde saklanmasını siz seçersiniz.',
-    },
-    {
-      baslik: 'Ürünü seçin',
-      metin:
-        'Beğendiğiniz parçada "Üzerimde Dene" düğmesine basın. Farklı mağazaların parçalarını tek kombinde birleştirebilirsiniz.',
-    },
-    {
-      baslik: 'Sonucu değerlendirin',
-      metin:
-        'Görsel benzerliği ve beden uyumu ayrı skorlarla gösterilir — iyi durmak ile üzerinize olmak farklı sorulardır.',
-    },
-  ];
+async function NasilCalisir(): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
+  const adimlar = [1, 2, 3] as const;
 
   return (
     <section>
-      <h2 className="mb-6 text-sm font-semibold tracking-tight">Nasıl çalışır</h2>
+      <h2 className="mb-6 text-sm font-semibold tracking-tight">{t('nasilCalisir')}</h2>
       <ol className="grid gap-8 sm:grid-cols-3">
-        {adimlar.map((adim, sira) => (
-          <li key={adim.baslik} className="flex flex-col gap-2">
-            <span className="text-xs tabular-nums text-metin-soluk">0{sira + 1}</span>
-            <h3 className="text-sm font-semibold tracking-tight">{adim.baslik}</h3>
-            <p className="text-sm leading-relaxed text-metin-soluk">{adim.metin}</p>
+        {adimlar.map((sira) => (
+          <li key={sira} className="flex flex-col gap-2">
+            <span className="text-xs tabular-nums text-metin-soluk">0{sira}</span>
+            <h3 className="text-sm font-semibold tracking-tight">{t(`adim${sira}Baslik`)}</h3>
+            <p className="text-sm leading-relaxed text-metin-soluk">{t(`adim${sira}Metin`)}</p>
           </li>
         ))}
       </ol>
@@ -206,13 +173,10 @@ function NasilCalisir(): React.ReactElement {
  *    daha önce satıcı menüsünde yaşandı: altı ekran yazılmış, menüde bağlantı
  *    olmadığı için hiçbirine ulaşılamıyordu.
  */
-function Koleksiyonlar(): React.ReactElement {
+async function Koleksiyonlar(): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
   return (
-    <Ray
-      baslik="Koleksiyonlar"
-      aciklama="Aradığınız şeye göre hazırlanmış giriş noktaları."
-      tumuAdres="/collection"
-    >
+    <Ray baslik={t('koleksiyonlar')} aciklama={t('koleksiyonlarNot')} tumuAdres="/collection">
       {KOLEKSIYON_LISTESI.map((koleksiyon) => (
         <RayKarti key={koleksiyon.slug}>
           <Link
@@ -239,7 +203,12 @@ function Koleksiyonlar(): React.ReactElement {
  *    ana sayfanın gecikmesini artırırdı. Bedeli dürüstçe: yalnızca vitrindeki
  *    dokuz üründe geçen mağazalar görünür — tam liste değil, bir örneklem.
  */
-function Magazalar({ urunler }: { urunler: ProductListItemWire[] }): React.ReactElement | null {
+async function Magazalar({
+  urunler,
+}: {
+  urunler: ProductListItemWire[];
+}): Promise<React.ReactElement | null> {
+  const t = await getTranslations('vitrin');
   /**
    * ⚠️ `seller` alanı liste tipinde YOK, yalnızca ürün DETAY tipinde var
    *    (ölçüldü: `ProductListItemWire` → `brandName` + `storeSlug`). Detay
@@ -257,10 +226,8 @@ function Magazalar({ urunler }: { urunler: ProductListItemWire[] }): React.React
 
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold tracking-tight">Mağazalar</h2>
-      <p className="mb-6 max-w-xl text-sm text-metin-soluk">
-        Farklı mağazaların parçalarını aynı kombinde deneyebilir, tek sepette satın alabilirsiniz.
-      </p>
+      <h2 className="mb-2 text-sm font-semibold tracking-tight">{t('magazalar')}</h2>
+      <p className="mb-6 max-w-xl text-sm text-metin-soluk">{t('magazalarNot')}</p>
 
       <ul className="flex flex-wrap gap-2">
         {[...magazalar.entries()].map(([slug, ad]) => (
@@ -287,20 +254,18 @@ function Magazalar({ urunler }: { urunler: ProductListItemWire[] }): React.React
  * ⚠️ Danışman yalnızca üst menüde duruyordu. Menü ikonu, ne yaptığını
  *    bilmeyen bir kullanıcıya hiçbir şey anlatmaz; bu şerit onun karşılığı.
  */
-function Danisman(): React.ReactElement {
+async function Danisman(): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-kenar p-6 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-semibold tracking-tight">
           Ne giyeceğinize karar veremiyorsanız
         </h2>
-        <p className="max-w-xl text-sm text-metin-soluk">
-          Stil danışmanı dolabınızdaki parçaları ve beğendiklerinizi birlikte değerlendirip kombin
-          önerir.
-        </p>
+        <p className="max-w-xl text-sm text-metin-soluk">{t('danismanMetin')}</p>
       </div>
       <Button asChild variant="ikincil">
-        <Link href="/stylist">Danışmana sor</Link>
+        <Link href="/stylist">{t('danismanDugme')}</Link>
       </Button>
     </section>
   );
@@ -319,7 +284,12 @@ function Danisman(): React.ReactElement {
  *    yüklenemediğinde bu düzen nötr bir gri panele iner ve başlık okunur
  *    kalır; bindirmeli bir düzende aynı durum okunamayan bir ekran olurdu.
  */
-function Vitrin({ urun }: { urun: ProductListItemWire | undefined }): React.ReactElement {
+async function Vitrin({
+  urun,
+}: {
+  urun: ProductListItemWire | undefined;
+}): Promise<React.ReactElement> {
+  const t = await getTranslations('vitrin');
   const gorsel = urun ? mediaUrl(urun.imageKey) : null;
 
   return (
@@ -332,25 +302,22 @@ function Vitrin({ urun }: { urun: ProductListItemWire | undefined }): React.Reac
 
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h1 className="max-w-2xl text-3xl font-semibold tracking-tight">
-            Satın almadan önce üzerinizde görün.
-          </h1>
-          <p className="max-w-xl text-metin-soluk">
-            Sanal deneme ile kıyafetin üzerinizde nasıl durduğunu görün, bedeninize uygun olup
-            olmadığını ayrı bir skorla değerlendirin.
-          </p>
+          <h1 className="max-w-2xl text-3xl font-semibold tracking-tight">{t('baslik')}</h1>
+          <p className="max-w-xl text-metin-soluk">{t('aciklama')}</p>
         </div>
 
         <AramaKutusu className="max-w-xl" />
 
         <div className="flex flex-wrap items-center gap-6">
           <Button asChild size="lg">
-            <Link href="/products">Ürünleri keşfet</Link>
+            <Link href="/products">{t('urunleriKesfet')}</Link>
           </Button>
 
           {urun ? (
             <Link href={`/product/${urun.slug}`} className="group flex flex-col gap-0.5 text-sm">
-              <span className="text-xs uppercase tracking-wide text-metin-soluk">Vitrinde</span>
+              <span className="text-xs uppercase tracking-wide text-metin-soluk">
+                {t('vitrinde')}
+              </span>
               {/* Ürün adı birincil, mağaza ikincil gri, fiyat birincil. */}
               <span className="font-semibold group-hover:underline">{urun.title}</span>
               <span className="text-metin-soluk">{urun.brandName}</span>
@@ -363,20 +330,21 @@ function Vitrin({ urun }: { urun: ProductListItemWire | undefined }): React.Reac
   );
 }
 
-function Kategoriler({
+async function Kategoriler({
   agac,
 }: {
   agac: Awaited<ReturnType<typeof kategoriAgaci>>;
-}): React.ReactElement | null {
+}): Promise<React.ReactElement | null> {
+  const t = await getTranslations('vitrin');
   const gosterilecek = vitrinKategorileri(agac, VITRIN_KATEGORI_SAYISI);
   if (gosterilecek.length === 0) return null;
 
   return (
     <section>
       <div className="mb-6 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold tracking-tight">Kategoriler</h2>
+        <h2 className="text-sm font-semibold tracking-tight">{t('kategoriler')}</h2>
         <Link href="/category" className="text-sm text-metin-soluk hover:text-metin">
-          Tüm kategoriler
+          {t('tumKategoriler')}
         </Link>
       </div>
 

@@ -68,6 +68,57 @@ export const en = {
     telifHakki: '© {yil} Virtual Textile',
   },
 
+  vitrin: {
+    baslik: 'See it on you before you buy.',
+    aciklama:
+      'Use virtual try-on to see how a garment looks on you, and check the fit with a separate score.',
+    urunleriKesfet: 'Explore products',
+    vitrinde: 'Featured',
+    oneCikanlar: 'Featured',
+    tumunuGor: 'See all',
+    tumu: 'All',
+    tumKategoriler: 'All categories',
+
+    nasilCalisir: 'How it works',
+    adim1Baslik: 'Upload your photo',
+    adim1Metin:
+      'A single full-length photo is enough. You choose whether it is used only for this try-on or saved to your profile.',
+    adim2Baslik: 'Pick a product',
+    adim2Metin:
+      'Press "Try it on" on any item you like. You can combine pieces from different stores into one outfit.',
+    adim3Baslik: 'Judge the result',
+    adim3Metin:
+      'Visual similarity and size fit are shown as separate scores — looking good and fitting well are different questions.',
+
+    ozellikler: 'What you can do',
+    ozelliklerNot: 'Everything here works today — nothing on this list is "coming soon".',
+    ozellikDeneme: 'Virtual try-on',
+    ozellikDenemeMetin: 'On your own photo: tops, bottoms, dresses and outerwear.',
+    ozellikKombin: 'Cross-brand outfits',
+    ozellikKombinMetin:
+      'One store\u2019s jacket, another\u2019s trousers — same image, one basket.',
+    ozellikBeden: 'Size recommendation',
+    ozellikBedenMetin:
+      'From your measurements and return feedback; when confidence is low you get the size chart, not a guess.',
+    ozellikDanisman: 'Style advisor',
+    ozellikDanismanMetin: 'AI that reads your wardrobe and favourites and suggests outfits.',
+    ozellikGardirop: 'Digital wardrobe',
+    ozellikGardiropMetin: 'Items you buy are added to your wardrobe automatically.',
+    ozellikArama: 'Natural language search',
+    ozellikAramaMetin: 'Type "something for a wedding" instead of wrestling with filters.',
+
+    koleksiyonlar: 'Collections',
+    kategoriler: 'Categories',
+    koleksiyonlarNot: 'Entry points curated around what you are looking for.',
+    magazalar: 'Stores',
+    magazalarNot:
+      'Try pieces from different stores in the same outfit and buy them in a single basket.',
+    danismanBaslik: 'Not sure what to wear?',
+    danismanMetin:
+      'The style advisor weighs what is already in your wardrobe together with what you liked, then suggests outfits.',
+    danismanDugme: 'Ask the advisor',
+  },
+
   panel: {
     sekmeler: 'Status filter',
     sonrakiSayfa: 'Next page',

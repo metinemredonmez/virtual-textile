@@ -74,6 +74,68 @@ export const tr = {
     telifHakki: '© {yil} Virtual Textile',
   },
 
+  /**
+   * ⚠️ VİTRİN METİNLERİ SÖZLÜKTE, JSX'te DEĞİL. Ana sayfaya yedi bölüm
+   *    eklendiğinde bu metinler doğrudan JSX'e yazılmıştı ve
+   *    `gomulu-metin.test.ts` çeviri borcunu 687'den 694'e çıkararak KIRMIZI
+   *    yandı. Testin kendi uyarısı: "Tavanı BÜYÜTME — metni sözlüğe taşı."
+   *    Doğru olan oydu; tavan yükseltilmedi.
+   */
+  vitrin: {
+    baslik: 'Satın almadan önce üzerinizde görün.',
+    aciklama:
+      'Sanal deneme ile kıyafetin üzerinizde nasıl durduğunu görün, bedeninize uygun olup olmadığını ayrı bir skorla değerlendirin.',
+    urunleriKesfet: 'Ürünleri keşfet',
+    vitrinde: 'Vitrinde',
+    oneCikanlar: 'Öne çıkanlar',
+    tumunuGor: 'Tümünü gör',
+    tumu: 'Tümü',
+    tumKategoriler: 'Tüm kategoriler',
+
+    nasilCalisir: 'Nasıl çalışır',
+    adim1Baslik: 'Fotoğrafınızı yükleyin',
+    adim1Metin:
+      'Tek bir boy fotoğrafı yeterli. Yalnızca bu deneme için kullanılmasını ya da profilinizde saklanmasını siz seçersiniz.',
+    adim2Baslik: 'Ürünü seçin',
+    adim2Metin:
+      'Beğendiğiniz parçada "Üzerimde Dene" düğmesine basın. Farklı mağazaların parçalarını tek kombinde birleştirebilirsiniz.',
+    adim3Baslik: 'Sonucu değerlendirin',
+    adim3Metin:
+      'Görsel benzerliği ve beden uyumu ayrı skorlarla gösterilir — iyi durmak ile üzerinize olmak farklı sorulardır.',
+
+    /**
+     * ⚠️ Bu liste bir VAAT LİSTESİ DEĞİL: her madde bugün çalışan bir şeye
+     *    işaret eder. Yazılmamış bir özelliği buraya eklemek, kullanıcıyı
+     *    olmayan bir düğmeyi aramaya göndermektir.
+     */
+    ozellikler: 'Neler yapabilirsiniz',
+    ozelliklerNot: 'Hepsi bugün çalışıyor — yakında gelecek olanlar bu listede yok.',
+    ozellikDeneme: 'Sanal deneme',
+    ozellikDenemeMetin: 'Kendi fotoğrafınızda, üst giyim · alt giyim · elbise · dış giyim.',
+    ozellikKombin: 'Markalar arası kombin',
+    ozellikKombinMetin: 'Bir mağazanın ceketi, diğerinin pantolonu — aynı görselde, tek sepette.',
+    ozellikBeden: 'Beden önerisi',
+    ozellikBedenMetin:
+      'Ölçüleriniz ve iade geri bildirimleriyle; güven düşükse öneri değil ölçü tablosu.',
+    ozellikDanisman: 'Stil danışmanı',
+    ozellikDanismanMetin: 'Dolabınızı ve beğenilerinizi okuyup kombin öneren yapay zekâ.',
+    ozellikGardirop: 'Dijital gardırop',
+    ozellikGardiropMetin: 'Satın aldığınız parçalar dolabınıza otomatik eklenir.',
+    ozellikArama: 'Doğal dilde arama',
+    ozellikAramaMetin: '"Düğüne gidecek bir şey" yazın; filtrelerle uğraşmayın.',
+
+    koleksiyonlar: 'Koleksiyonlar',
+    kategoriler: 'Kategoriler',
+    koleksiyonlarNot: 'Aradığınız şeye göre hazırlanmış giriş noktaları.',
+    magazalar: 'Mağazalar',
+    magazalarNot:
+      'Farklı mağazaların parçalarını aynı kombinde deneyebilir, tek sepette satın alabilirsiniz.',
+    danismanBaslik: 'Ne giyeceğinize karar veremiyorsanız',
+    danismanMetin:
+      'Stil danışmanı dolabınızdaki parçaları ve beğendiklerinizi birlikte değerlendirip kombin önerir.',
+    danismanDugme: 'Danışmana sor',
+  },
+
   panel: {
     sekmeler: 'Durum filtresi',
     sonrakiSayfa: 'Sonraki sayfa',

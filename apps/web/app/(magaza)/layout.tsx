@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Layers, ShoppingBag, Shirt, Sparkles, User } from 'lucide-react';
-import { TemaSecici } from '@/components/tema/tema-secici';
+import { AltBilgi } from '@/components/vitrin/alt-bilgi';
 import { GezinmeBaglantisi } from '@/components/gezinme/gezinme-baglantisi';
 
 /**
@@ -80,16 +80,7 @@ export default function MagazaLayout({ children }: { children: ReactNode }) {
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
 
-      {/*
-        ⚠️ TEMA ANAHTARI ALT BİLGİDE, GEZİNME ÇUBUĞUNDA DEĞİL. Çubuk 375px'te
-           zaten ölçülmüş bir taşma sorunu yaşadı (etiketler `hidden sm:inline`
-           tam bu yüzden); altıncı bir hedef aynı arızayı geri getirirdi. Tema
-           bir gezinme hedefi de değil — tek seferlik bir tercihtir.
-      */}
-      <footer className="flex items-center justify-center gap-4 border-t border-kenar py-6 text-center text-xs text-metin-soluk">
-        <span>Virtual Textile</span>
-        <TemaSecici />
-      </footer>
+      <AltBilgi />
     </div>
   );
 }
