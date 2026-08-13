@@ -293,6 +293,24 @@ export async function katalogYaz(
       else atlananGorsel += 1;
       depolamaAnahtarlari.push(sonuc.anahtar);
 
+      /**
+       * ⚠️ İLERLEME SATIRI — SÜS DEĞİL, ÖLÇÜLMÜŞ BİR ARIZANIN KARŞILIĞI.
+       *
+       *    Bu döngü seed'in EN UZUN adımı: 278 kare × (1 kaynak + 3 türev)
+       *    ≈ 1100 nesne, hepsi SIRAYLA R2'ye gidiyor. Ama tek satır bile
+       *    basmıyordu; ekranda yalnızca seed başlığı kalıyordu.
+       *
+       *    Sunucuda yaşandı: kullanıcı dakikalarca boş ekrana bakıp
+       *    "takıldı mı?" diye sordu. Sessizlik burada bilgi kaybıdır —
+       *    "çalışıyor" ile "asıldı" ayırt edilemiyordu.
+       *
+       * ⚠️ HER KAREDE DEĞİL, 25'TE BİR. Her yüklemede satır basmak 1100
+       *    satırlık bir duvar üretir ve asıl özeti (kaç kategori, kaç satıcı)
+       *    yukarı kaydırıp görünmez yapardı.
+       */
+      const islenenKare = yuklenenGorsel + atlananGorsel;
+      if (islenenKare % 25 === 0) console.log(`    … ${islenenKare} kare yüklendi`);
+
       const gorselOrtak = {
         storageKey: sonuc.anahtar,
         angle: aci,
