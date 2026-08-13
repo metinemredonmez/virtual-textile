@@ -7,21 +7,40 @@ import { UrunGorseli } from '@/components/urun/urun-gorseli';
 import { Button } from '@/components/ui/button';
 import { Fiyat } from '@/components/fiyat/fiyat';
 import { AramaKutusu } from './products/_liste/arama-kutusu';
-import { UrunIzgarasi } from '@/components/urun/urun-izgarasi';
+import { UrunKarti } from '@/components/urun/urun-karti';
+import { Ray, RayKarti } from '@/components/vitrin/ray';
 import { kategoriAgaci, vitrinKategorileri } from '@/lib/kategori';
+import { KOLEKSIYON_LISTESI } from './collection/koleksiyonlar';
 
 /**
- * VİTRİN — ÜÇ BÖLÜM, DAHA FAZLASI DEĞİL.
+ * VİTRİN — YEDİ BÖLÜM.
  *
- *   1. Vitrin görseli  — ekranın çoğu
- *   2. Öne çıkanlar    — sekiz ürün
- *   3. Kategoriler     — giriş kapıları
+ *   1. Vitrin görseli   — ekranın çoğu, ayrıştırıcının vaadi
+ *   2. Nasıl çalışır    — üç adım
+ *   3. Öne çıkanlar     — sekiz ürün
+ *   4. Koleksiyonlar    — dört iniş sayfası
+ *   5. Kategoriler      — giriş kapıları
+ *   6. Mağazalar        — çok satıcılı olduğumuzun tek görünür kanıtı
+ *   7. Stil danışmanı   — AI özelliğine giriş
  *
- * ⚠️ Dördüncü bölüm eklenmez. `design-system.md` → öğe bütçesi: ana sayfa
- *    azami 3 bölüm. "Bültene abone ol", "neden biz", "yorumlar" gibi bir blok
- *    gerekiyorsa yeni bir EKRAN gerekiyordur, sıkıştırma değil. Sıkıştırılan
- *    her blok vitrin görselinden yer çalar ve bu platformun ayrıştırıcısı o
- *    görseldir.
+ * ⚠️ BURADA BİR DÖNEM "ÜÇ BÖLÜM, DAHA FAZLASI DEĞİL" YAZIYORDU ve o kural
+ *    YANLIŞTI. Gerekçesi `design-system.md`nin öğe bütçesiydi ve o bütçe
+ *    SSENSE'e bakılarak yazılmıştı. Kaçırılan şey şu: SSENSE'in ziyaretçisi
+ *    markayı ZATEN TANIYOR ve oradaki tek iş ürünü göstermektir. Bu ana
+ *    sayfanın iki işi daha var — kendini anlatmak ve SANAL DENEMEYİ göstermek.
+ *
+ *    Ölçüldü: sayfa "üzerinizde görün" diyor ama göstermiyor; ve yazılmış
+ *    özelliklerin hiçbiri buradan görünmüyordu —
+ *      · dört koleksiyon iniş sayfası  → ana sayfada YOK
+ *      · stil danışmanı                → yalnızca menüde
+ *      · çok satıcılı yapı             → hiçbir yerde
+ *    Yani sorun "fazla sade" değil, YAPILAN İŞİN GÖRÜNMEMESİYDİ.
+ *
+ * ⚠️ SADELİK KURALI DURUYOR, YALNIZCA YERİ DEĞİŞTİ. Bölüm sayısı arttı ama
+ *    her bölüm hâlâ akromatik, kenarlıksız, süssüz. "Az bölüm" ile "az süs"
+ *    aynı şey değil; bu depoda karıştırılmıştı. Bir bölüm eklemek için şart:
+ *    VAR OLAN bir yeteneğe kapı açıyor olmalı. Pazarlama dolgusu ("neden biz",
+ *    "bültene abone ol") hâlâ eklenmez.
  */
 export const dynamic = 'force-dynamic';
 
@@ -47,20 +66,243 @@ export default async function VitrinPage(): Promise<React.ReactElement> {
     <div className="flex flex-col gap-20 py-4">
       <Vitrin urun={vitrin} />
 
+      <NasilCalisir />
+
       {izgara.length > 0 ? (
-        <section>
-          <div className="mb-6 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold tracking-tight">Öne çıkanlar</h2>
-            <Link href="/products" className="text-sm text-metin-soluk hover:text-metin">
-              Tümünü gör
-            </Link>
-          </div>
-          <UrunIzgarasi urunler={izgara} />
-        </section>
+        <Ray baslik="Öne çıkanlar" tumuAdres="/products" tumuEtiket="Tümünü gör">
+          {izgara.map((urun) => (
+            <RayKarti key={urun.id}>
+              <UrunKarti urun={urun} />
+            </RayKarti>
+          ))}
+        </Ray>
       ) : null}
 
+      <Ozellikler />
+
+      <Koleksiyonlar />
+
       <Kategoriler agac={agac} />
+
+      <Magazalar urunler={items} />
+
+      <Danisman />
     </div>
+  );
+}
+
+/**
+ * ÖZELLİKLER — platformun BUGÜN yapabildikleri.
+ *
+ * ⚠️ HER MADDE ÇALIŞAN BİR ŞEYE İŞARET EDER. Burası bir vaat listesi değil;
+ *    yazılmamış bir özelliği buraya koymak, kullanıcıyı olmayan bir düğmeyi
+ *    aramaya göndermektir. Yol haritasındaki işler (favori, yorum, adres
+ *    defteri) BİLEREK yok — henüz ucu bile yazılmadı.
+ *
+ * ⚠️ Ayakkabı, takı ve çanta denemesi de yok: sağlayıcıda model yok
+ *    (`docs/tryon-kategori-destegi.md`, ölçülerek yazıldı). "Yakında" demek
+ *    bile taahhüttür; ölçülmemiş bir tarihi buraya yazmayız.
+ */
+function Ozellikler(): React.ReactElement {
+  const ozellikler = [
+    {
+      baslik: 'Sanal deneme',
+      metin: 'Kendi fotoğrafınızda, üst giyim · alt giyim · elbise · dış giyim.',
+    },
+    {
+      baslik: 'Markalar arası kombin',
+      metin: 'Bir mağazanın ceketi, diğerinin pantolonu — aynı görselde, tek sepette.',
+    },
+    {
+      baslik: 'Beden önerisi',
+      metin: 'Ölçüleriniz ve iade geri bildirimleriyle; güven düşükse öneri değil ölçü tablosu.',
+    },
+    {
+      baslik: 'Stil danışmanı',
+      metin: 'Dolabınızı ve beğenilerinizi okuyup kombin öneren yapay zekâ.',
+    },
+    {
+      baslik: 'Dijital gardırop',
+      metin: 'Satın aldığınız parçalar dolabınıza otomatik eklenir.',
+    },
+    {
+      baslik: 'Doğal dilde arama',
+      metin: '"Düğüne gidecek bir şey" yazın; filtrelerle uğraşmayın.',
+    },
+  ];
+
+  return (
+    <section>
+      <h2 className="mb-2 text-sm font-semibold tracking-tight">Neler yapabilirsiniz</h2>
+      <p className="mb-6 max-w-xl text-sm text-metin-soluk">
+        Hepsi bugün çalışıyor — yakında gelecek olanlar bu listede yok.
+      </p>
+
+      <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+        {ozellikler.map((ozellik) => (
+          <li key={ozellik.baslik} className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold tracking-tight">{ozellik.baslik}</h3>
+            <p className="text-sm leading-relaxed text-metin-soluk">{ozellik.metin}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * NASIL ÇALIŞIR — üç adım.
+ *
+ * ⚠️ Ana sayfa sanal denemeyi ANLATIYOR ama akışın nasıl işlediğini
+ *    söylemiyordu. Kullanıcı "üzerinizde görün" cümlesini okuyup ürün
+ *    sayfasına gidiyor ve orada fotoğraf isteyen bir ekranla karşılaşıyordu.
+ *    Beklenti burada kurulmazsa fotoğraf isteği sürpriz olur; özel nitelikli
+ *    veri isteyen bir akışta sürpriz, terk demektir.
+ *
+ * ⚠️ Numaralar RENKSİZ. `design-system.md`: renk yalnızca DURUM taşır; adım
+ *    numarası bir durum değil, sıradır.
+ */
+function NasilCalisir(): React.ReactElement {
+  const adimlar = [
+    {
+      baslik: 'Fotoğrafınızı yükleyin',
+      metin:
+        'Tek bir boy fotoğrafı yeterli. Yalnızca bu deneme için kullanılmasını ya da profilinizde saklanmasını siz seçersiniz.',
+    },
+    {
+      baslik: 'Ürünü seçin',
+      metin:
+        'Beğendiğiniz parçada "Üzerimde Dene" düğmesine basın. Farklı mağazaların parçalarını tek kombinde birleştirebilirsiniz.',
+    },
+    {
+      baslik: 'Sonucu değerlendirin',
+      metin:
+        'Görsel benzerliği ve beden uyumu ayrı skorlarla gösterilir — iyi durmak ile üzerinize olmak farklı sorulardır.',
+    },
+  ];
+
+  return (
+    <section>
+      <h2 className="mb-6 text-sm font-semibold tracking-tight">Nasıl çalışır</h2>
+      <ol className="grid gap-8 sm:grid-cols-3">
+        {adimlar.map((adim, sira) => (
+          <li key={adim.baslik} className="flex flex-col gap-2">
+            <span className="text-xs tabular-nums text-metin-soluk">0{sira + 1}</span>
+            <h3 className="text-sm font-semibold tracking-tight">{adim.baslik}</h3>
+            <p className="text-sm leading-relaxed text-metin-soluk">{adim.metin}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * KOLEKSİYONLAR — dört iniş sayfasının ana sayfadaki kapısı.
+ *
+ * ⚠️ Bu sayfalar YAZILMIŞTI ve ana sayfadan hiçbir bağlantı verilmiyordu.
+ *    Tek giriş yolu doğrudan adres yazmak ya da aramadan gelmekti — yani
+ *    site içinde gezinen bir kullanıcı için YOKTULAR. Bu depoda aynı hata
+ *    daha önce satıcı menüsünde yaşandı: altı ekran yazılmış, menüde bağlantı
+ *    olmadığı için hiçbirine ulaşılamıyordu.
+ */
+function Koleksiyonlar(): React.ReactElement {
+  return (
+    <Ray
+      baslik="Koleksiyonlar"
+      aciklama="Aradığınız şeye göre hazırlanmış giriş noktaları."
+      tumuAdres="/collection"
+    >
+      {KOLEKSIYON_LISTESI.map((koleksiyon) => (
+        <RayKarti key={koleksiyon.slug}>
+          <Link
+            href={`/collection/${koleksiyon.slug}`}
+            className="flex h-full flex-col gap-2 rounded-lg border border-kenar p-4 transition-colors hover:bg-yuzey-vurgulu"
+          >
+            <span className="text-sm font-semibold tracking-tight">{koleksiyon.h1}</span>
+            <span className="line-clamp-3 text-sm text-metin-soluk">{koleksiyon.girisMetni}</span>
+          </Link>
+        </RayKarti>
+      ))}
+    </Ray>
+  );
+}
+
+/**
+ * MAĞAZALAR — çok satıcılı olduğumuzun ana sayfadaki TEK kanıtı.
+ *
+ * ⚠️ Ayrıştırıcımız "bir mağazanın ceketi + ikincinin pantolonu, tek sepette"
+ *    ama ana sayfada birden fazla mağaza olduğuna dair hiçbir işaret yoktu.
+ *
+ * ⚠️ AYRI BİR UÇ YOK ve İSTENMEDİ: mağaza adları zaten çekilmiş ürün
+ *    listesinden türetiliyor. İkinci bir istek atmak, yalnızca bir şerit için
+ *    ana sayfanın gecikmesini artırırdı. Bedeli dürüstçe: yalnızca vitrindeki
+ *    dokuz üründe geçen mağazalar görünür — tam liste değil, bir örneklem.
+ */
+function Magazalar({ urunler }: { urunler: ProductListItemWire[] }): React.ReactElement | null {
+  /**
+   * ⚠️ `seller` alanı liste tipinde YOK, yalnızca ürün DETAY tipinde var
+   *    (ölçüldü: `ProductListItemWire` → `brandName` + `storeSlug`). Detay
+   *    tipini kullanmak dokuz ürün için dokuz ek istek demekti.
+   */
+  const magazalar = new Map<string, string>();
+  for (const urun of urunler) {
+    if (urun.storeSlug && !magazalar.has(urun.storeSlug)) {
+      magazalar.set(urun.storeSlug, urun.brandName);
+    }
+  }
+
+  // Tek mağaza varsa "çok satıcılı" iddiası kurulamaz; şerit gösterilmez.
+  if (magazalar.size < 2) return null;
+
+  return (
+    <section>
+      <h2 className="mb-2 text-sm font-semibold tracking-tight">Mağazalar</h2>
+      <p className="mb-6 max-w-xl text-sm text-metin-soluk">
+        Farklı mağazaların parçalarını aynı kombinde deneyebilir, tek sepette satın alabilirsiniz.
+      </p>
+
+      <ul className="flex flex-wrap gap-2">
+        {[...magazalar.entries()].map(([slug, ad]) => (
+          <li key={slug}>
+            {/* ⚠️ Filtre parametresi `marka` — liste sayfasının kendi sözlüğü
+                (bkz. products/_liste/liste-sorgusu.ts). `magaza` yazmak sessizce
+                filtresiz bir liste açardı. */}
+            <Link
+              href={`/products?marka=${encodeURIComponent(ad)}`}
+              className="inline-block rounded-md border border-kenar px-4 py-2 text-sm hover:bg-yuzey-vurgulu"
+            >
+              {ad}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * STİL DANIŞMANI — yazılmış bir AI ekranına ana sayfadan giriş.
+ *
+ * ⚠️ Danışman yalnızca üst menüde duruyordu. Menü ikonu, ne yaptığını
+ *    bilmeyen bir kullanıcıya hiçbir şey anlatmaz; bu şerit onun karşılığı.
+ */
+function Danisman(): React.ReactElement {
+  return (
+    <section className="flex flex-col gap-4 rounded-lg border border-kenar p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Ne giyeceğinize karar veremiyorsanız
+        </h2>
+        <p className="max-w-xl text-sm text-metin-soluk">
+          Stil danışmanı dolabınızdaki parçaları ve beğendiklerinizi birlikte değerlendirip kombin
+          önerir.
+        </p>
+      </div>
+      <Button asChild variant="ikincil">
+        <Link href="/stylist">Danışmana sor</Link>
+      </Button>
+    </section>
   );
 }
 
