@@ -24,6 +24,17 @@ export const dynamic = 'force-dynamic';
  *    sayfayı layout'un iç yapısına bağlardı.
  */
 const KISAYOLLAR = [
+  /**
+   * ⚠️ EKRAN YAZILDIĞI TURDA BURAYA DA EKLENDİ. Bu depoda ALTI KEZ "ekran
+   *    yazıldı, hiçbir menüde bağlantısı yok" yaşandı — sonuncusu satıcı
+   *    panelindeki altı ekrandı. Ölçü ekranı da o listeye girmesin diye
+   *    bağlantı, ekranla AYNI commit'te.
+   */
+  {
+    href: '/account/measurements',
+    baslik: 'Ölçülerim',
+    aciklama: 'Beden önerisinin dayandığı ölçüler. Ne kadar çok ölçü, o kadar güvenilir öneri.',
+  },
   {
     href: '/account/orders',
     baslik: 'Siparişlerim',

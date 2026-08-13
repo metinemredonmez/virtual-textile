@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma.service.js';
+import { BodyProfileService } from './body-profile.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import { MeController } from './me.controller.js';
 import { MeService } from './me.service.js';
@@ -32,6 +33,8 @@ import { PrismaMeRetentionBridge, PrismaMeSessionBridge } from './me.bridges.js'
 @Module({
   controllers: [MeController],
   providers: [
+    // ⚠️ Ölçü servisi: `BodyProfile` tablosuna YAZAN tek yol.
+    BodyProfileService,
     // ── Geçici köprüler (bkz. me.bridges.ts) ──
     { provide: ME_RETENTION, useClass: PrismaMeRetentionBridge },
     { provide: ME_SESSIONS, useClass: PrismaMeSessionBridge },

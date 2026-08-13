@@ -13,22 +13,53 @@
  */
 
 /**
- * ⚠️ `SizeReason` bir union'dır ve `apps/api` → `size-engine.ts` ile aynı
- *    kalmalıdır. Metin SUNUCUDAN gelir (`message`); kod yalnızca gerekirse
- *    davranış seçmek içindir — istemcide metne çevrilmez.
+ * GEREKÇE KODLARI — TEK KAYNAK. `size-engine.ts` bu union'ı import eder ve
+ * kendi elle yazılmış kopyasını TAŞIMAZ; böylece motor yeni bir kod üretip
+ * tele yazmayı UNUTAMAZ — derleme kırılır.
+ *
+ * Metin SUNUCUDAN gelir (`message`); kod yalnızca gerekirse davranış seçmek
+ * içindir — istemcide metne çevrilmez.
+ *
+ * ⚠️ İKİ KOPYA VARKEN SAPMIŞTI. Ölçüldü:
+ *      grep -on "code: '[A-Z_]*'" apps/api/src/modules/ai/size-engine.ts
+ *    → motor `USER_KEPT_SIZE`, `USER_RETURNED_SIZE`, `USER_BRAND_HISTORY`,
+ *      `USUAL_SIZE_AGREES`, `USUAL_SIZE_CONFLICTS` üretiyordu ve BEŞİ DE
+ *      telde YOKTU.
+ *
+ * ⚠️ `USER_HISTORY` KALDIRILDI. Ölçüldü:
+ *      grep -rn "USER_HISTORY" apps/api/src apps/web/app apps/web/src packages e2e
+ *    → yalnızca `fit-learning.gateway.ts` içindeki İLGİSİZ bir sabit
+ *      (`USER_HISTORY_LIMIT = 50`), bu tanımın kendisi ve derlenmiş dist
+ *      çıktısı. Motorda üretilmiyor, tüketen SIFIR.
+ *
+ * ⚠️ Dizi `as const` durur, union ondan TÜRETİLİR. İkisi ayrı ayrı yazılırsa
+ *    aynı sapma sınıfı bu dosyanın İÇİNDE geri gelir.
  */
-export type SizeReasonCodeWire =
-  | 'MEASUREMENT_MATCH'
-  | 'NO_MEASUREMENTS'
-  | 'NO_SIZE_CHART'
-  | 'AMBIGUOUS'
-  | 'BRAND_FIT'
-  | 'BRAND_FIT_LEARNED'
-  | 'FIT_PREFERENCE'
-  | 'RETURN_FEEDBACK'
-  | 'FEEDBACK_TOO_FEW'
-  | 'FEEDBACK_CONFLICTING'
-  | 'USER_HISTORY';
+export const SIZE_REASON_CODES = [
+  'MEASUREMENT_MATCH',
+  'NO_MEASUREMENTS',
+  'NO_SIZE_CHART',
+  'CHART_UNREADABLE',
+  'AMBIGUOUS',
+  'POOR_MATCH',
+  'BRAND_FIT',
+  'BRAND_FIT_LEARNED',
+  'FIT_PREFERENCE',
+  'RETURN_FEEDBACK',
+  'FEEDBACK_TOO_FEW',
+  'FEEDBACK_CONFLICTING',
+  'USER_KEPT_SIZE',
+  'USER_RETURNED_SIZE',
+  'USER_BRAND_HISTORY',
+  'USUAL_SIZE_AGREES',
+  'USUAL_SIZE_CONFLICTS',
+  'HEIGHT_WEIGHT_ONLY',
+  'HEIGHT_WEIGHT_IMPLAUSIBLE',
+  'MEASUREMENT_IMPLAUSIBLE',
+  'LENGTH_NOTE',
+] as const;
+
+export type SizeReasonCodeWire = (typeof SIZE_REASON_CODES)[number];
 
 export interface SizeReasonWire {
   /** ⚠️ Sürüm sapmasında bilinmeyen kod gelebilir; `string` kabul edilir. */

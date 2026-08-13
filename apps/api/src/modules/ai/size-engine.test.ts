@@ -53,8 +53,18 @@ describe('orderSizes', () => {
 
 describe('recommendSize — temel davranış', () => {
   it('ölçü yoksa öneri vermez, yalnızca tabloyu döndürür', () => {
-    // ⚠️ Boy/kilodan beden türetmek cazip ama güvenilmez: aynı boy-kiloda
-    // göğüs çevresi 15 cm oynayabilir.
+    /**
+     * ⚠️ BEKLENTİ DEĞİŞTİ: `NO_MEASUREMENTS` → `HEIGHT_WEIGHT_ONLY`.
+     *
+     *    Test SUSTURULMADI, davranış BİLEREK iyileşti. Eskiden boy/kilosunu
+     *    GİRMİŞ bir kullanıcıya "ölçünüzü girin" deniyordu; kullanıcı formu
+     *    doldurduğunu bildiği için bunu bir arıza sanıyordu. Artık ne
+     *    girdiğini kabul eden, neyin eksik olduğunu söyleyen ayrı bir kod var.
+     *
+     *    Kararın kendisi DEĞİŞMEDİ ve değişmemeli: boy/kilodan beden
+     *    türetmek kaynaklı bir antropometrik model ister, elimizde yok.
+     *    Aynı boy-kiloda göğüs çevresi 15 cm oynayabilir.
+     */
     const result = recommendSize({
       sizeChart: CHART,
       measurements: { heightCm: 175, weightKg: 70 },
@@ -62,8 +72,15 @@ describe('recommendSize — temel davranış', () => {
 
     expect(result.kind).toBe('CHART_ONLY');
     expect(result.confidence).toBe(0);
-    expect(result.reasons.map((r) => r.code)).toContain('NO_MEASUREMENTS');
+    expect(result.reasons.map((r) => r.code)).toContain('HEIGHT_WEIGHT_ONLY');
     expect(result.orderedSizes).toEqual(['S', 'M', 'L', 'XL']);
+  });
+
+  it('hiçbir ölçü yoksa NO_MEASUREMENTS döner (boy/kilo da yoksa)', () => {
+    // ⚠️ Eski kod yolu SİLİNMEDİ, yalnız daraldı. İki durum artık ayrı ayrı
+    //    ölçülüyor; biri diğerinin kapsamına kayarsa test söyler.
+    const result = recommendSize({ sizeChart: CHART, measurements: {} });
+    expect(result.reasons.map((r) => r.code)).toContain('NO_MEASUREMENTS');
   });
 
   it('beden tablosu yoksa öneri vermez', () => {
@@ -668,5 +685,167 @@ describe('recommendSize — öğrenilen sinyal de "tahmin" olarak sunulur', () =
 
     expect(result.disclaimer).toBe(SIZE_DISCLAIMER);
     expect(result.confidence).toBeLessThanOrEqual(100);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  OMUZ · İÇ BACAK BOYU · BOY/KİLO — bu turda bağlanan yollar.
+ *
+ *  ⚠️ HER TEST BİR MUTASYONLA ÖLÇÜLDÜ. Yazıldıktan sonra ilgili satır kasten
+ *     bozuldu, testin KIRILDIĞI görüldü, sonra geri alındı. Bu depoda bir kez
+ *     tam tersi oldu: bir sapma kontrolü `.test.ts` içindeydi ve
+ *     `apps/api/tsconfig.json` test dosyalarını dışladığı için HİÇ DERLENMEDİ;
+ *     yeşil görünen bir ölü koruma aylarca durdu.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('yeni ölçüler', () => {
+  /** Seed `UST_BEDEN_TABLOSU` ile birebir aynı (omuz bu turda eklendi). */
+  const UST = {
+    XS: { gogus: 84, bel: 66, boy: 60, omuz: 37 },
+    S: { gogus: 88, bel: 70, boy: 62, omuz: 39 },
+    M: { gogus: 94, bel: 76, boy: 64, omuz: 41 },
+    L: { gogus: 100, bel: 82, boy: 66, omuz: 43 },
+    XL: { gogus: 108, bel: 90, boy: 68, omuz: 46 },
+  };
+
+  /** Seed `ALT_BEDEN_TABLOSU` — `icBoy` bugüne kadar hiç okunmuyordu. */
+  const ALT = {
+    '26': { bel: 66, kalca: 92, icBoy: 76 },
+    '28': { bel: 71, kalca: 97, icBoy: 77 },
+    '30': { bel: 76, kalca: 102, icBoy: 78 },
+    '32': { bel: 81, kalca: 107, icBoy: 79 },
+  };
+
+  it('omuz ölçüsü eşleşen boyut sayısına GİRER ve güveni artırır', () => {
+    const omuzsuz = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 88, waistCm: 70 },
+    });
+    const omuzlu = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 88, waistCm: 70, shoulderCm: 37 },
+    });
+
+    // ⚠️ Mutasyon: `DIMENSION_TO_MEASUREMENT`ten `omuz` satırı silinince bu
+    //    beklenti düşüyor (güvenler eşitleniyor) — ölçüldü.
+    expect(omuzsuz.kind).toBe('RECOMMENDATION');
+    expect(omuzlu.kind).toBe('RECOMMENDATION');
+    if (omuzsuz.kind !== 'RECOMMENDATION' || omuzlu.kind !== 'RECOMMENDATION') return;
+    expect(omuzlu.confidence).toBeGreaterThan(omuzsuz.confidence);
+  });
+
+  it('iç bacak boyu ORTALAMAYA girmez — yalnız beraberlik bozar', () => {
+    /**
+     * ⚠️ Bu testin çekirdeği: `icBoy` skora girseydi sapma ortalaması
+     *    değişirdi ve iki çağrı FARKLI güven üretirdi. Aynı çıkması,
+     *    uzunluğun kovaya girmediğinin kanıtı.
+     */
+    const icBoysuz = recommendSize({
+      sizeChart: ALT,
+      measurements: { waistCm: 66, hipCm: 92 },
+    });
+    const icBoylu = recommendSize({
+      sizeChart: ALT,
+      measurements: { waistCm: 66, hipCm: 92, inseamCm: 76 },
+    });
+
+    expect(icBoysuz.kind).toBe('RECOMMENDATION');
+    expect(icBoylu.kind).toBe('RECOMMENDATION');
+    if (icBoysuz.kind !== 'RECOMMENDATION' || icBoylu.kind !== 'RECOMMENDATION') return;
+
+    // Uzunluk skora girmediği için ÖNERİ aynı kalmalı.
+    expect(icBoylu.recommendedSize).toBe(icBoysuz.recommendedSize);
+
+    /**
+     * ⚠️ İLK YAZIMDA `toBe(icBoysuz.confidence)` YAZMIŞTIM VE TEST KIRILDI —
+     *    70 beklenirken 75 geldi. Test haklıydı, ben yanlıştım: aradaki 5
+     *    puan `LENGTH_NOTE` cezasıdır (iç bacak boyu verilmediğinde güven
+     *    düşüyor), skora karışan bir uzunluk değil.
+     *
+     *    Beklenti bu yüzden "eşit" değil "TAM 5 fark" — böylece uzunluk bir
+     *    gün yanlışlıkla ortalamaya karışırsa fark 5 olmaktan çıkar ve test
+     *    yakalar. "Eşit" yazsaydım cezayı da silmem gerekirdi ve gerçek
+     *    korumayı kaybederdim.
+     */
+    expect(icBoylu.confidence - icBoysuz.confidence).toBe(5);
+    expect(icBoysuz.reasons.map((r) => r.code)).toContain('LENGTH_NOTE');
+    expect(icBoylu.reasons.map((r) => r.code)).not.toContain('LENGTH_NOTE');
+  });
+
+  it('yalnız iç bacak boyu verilirse ÖNERİ ÜRETİLMEZ', () => {
+    // ⚠️ 3 cm'lik bir aralıktan beden çıkarmak gürültüden karar üretmektir.
+    const sonuc = recommendSize({
+      sizeChart: ALT,
+      measurements: { inseamCm: 78 },
+    });
+    expect(sonuc.kind).toBe('CHART_ONLY');
+  });
+
+  it('yalnız boy/kilo verilirse HEIGHT_WEIGHT_ONLY döner, öneri dönmez', () => {
+    const sonuc = recommendSize({
+      sizeChart: UST,
+      measurements: { heightCm: 172, weightKg: 68 },
+    });
+    expect(sonuc.kind).toBe('CHART_ONLY');
+    expect(sonuc.reasons.map((r) => r.code)).toContain('HEIGHT_WEIGHT_ONLY');
+  });
+
+  it('çevre ölçüsü boydan büyükse güven düşer ve sebebi söylenir', () => {
+    const normal = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 94, waistCm: 76, heightCm: 170 },
+    });
+    // 94 cm göğüs, 90 cm boy — geometrik olarak imkânsız (inç ↔ cm karışması).
+    const imkansiz = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 94, waistCm: 76, heightCm: 90 },
+    });
+
+    expect(normal.kind).toBe('RECOMMENDATION');
+    if (normal.kind !== 'RECOMMENDATION') return;
+    expect(imkansiz.reasons.map((r) => r.code)).toContain('MEASUREMENT_IMPLAUSIBLE');
+    if (imkansiz.kind === 'RECOMMENDATION') {
+      // ⚠️ ÖNERİ DEĞİŞMEZ, yalnız güven düşer — model iddiası yok, veri uyarısı var.
+      expect(imkansiz.recommendedSize).toBe(normal.recommendedSize);
+      expect(imkansiz.confidence).toBeLessThan(normal.confidence);
+    }
+  });
+
+  it('boy/kilo birlikte okunamıyorsa (BMI dışı) uyarır, öneriyi değiştirmez', () => {
+    const normal = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 94, waistCm: 76, heightCm: 172, weightKg: 68 },
+    });
+    // 172 cm / 150 kg gerçek; 172 cm / 350 kg libre karışması (BMI ~118).
+    const bozuk = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 94, waistCm: 76, heightCm: 172, weightKg: 350 },
+    });
+
+    if (normal.kind !== 'RECOMMENDATION' || bozuk.kind !== 'RECOMMENDATION') {
+      throw new Error('iki çağrı da öneri döndürmeliydi');
+    }
+    expect(bozuk.reasons.map((r) => r.code)).toContain('HEIGHT_WEIGHT_IMPLAUSIBLE');
+    expect(bozuk.recommendedSize).toBe(normal.recommendedSize);
+    expect(bozuk.confidence).toBeLessThan(normal.confidence);
+  });
+
+  it('ürün uzunluk taşıyıp kullanıcı iç bacak boyu vermediyse LENGTH_NOTE düşer', () => {
+    const sonuc = recommendSize({
+      sizeChart: ALT,
+      measurements: { waistCm: 76, hipCm: 102 },
+    });
+    expect(sonuc.reasons.map((r) => r.code)).toContain('LENGTH_NOTE');
+  });
+
+  it('üst giyimde LENGTH_NOTE DÜŞMEZ — o tabloda iç bacak boyu yok', () => {
+    // ⚠️ `boy` sütunu var ama eşlenmemiş; uzunluk uyarısı yalnız EŞLENEN bir
+    //    uzunluk boyutu varken anlamlı, yoksa her üst giyimde gürültü olurdu.
+    const sonuc = recommendSize({
+      sizeChart: UST,
+      measurements: { chestCm: 94, waistCm: 76 },
+    });
+    expect(sonuc.reasons.map((r) => r.code)).not.toContain('LENGTH_NOTE');
   });
 });

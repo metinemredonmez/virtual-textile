@@ -1,0 +1,35 @@
+-- Vücut profiline iki ölçü: omuz genişliği ve iç bacak boyu.
+--
+-- NİÇİN: `shoulderCm` seed `UST_BEDEN_TABLOSU`na bu turda eklenen `omuz`
+-- sütunuyla, `inseamCm` ise `ALT_BEDEN_TABLOSU`nda ZATEN duran `icBoy`
+-- sütunuyla eşleşir. Yani iki kolon da gerçek bir tabloyla karşılanıyor;
+-- toplanıp hiç okunmayan bir alan açılmıyor.
+--
+-- ⚠️ İKİSİ DE NULL KABUL EDER. Ölçüldü:
+--       SELECT count(*) FROM user_body_profiles;  →  4
+--    Bu 4 satırın hiçbiri geriye dönük doldurulamaz — omuz ve iç bacak
+--    boyu var olan göğüs/bel/kalça değerlerinden TÜRETİLEMEZ (kaynaklı bir
+--    katsayı yok, uydurulmayacak). NOT NULL + DEFAULT vermek 4 kullanıcıya
+--    hiç vermedikleri bir ölçüyü atfetmek olurdu.
+--
+-- ⚠️ GERİ ALINABİLİR. Bu migration YALNIZCA iki nullable kolon ekler:
+--    enum YOK, indeks YOK, DEFAULT YOK, tip değişikliği YOK. Geri alma tam
+--    olarak şudur:
+--
+--        ALTER TABLE "user_body_profiles" DROP COLUMN "inseamCm";
+--        ALTER TABLE "user_body_profiles" DROP COLUMN "shoulderCm";
+--
+--    Kaybedilen veri yalnızca bu iki ölçüdür; sipariş, katalog, finans
+--    tarafında tek satır etkilenmez ve öneri motoru bu iki alan yokken
+--    bugünkü davranışına döner (ölçü NULL ise sessizce atlanır).
+--
+-- ⚠️ YENİ ConsentType DEĞERİ EKLENMEDİ. docs/kvkk-veri-akisi.md:51 ve
+--    docs/privacy.md:127 vücut ölçüsünü "Kişisel" sınıflandırıyor, "Özel
+--    nitelikli" DEMİYOR (o FOTOĞRAF). Zaten `ALTER TYPE ... ADD VALUE`
+--    PostgreSQL'de geri alınamaz; iki ölçü bunu gerektirmiyor.
+--
+-- ⚠️ ELLE YAZILDI. `prisma migrate diff` KOŞTURULMADI: bu depoda ölçüldü ki
+--    çıktısı pgvector HNSW indeksini, kısmi unique indeksi ve searchVector
+--    DEFAULT'unu DROP etmeye çalışıyor.
+ALTER TABLE "user_body_profiles" ADD COLUMN "shoulderCm" INTEGER;
+ALTER TABLE "user_body_profiles" ADD COLUMN "inseamCm" INTEGER;

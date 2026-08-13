@@ -83,6 +83,14 @@ export class SizeService {
           chestCm: input.measurements.chestCm ?? null,
           waistCm: input.measurements.waistCm ?? null,
           hipCm: input.measurements.hipCm ?? null,
+          /**
+           * ⚠️ BU İKİ SATIR EKLENMESEYDİ ALANLAR ÖLÜ KALIRDI. Şema, sözleşme
+           *    ve motor hazır olsa bile gövdeden gelen omuz/iç bacak boyu
+           *    BURADA düşerdi — kullanıcı ölçüyü girer, hiçbir şey değişmezdi.
+           *    Deponun altı kez yaşadığı sınıfın tam olarak geçtiği yer burası.
+           */
+          shoulderCm: input.measurements.shoulderCm ?? null,
+          inseamCm: input.measurements.inseamCm ?? null,
           heightCm: input.measurements.heightCm ?? null,
           weightKg: input.measurements.weightKg ?? null,
           usualSize: input.measurements.usualSize ?? profile?.usualSize ?? null,

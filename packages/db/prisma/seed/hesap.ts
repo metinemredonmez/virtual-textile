@@ -201,6 +201,18 @@ async function adresYaz(prisma: PrismaClient, userId: string, hesap: HesapTanimi
   else await prisma.address.create({ data: { userId, ...govde } });
 }
 
+/**
+ * DEMO HESAPLARIN VÜCUT ÖLÇÜLERİ (cm / kg).
+ *
+ * ⚠️ DÖRT SETİN DÖRDÜNDE DE `shoulderCm` ve `inseamCm` DOLU. Bir tanesini
+ *    boş bırakmak yeni alanları demo hesaplarda görünmez kılardı — yani
+ *    "eklendi ama hiçbir yerde beslenmedi" arızası buradan geri gelirdi.
+ *
+ * ⚠️ Değerler UYDURMA DEĞİL, TUTARLI: her set kendi içinde `heightCm` ile
+ *    uyumlu (iç bacak boyu boyun yarısı civarı) ve göğüs sırasıyla aynı yönde
+ *    artan omuz taşıyor. Bir antropometrik kaynağa dayandığı İDDİA EDİLMİYOR;
+ *    bunlar demo verisidir ve tek işi ekranı beslemektir.
+ */
 const OLCULER = [
   {
     heightCm: 168,
@@ -208,6 +220,8 @@ const OLCULER = [
     chestCm: 90,
     waistCm: 72,
     hipCm: 96,
+    shoulderCm: 40,
+    inseamCm: 78,
     usualSize: 'M',
     fitPref: 'REGULAR',
   },
@@ -217,6 +231,8 @@ const OLCULER = [
     chestCm: 94,
     waistCm: 76,
     hipCm: 100,
+    shoulderCm: 42,
+    inseamCm: 81,
     usualSize: 'L',
     fitPref: 'OVERSIZE',
   },
@@ -226,6 +242,8 @@ const OLCULER = [
     chestCm: 84,
     waistCm: 66,
     hipCm: 90,
+    shoulderCm: 38,
+    inseamCm: 74,
     usualSize: 'S',
     fitPref: 'SLIM',
   },
@@ -235,6 +253,8 @@ const OLCULER = [
     chestCm: 102,
     waistCm: 88,
     hipCm: 104,
+    shoulderCm: 45,
+    inseamCm: 84,
     usualSize: 'XL',
     fitPref: 'REGULAR',
   },

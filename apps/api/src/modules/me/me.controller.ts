@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import type { JwtPayload } from '@vt/contracts';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
+import type { BodyProfileWire, BodyProfileWriteInput, JwtPayload } from '@vt/contracts';
+import { bodyProfileWriteSchema } from '@vt/contracts';
 import type { Role } from '@vt/db';
 import { zodBody } from '../../common/pipes/zod-validation.pipe.js';
 import { CurrentUser } from '../auth/auth.guard.js';
@@ -10,6 +11,7 @@ import {
   type ConsentWriteView,
   type DataExportView,
 } from './me.service.js';
+import { BodyProfileService } from './body-profile.service.js';
 import {
   accountDeletionSchema,
   consentWriteSchema,
@@ -32,7 +34,47 @@ import {
  */
 @Controller('me')
 export class MeController {
-  constructor(private readonly me: MeService) {}
+  constructor(
+    private readonly me: MeService,
+    private readonly bodyProfile: BodyProfileService,
+  ) {}
+
+  /**
+   * VÜCUT ÖLÇÜLERİ — okuma.
+   *
+   * ⚠️ `null` DÖNER, 404 DEĞİL. "Profili yok" bir hata değil, geçerli bir
+   *    durumdur: her yeni kullanıcı orada başlar. 404 döndürseydik istemci
+   *    tarafında her ilk açılış bir hata dalı çalıştırırdı ve o dalın sessizce
+   *    yanlış davranması an meselesiydi.
+   */
+  @Get('body-profile')
+  async readBodyProfile(@CurrentUser() user: JwtPayload): Promise<BodyProfileWire | null> {
+    return this.bodyProfile.read(user.sub);
+  }
+
+  /**
+   * VÜCUT ÖLÇÜLERİ — yazma.
+   *
+   * ⚠️ PATCH, PUT DEĞİL. Gönderilmeyen alan DOKUNULMAZ, `null` gönderilen alan
+   *    SİLİNİR. PUT olsaydı kullanıcı yalnız göğüs ölçüsünü güncellediğinde
+   *    gönderilmeyen bel/kalça silinirdi (gerekçe `body-profile.service.ts`).
+   *
+   * ⚠️ `@Idempotent()` YOK ve gerekmiyor: upsert doğası gereği idempotent —
+   *    aynı gövdeyle ikinci çağrı aynı satırı aynı değerlere getirir, yeni
+   *    bir kayıt açmaz. (Rıza uçlarında durum TERSİ: orası append-only.)
+   *
+   * ⚠️ ÖLÇÜ KİŞİSEL VERİDİR ama ÖZEL NİTELİKLİ DEĞİLDİR — o sınıf FOTOĞRAFA
+   *    ait (`docs/kvkk-veri-akisi.md:51`). Bu yüzden yeni bir `ConsentType`
+   *    açılmadı; `ALTER TYPE ... ADD VALUE` PostgreSQL'de geri alınamaz ve iki
+   *    ölçü bunu gerektirmiyor.
+   */
+  @Patch('body-profile')
+  async writeBodyProfile(
+    @CurrentUser() user: JwtPayload,
+    @Body(zodBody(bodyProfileWriteSchema)) body: BodyProfileWriteInput,
+  ): Promise<BodyProfileWire> {
+    return this.bodyProfile.write(user.sub, body);
+  }
 
   /**
    * Rıza durumları ve TAM GEÇMİŞ.

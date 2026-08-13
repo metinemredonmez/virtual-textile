@@ -68,6 +68,50 @@ export const en = {
     telifHakki: '© {yil} Virtual Textile',
   },
 
+  olculerim: {
+    baslik: 'My measurements',
+    girisMetni:
+      'Your measurements power our size recommendation. The more you enter, the more reliable it gets — none of them are required.',
+
+    nasilKullanilirBaslik: 'How are measurements used?',
+    nasilKullanilir1:
+      'Chest, waist, hip and shoulder are compared directly against the product size chart. Inseam only breaks the tie when two sizes come out equally close.',
+    nasilKullanilir2:
+      'We do not estimate a size from height and weight: at the same height and weight chest circumference can vary by around 15 cm, and we have no reliable model for that conversion. They are used only to check that the measurements you entered are consistent with each other.',
+    nasilKullanilir3:
+      'Your measurements are shown only to you and used in recommendations; they are never shared with sellers. Clear a field and save to delete it at any time.',
+
+    boy: 'Height',
+    boyIpucu: 'Without shoes, back against a wall.',
+    kilo: 'Weight',
+    kiloIpucu: 'Measuring in the morning on an empty stomach is the most consistent.',
+    gogus: 'Chest',
+    gogusIpucu: 'Around the fullest part of the chest, tape parallel to the floor.',
+    bel: 'Waist',
+    belIpucu: 'Around the narrowest part of the waist; do not hold your breath.',
+    kalca: 'Hip',
+    kalcaIpucu: 'Around the fullest part of the hips, feet together.',
+    omuz: 'Shoulder width',
+    omuzIpucu: 'Across the back, from one shoulder point to the other.',
+    icBoy: 'Inseam',
+    icBoyIpucu: 'From the crotch to the ankle, along the inside of the leg.',
+
+    normalBeden: 'The size you usually wear',
+    normalBedenIpucu:
+      'When it conflicts with your measurements the engine says so; it never picks one silently.',
+    kalipTercihi: 'Fit preference',
+    kalipSlim: 'I prefer it roomy',
+    kalipRegular: 'Regular',
+    kalipOversize: 'I prefer it fitted',
+
+    ayrintiAc: 'More measurements (optional)',
+    kaydet: 'Save measurements',
+    kaydediliyor: 'Saving…',
+    kaydedildi: 'Saved.',
+    kaydedilemedi: 'Measurements could not be saved.',
+    kisayolAciklama: 'The measurements behind your size recommendation.',
+  },
+
   vitrin: {
     baslik: 'Independent brands, one place.',
     aciklama:

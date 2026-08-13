@@ -206,14 +206,43 @@ export interface UrunTanimi {
   readonly bedenTablosu?: Readonly<Record<string, Record<string, number>>>;
 }
 
+/**
+ * ÜST GİYİM BEDEN TABLOSU — GİYSİ ölçüleri (cm), vücut ölçüsü DEĞİL.
+ *
+ * ⚠️ `omuz` BU TURDA EKLENDİ ve bir sebebi var: `BodyProfile.shoulderCm`
+ *    kullanıcıdan isteniyor. Bu sütun olmasaydı omuz ölçüsü toplanır ama
+ *    HİÇBİR tabloyla eşleşmezdi — bu deponun altı kez yaşadığı "yazıldı ama
+ *    hiç beslenmedi" arızasının yenisi olurdu.
+ *
+ * ⚠️ `boy` GİYSİ UZUNLUĞUDUR (60-68 cm), vücut boyu değil — bkz.
+ *    `olcu-tablosu.tsx` → `length: 'Boy'`. Karşılığı olacak vücut ölçüsü
+ *    "gövde uzunluğu"dur; hiçbir kullanıcı bunu bilmez ve `heightCm` ile
+ *    arasında KAYNAKLI bir katsayı yoktur. Bu yüzden motorda TANINIR AMA
+ *    SKORLANMAZ; buradan silinmez, tabloda görünmesi doğrudur.
+ *
+ * ⚠️ Anahtarlar TÜRKÇE. Motor eşlemesi `.trim().toLowerCase()` ile yapılıyor;
+ *    bu tablodaki adları değiştiren, oradaki haritayı da değiştirmek zorunda.
+ */
 const UST_BEDEN_TABLOSU = {
-  XS: { gogus: 84, bel: 66, boy: 60 },
-  S: { gogus: 88, bel: 70, boy: 62 },
-  M: { gogus: 94, bel: 76, boy: 64 },
-  L: { gogus: 100, bel: 82, boy: 66 },
-  XL: { gogus: 108, bel: 90, boy: 68 },
+  XS: { gogus: 84, bel: 66, boy: 60, omuz: 37 },
+  S: { gogus: 88, bel: 70, boy: 62, omuz: 39 },
+  M: { gogus: 94, bel: 76, boy: 64, omuz: 41 },
+  L: { gogus: 100, bel: 82, boy: 66, omuz: 43 },
+  XL: { gogus: 108, bel: 90, boy: 68, omuz: 46 },
 } as const;
 
+/**
+ * ALT GİYİM BEDEN TABLOSU — GİYSİ ölçüleri (cm).
+ *
+ * ⚠️ DEĞİŞMEDİ: `icBoy` bu tabloda ZATEN vardı (76/77/78/79). Bugüne kadar
+ *    motorda hiç okunmuyordu — `BodyProfile.inseamCm` onu okunur kılıyor,
+ *    tablonun kendisine dokunmak gerekmiyor.
+ *
+ * ⚠️ `icBoy` aralığı YALNIZCA 3 cm (76→79); bel 15 cm (66→81), kalça 15 cm
+ *    (92→107). Bu yüzden iç boy motorda eşit ağırlıkla ortalamaya GİRMEZ,
+ *    sadece beraberlik bozar: 3 cm'lik bir sinyalin 15 cm'lik iki kanıtı
+ *    devirmesi yanlış olurdu.
+ */
 const ALT_BEDEN_TABLOSU = {
   '26': { bel: 66, kalca: 92, icBoy: 76 },
   '28': { bel: 71, kalca: 97, icBoy: 77 },

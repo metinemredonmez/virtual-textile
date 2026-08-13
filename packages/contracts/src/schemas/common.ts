@@ -207,13 +207,60 @@ export const REQUIRED_TRYON_CONSENTS = [
 ] as const satisfies readonly ConsentType[];
 
 // ── Vücut ölçüleri ────────────────────────────────────────────────────────
+/**
+ * OKUMA / öneri gövdesi. `POST /v1/size/recommend` bunu alıyor ve
+ * `apps/web` → `beden-onerisi.tsx:80` onu kullanıyor.
+ *
+ * ⚠️ SINIRLAR BİR VÜCUT MODELİ DEĞİL, GİRDİ HATASI SINIRLARIDIR. Hiçbirinin
+ *    arkasında antropometrik bir kaynak İDDİA EDİLMİYOR; amaç birim
+ *    karışıklığını (inç→cm) ve basamak kaymasını yakalamaktır.
+ */
 export const bodyProfileSchema = z.object({
   heightCm: z.number().int().min(100).max(230).optional(),
   weightKg: z.number().int().min(30).max(250).optional(),
   chestCm: z.number().int().min(50).max(200).optional(),
   waistCm: z.number().int().min(40).max(200).optional(),
   hipCm: z.number().int().min(50).max(200).optional(),
+  /**
+   * Omuz genişliği (cm). Alt sınır 25 çocuk bedenini kapsar — seed'de
+   * `cocuk-ust-giyim` altında 6 ürün var; üst sınır 70, 5XL merdiven ucundan
+   * geniştir. ⚠️ Kaynak iddia edilmiyor, girdi hatası sınırıdır.
+   */
+  shoulderCm: z.number().int().min(25).max(70).optional(),
+  /**
+   * İç bacak boyu (cm). Alt sınır 40 çocuk alt giyimini kapsar; üst sınır 110
+   * seed `ALT_BEDEN_TABLOSU`ndaki en uzun `icBoy`un (79) çok üstünde kalır ama
+   * tipik hatayı — boy değerini (172) buraya yazmak — yakalar.
+   * ⚠️ Kaynak iddia edilmiyor, girdi hatası sınırıdır.
+   */
+  inseamCm: z.number().int().min(40).max(110).optional(),
   usualSize: z.string().trim().max(10).optional(),
   fitPref: fitPrefSchema.optional(),
 });
 export type BodyProfileInput = z.infer<typeof bodyProfileSchema>;
+
+/**
+ * YAZMA şeması — `PUT /v1/me/body-profile`, TAM DEĞİŞİM.
+ * Gönderilmeyen alan NULL'a düşer.
+ *
+ * ⚠️ HER ALAN `.nullable()` ve bu ŞART: kullanıcının bir kez girdiği ölçüyü
+ *    SİLEBİLMESİ gerekir. Yalnızca `.optional()` olsaydı "bu alanı gönderme"
+ *    ile "bu alanı sil" telde AYIRT EDİLEMEZDİ ve girilen bir ölçü asla geri
+ *    alınamazdı.
+ *
+ * ⚠️ `bodyProfileSchema` ile SINIRLARI AYNI, şekli değil. İkisi tek şemadan
+ *    türetilmedi çünkü okuma tarafının `null` kabul etmesi gereksiz; sınırlar
+ *    değişirse İKİSİ BİRDEN güncellenir.
+ */
+export const bodyProfileWriteSchema = z.object({
+  heightCm: z.number().int().min(100).max(230).nullable().optional(),
+  weightKg: z.number().int().min(30).max(250).nullable().optional(),
+  chestCm: z.number().int().min(50).max(200).nullable().optional(),
+  waistCm: z.number().int().min(40).max(200).nullable().optional(),
+  hipCm: z.number().int().min(50).max(200).nullable().optional(),
+  shoulderCm: z.number().int().min(25).max(70).nullable().optional(),
+  inseamCm: z.number().int().min(40).max(110).nullable().optional(),
+  usualSize: z.string().trim().max(10).nullable().optional(),
+  fitPref: fitPrefSchema.nullable().optional(),
+});
+export type BodyProfileWriteInput = z.infer<typeof bodyProfileWriteSchema>;

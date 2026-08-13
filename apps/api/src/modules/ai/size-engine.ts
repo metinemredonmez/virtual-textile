@@ -1,4 +1,5 @@
 import { SIZE_ENGINE } from '@vt/config';
+import type { SizeReasonCodeWire } from '@vt/contracts';
 import {
   evaluateBrandFitSignal,
   evaluateFitSignal,
@@ -43,6 +44,18 @@ export interface BodyMeasurements {
   chestCm?: number | null;
   waistCm?: number | null;
   hipCm?: number | null;
+  /**
+   * Omuz genişliği (cm) — omuz ucundan omuz ucuna, sırttan.
+   * Seed `UST_BEDEN_TABLOSU.omuz` sütunuyla eşleşir (XS 37 … XL 46).
+   * ⚠️ ÇEVRE sınıfındadır: skorlar VE eşleşme sayısına girer.
+   */
+  shoulderCm?: number | null;
+  /**
+   * İç bacak boyu (cm). Seed `ALT_BEDEN_TABLOSU.icBoy` ile eşleşir.
+   * ⚠️ UZUNLUK sınıfındadır: yalnızca BERABERLİK bozar, güven üretmez.
+   *    Gerekçe `CEVRE_ALANLARI` başlığında aritmetiğiyle yazılı.
+   */
+  inseamCm?: number | null;
   heightCm?: number | null;
   weightKg?: number | null;
   /** Kullanıcının "normalde giydiğim" bedeni — doğrulama sinyali. */
@@ -75,31 +88,20 @@ export interface SizeEngineInput {
   userHistory?: UserSizeHistory | null;
 }
 
-/** Şeffaflık: öneriyi oluşturan her adım kullanıcıya gösterilir. */
+/**
+ * Şeffaflık: öneriyi oluşturan her adım kullanıcıya gösterilir.
+ *
+ * ⚠️ `code` ARTIK ELLE YAZILMIYOR — tek kaynak `@vt/contracts` içindeki
+ *    `SIZE_REASON_CODES`. Burada 15 üyelik bir kopya duruyordu ve SAPMIŞTI:
+ *    motorun ürettiği `USER_KEPT_SIZE`, `USER_RETURNED_SIZE`,
+ *    `USER_BRAND_HISTORY`, `USUAL_SIZE_AGREES`, `USUAL_SIZE_CONFLICTS`
+ *    kodlarının BEŞİ DE telde yoktu; teldeki `USER_HISTORY` ise motorda hiç
+ *    üretilmiyordu. İki liste ayrı ayrı yaşadığı sürece bu sapma sessizdi.
+ *    Bağlandıktan sonra motor yeni bir kod üretip tele yazmayı UNUTAMAZ —
+ *    derleme kırılır.
+ */
 export interface SizeReason {
-  code:
-    | 'MEASUREMENT_MATCH'
-    | 'NO_MEASUREMENTS'
-    | 'NO_SIZE_CHART'
-    | 'AMBIGUOUS'
-    /** Satıcının/AI etiketinin BEYAN ettiği kalıp uygulandı. */
-    | 'BRAND_FIT'
-    /** Marka kalıbı iade verisinden ÖĞRENİLDİ ve beyanın yerine geçti. */
-    | 'BRAND_FIT_LEARNED'
-    | 'FIT_PREFERENCE'
-    | 'RETURN_FEEDBACK'
-    /** ⚠️ Eşik altı veri — kullanılmadı. */
-    | 'FEEDBACK_TOO_FEW'
-    /** Geri bildirimler birbiriyle çelişiyor; yön çıkarılamadı. */
-    | 'FEEDBACK_CONFLICTING'
-    /** Kullanıcı bu üründen bu bedeni almış ve iade etmemiş. */
-    | 'USER_KEPT_SIZE'
-    /** Kullanıcı bu üründen bu bedeni beden yüzünden iade etmiş. */
-    | 'USER_RETURNED_SIZE'
-    /** Kullanıcının aynı markadaki geçmişi. */
-    | 'USER_BRAND_HISTORY'
-    | 'USUAL_SIZE_AGREES'
-    | 'USUAL_SIZE_CONFLICTS';
+  code: SizeReasonCodeWire;
   message: string;
 }
 
@@ -145,9 +147,34 @@ const IDEAL_EASE_CM: Record<string, number> = {
   chest: 6,
   waist: 5,
   hip: 6,
+  /**
+   * ⚠️ OMUZDA BOLLUK PAYI SIFIRA YAKIN. Göğüs/bel/kalça giysinin İÇİNDE
+   *    kalan çevrelerdir; omuz ise dikiş çizgisinin OTURDUĞU noktadır.
+   *    6 cm bolluk verilen bir omuz, omzu düşük bir giysi demektir — regular
+   *    kalıpta arıza, oversize kalıpta zaten `fitAdjustment` işini yapıyor.
+   *    2 cm dikiş payıdır; varsayılan 5'i devralsaydı motor sistematik olarak
+   *    bir beden büyük önerirdi.
+   */
+  shoulder: 2,
+  omuz: 2,
 };
 
-/** Beden tablosu anahtarı → vücut ölçüsü alanı. Diğer anahtarlar (boy, kol) yok sayılır. */
+/**
+ * Beden tablosu anahtarı → vücut ölçüsü alanı.
+ *
+ * ⚠️ BU HARİTA ÜÇ ÖLÇÜ TANIYORDU VE İKİ SÜTUN SESSİZCE ÇÖPE GİDİYORDU.
+ *    Ölçüldü: `ALT_BEDEN_TABLOSU` her bedende `icBoy` taşıyor (76/77/78/79)
+ *    ve `scoreSizes` onu `if (!field) continue;` ile atlıyordu. Yani veri
+ *    yazılmış, okunmuyordu — bu deponun altı kez yaşadığı sınıfın bir örneği,
+ *    bu sefer bir `Record` içinde.
+ *
+ * ⚠️ `boy` (üst giyim boyu) BİLEREK EŞLEŞTİRİLMEDİ ve bu bir eksiklik değil,
+ *    bir KARAR: karşılığı olacak vücut ölçüsü "gövde boyu"dur ve onu
+ *    TOPLAMIYORUZ. Var olmayan bir alana eşlemek ya da kullanıcının boyundan
+ *    türetmek (kaynaklı katsayı yok) sessizce yanlış olurdu. Sütun tabloda
+ *    kalıyor — ölçü tablosu ekranında kullanıcıya GÖSTERİLİYOR, yalnızca
+ *    skorlamaya girmiyor.
+ */
 const DIMENSION_TO_MEASUREMENT: Record<string, keyof BodyMeasurements> = {
   chest: 'chestCm',
   bust: 'chestCm',
@@ -156,7 +183,37 @@ const DIMENSION_TO_MEASUREMENT: Record<string, keyof BodyMeasurements> = {
   bel: 'waistCm',
   hip: 'hipCm',
   kalca: 'hipCm',
+  shoulder: 'shoulderCm',
+  omuz: 'shoulderCm',
+  inseam: 'inseamCm',
+  icboy: 'inseamCm',
 };
+
+/**
+ * ÇEVRE ÖLÇÜLERİ — skorlamaya TAM girerler.
+ *
+ * ⚠️ UZUNLUK ÖLÇÜLERİ (iç bacak boyu) BU LİSTEDE YOK ve sebebi aritmetik:
+ *
+ *      bel    66 → 81 cm   (15 cm aralık, dört beden)
+ *      kalça  92 → 107 cm  (15 cm)
+ *      icBoy  76 → 79 cm   ( 3 cm)
+ *
+ *    `scoreSizes` sapmaların ORTALAMASINI alıyor. `icBoy` ortalamaya girseydi
+ *    her bedende neredeyse aynı küçük sapmayı üretip aradaki GERÇEK farkı
+ *    (bel/kalça) seyreltirdi: 26 ile 30 arasındaki 15 cm'lik ayrım, üçüncü
+ *    bir boyutla bölününce 10 cm'e iner ve iki beden birbirine yaklaşır.
+ *    Yani uzunluğu skora katmak öneriyi İYİLEŞTİRMEZ, BULANIKLAŞTIRIR.
+ *
+ *    Uzunluğun doğru yeri BERABERLİK BOZMAK: çevre ölçüleri iki bedeni eşit
+ *    yakın bulduğunda iç bacak boyu hangisinin uygun olduğunu söyleyebilir.
+ *    `uzunlukFarki()` tam olarak bunu yapıyor.
+ */
+const CEVRE_ALANLARI = new Set<keyof BodyMeasurements>([
+  'chestCm',
+  'waistCm',
+  'hipCm',
+  'shoulderCm',
+]);
 
 /**
  * Harf bedenlerin sırası. Sıralama olmadan "bir beden büyük" ifadesi
@@ -207,9 +264,16 @@ export function orderSizes(labels: readonly string[]): string[] {
 
 interface Scored {
   size: string;
-  /** Ortalama sapma (cm). Küçük = daha iyi eşleşme. */
+  /** Ortalama sapma (cm) — YALNIZCA çevre ölçülerinden. Küçük = daha iyi. */
   deviationCm: number;
+  /** ⚠️ Çevre ölçüsü sayısı. Güven bundan hesaplanıyor; uzunluk BURAYA GİRMEZ. */
   matchedDimensions: number;
+  /**
+   * Uzunluk ölçülerinin toplam sapması (cm). `null` = karşılaştırılamadı
+   * (ürünün uzunluk sütunu yok ya da kullanıcı o ölçüyü vermedi).
+   * ⚠️ Skoru DEĞİŞTİRMEZ; yalnızca beraberlikte kullanılır.
+   */
+  uzunlukFarkiCm: number | null;
 }
 
 function scoreSizes(chart: SizeChart, measurements: BodyMeasurements): Scored[] {
@@ -218,25 +282,136 @@ function scoreSizes(chart: SizeChart, measurements: BodyMeasurements): Scored[] 
   for (const [size, dimensions] of Object.entries(chart)) {
     let total = 0;
     let matched = 0;
+    let uzunlukToplam = 0;
+    let uzunlukSayisi = 0;
 
     for (const [rawDimension, garmentCm] of Object.entries(dimensions)) {
-      const field = DIMENSION_TO_MEASUREMENT[rawDimension.trim().toLowerCase()];
+      const anahtar = rawDimension.trim().toLowerCase();
+      const field = DIMENSION_TO_MEASUREMENT[anahtar];
       if (!field) continue;
 
       const bodyCm = measurements[field];
       if (typeof bodyCm !== 'number' || !Number.isFinite(garmentCm)) continue;
 
-      const ease = IDEAL_EASE_CM[rawDimension.trim().toLowerCase()] ?? 5;
-      total += Math.abs(garmentCm - (bodyCm + ease));
-      matched += 1;
+      const ease = IDEAL_EASE_CM[anahtar] ?? 5;
+      const sapma = Math.abs(garmentCm - (bodyCm + ease));
+
+      /**
+       * ⚠️ ÇEVRE VE UZUNLUK AYRI KOVALARA GİDER. Gerekçe `CEVRE_ALANLARI`
+       *    başlığında aritmetiğiyle yazılı: uzunluğu ortalamaya katmak
+       *    bedenler arası gerçek farkı seyreltiyor.
+       */
+      if (CEVRE_ALANLARI.has(field)) {
+        total += sapma;
+        matched += 1;
+      } else {
+        uzunlukToplam += sapma;
+        uzunlukSayisi += 1;
+      }
     }
 
+    /**
+     * ⚠️ YALNIZCA UZUNLUK EŞLEŞMİŞSE BEDEN LİSTEYE GİRMEZ. İç bacak boyu tek
+     *    başına beden söylemez — 26 ile 32 arasındaki `icBoy` farkı 3 cm,
+     *    yani gürültü. Girseydi motor "sadece boyunuzu verdiniz" durumunda
+     *    dayanaksız bir beden önerirdi; oysa doğru cevap ölçü istemektir.
+     */
     if (matched > 0) {
-      scored.push({ size, deviationCm: total / matched, matchedDimensions: matched });
+      scored.push({
+        size,
+        deviationCm: total / matched,
+        matchedDimensions: matched,
+        uzunlukFarkiCm: uzunlukSayisi > 0 ? uzunlukToplam / uzunlukSayisi : null,
+      });
     }
   }
 
-  return scored.sort((a, b) => a.deviationCm - b.deviationCm);
+  /**
+   * ⚠️ BERABERLİKTE UZUNLUK KARAR VERİR. Çevre sapmaları 0,5 cm'den yakınsa
+   *    iki beden pratikte aynıdır; orada uzunluğa bakmak öneriyi keskinleştirir.
+   *    Eşik 0,5: ölçüldü — seed tablolarında bedenler arası en küçük çevre
+   *    adımı 4 cm (bel 66→70), yani 0,5 cm gerçek bir ayrım DEĞİL, sayısal
+   *    yakınlıktır.
+   */
+  return scored.sort((a, b) => {
+    const fark = a.deviationCm - b.deviationCm;
+    if (Math.abs(fark) >= 0.5) return fark;
+    if (a.uzunlukFarkiCm !== null && b.uzunlukFarkiCm !== null) {
+      return a.uzunlukFarkiCm - b.uzunlukFarkiCm;
+    }
+    return fark;
+  });
+}
+
+/**
+ * GİRDİ MANTIK DENETİMİ — boy ve kilonun TEK MEŞRU KULLANIMI.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  ⚠️ BOY VE KİLO SKORLAMAYA GİRMEZ VE BU BİLİNÇLİ BİR REDDİR.
+ *
+ *  Beden tablosunda "boy: 172" diye bir satır yok; yani mesafe hesabına
+ *  DOĞRUDAN giremezler. Girebilmelerinin tek yolu boy+kilodan göğüs/bel/kalça
+ *  KESTİRMEK olurdu ve bu bir ANTROPOMETRİK MODEL iddiasıdır: elimizde
+ *  kaynaklı bir katsayı seti YOK. Uydurulmuş bir katsayı, kullanıcıya
+ *  bilimsel GÖRÜNEN bir tahmin sunmak demektir — yanlış beden alır, iadeyi
+ *  satıcı öder ve biz "motor öyle dedi" deriz. Bunu yapmıyoruz.
+ *
+ *  Aşağıdakiler MODEL DEĞİL, VERİ GİRİŞİ DENETİMİdir. Hiçbiri "şu boyda şu
+ *  beden olur" demiyor; yalnızca "bu değerler birlikte İMKÂNSIZ" diyor.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * ⚠️ GEOMETRİK SAÇMALIK — istatistik değil. Bir insanın göğüs/bel/kalça
+ *    ÇEVRESİ, toplam BOYUNDAN büyük olamaz. Bu bir dağılım iddiası değil;
+ *    böyle bir girdi neredeyse kesinlikle yazım hatası ya da birim karışması
+ *    (inç ↔ cm) demektir. Öneriyi DEĞİŞTİRMEZ, güveni düşürür ve söyler.
+ */
+function olculerImkansizMi(m: BodyMeasurements): boolean {
+  if (typeof m.heightCm !== 'number') return false;
+  const cevreler = [m.chestCm, m.waistCm, m.hipCm].filter(
+    (v): v is number => typeof v === 'number',
+  );
+  return cevreler.some((cevre) => cevre > m.heightCm!);
+}
+
+/**
+ * ⚠️ BMI BURADA BİR SAĞLIK ÖLÇÜSÜ DEĞİL, BİRİM DENETİMİ. Sınırlar 10 ve 80;
+ *    ikisi de yaşayan bir insan aralığının çok dışında. Tipik yakaladığı hata:
+ *    kilonun libre (lb) olarak girilmesi — 70 kg yerine 154 yazılınca BMI
+ *    ikiye katlanır. "Zayıf/kilolu" gibi bir yargı ÜRETMEZ ve öneriyi
+ *    değiştirmez; yalnızca girdinin okunamadığını söyler.
+ *
+ * ⚠️ Sınırlar GENİŞ TUTULDU. Dar bir aralık (ör. 15-40) gerçek kullanıcıları
+ *    "hatalı" diye işaretlerdi; bu denetimin işi tipo yakalamak, insan elemek
+ *    değil.
+ */
+function boyKiloImkansizMi(m: BodyMeasurements): boolean {
+  if (typeof m.heightCm !== 'number' || typeof m.weightKg !== 'number') return false;
+  const metre = m.heightCm / 100;
+  const bmi = m.weightKg / (metre * metre);
+  return bmi < 10 || bmi > 80;
+}
+
+/** Kullanıcı yalnız boy/kilo verdiyse — çevre ölçüsü yoksa öneri kurulamaz. */
+function yalnizBoyKilo(m: BodyMeasurements): boolean {
+  const cevreVar =
+    typeof m.chestCm === 'number' ||
+    typeof m.waistCm === 'number' ||
+    typeof m.hipCm === 'number' ||
+    typeof m.shoulderCm === 'number';
+  const boyKiloVar = typeof m.heightCm === 'number' || typeof m.weightKg === 'number';
+  return !cevreVar && boyKiloVar;
+}
+
+/** Beden tablosunda uzunluk sütunu var mı (icBoy/inseam)? */
+function tabloUzunlukTasiyorMu(chart: SizeChart): boolean {
+  return Object.values(chart).some((boyutlar) =>
+    Object.keys(boyutlar).some((ad) => {
+      const alan = DIMENSION_TO_MEASUREMENT[ad.trim().toLowerCase()];
+      return alan !== undefined && !CEVRE_ALANLARI.has(alan);
+    }),
+  );
 }
 
 /** Bir bedeni merdivende `steps` kadar kaydırır; uçlarda kırpılır. */
@@ -534,12 +709,25 @@ export function recommendSize(input: SizeEngineInput): SizeEngineResult {
   const scored = scoreSizes(input.sizeChart, input.measurements);
 
   if (scored.length === 0) {
-    // Ölçü yoksa tahmin de yok. Boy/kilodan beden türetmek cazip ama
-    // güvenilmez: aynı boy-kiloda göğüs çevresi 15 cm değişebilir.
-    reasons.push({
-      code: 'NO_MEASUREMENTS',
-      message: 'Beden önerisi için göğüs, bel veya kalça ölçünüzü girmeniz gerekiyor.',
-    });
+    /**
+     * ⚠️ İKİ AYRI DURUM, İKİ AYRI MESAJ. Eskiden ikisi de "ölçünüzü girin"
+     *    diyordu; oysa boy/kilosunu GİRMİŞ bir kullanıcıya "ölçü girin"
+     *    demek, girdiği şeyi görmezden gelmektir — kullanıcı formu doldurmuş
+     *    olduğunu bildiği için bunu bir arıza sanır.
+     */
+    if (yalnizBoyKilo(input.measurements)) {
+      reasons.push({
+        code: 'HEIGHT_WEIGHT_ONLY',
+        message:
+          'Boy ve kilo tek başına beden söylemez: aynı boy-kiloda göğüs çevresi ' +
+          '15 cm kadar değişebiliyor. Göğüs, bel ya da kalça ölçünüzü ekleyin.',
+      });
+    } else {
+      reasons.push({
+        code: 'NO_MEASUREMENTS',
+        message: 'Beden önerisi için göğüs, bel veya kalça ölçünüzü girmeniz gerekiyor.',
+      });
+    }
     return {
       kind: 'CHART_ONLY',
       confidence: 0,
@@ -562,6 +750,53 @@ export function recommendSize(input: SizeEngineInput): SizeEngineResult {
       1,
     )} cm farkla en yakın.`,
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   *  BOY VE KİLONUN İŞE KARIŞTIĞI YER — VE SADECE BURASI.
+   *
+   *  ⚠️ Hiçbiri ÖNERİYİ DEĞİŞTİRMİYOR, yalnızca GÜVENİ düşürüyor ve sebebini
+   *     söylüyor. Ayrım önemli: öneriyi değiştirmek bir model iddiasıdır
+   *     (boy şu ise beden şu olur), güveni düşürmek ise bir bilgi eksikliği
+   *     ya da veri hatası bildirimidir. İkincisini kaynaksız yapabiliriz,
+   *     birincisini yapamayız.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  if (olculerImkansizMi(input.measurements)) {
+    // Çevre > boy. Neredeyse kesinlikle birim karışması ya da yazım hatası.
+    confidence -= 25;
+    reasons.push({
+      code: 'MEASUREMENT_IMPLAUSIBLE',
+      message:
+        'Girdiğiniz çevre ölçülerinden en az biri boyunuzdan büyük. ' +
+        'Ölçüler santim olmalı — inç girdiyseniz 2,54 ile çarpın.',
+    });
+  }
+
+  if (boyKiloImkansizMi(input.measurements)) {
+    confidence -= 15;
+    reasons.push({
+      code: 'HEIGHT_WEIGHT_IMPLAUSIBLE',
+      message: 'Boy ve kilonuz birlikte okunamadı; kilonun kilogram olduğundan emin olun.',
+    });
+  }
+
+  /**
+   * ⚠️ UZUNLUK NOTU: ürünün tablosunda iç bacak boyu VAR ama kullanıcı o ölçüyü
+   *    VERMEMİŞ. Burada tahmin YAPILMAZ — boydan iç bacak boyu türetmek yine
+   *    kaynaksız bir katsayı isterdi. Yapılan tek şey söylemek: paça boyu bu
+   *    öneriye girmedi. Güven 5 düşüyor çünkü karar gerçekten eksik veriyle
+   *    verildi ve kullanıcı bunu bilmeli.
+   */
+  if (best.uzunlukFarkiCm === null && tabloUzunlukTasiyorMu(input.sizeChart)) {
+    confidence -= 5;
+    reasons.push({
+      code: 'LENGTH_NOTE',
+      message:
+        'Bu üründe paça boyu da tabloda var ama iç bacak boyunuz kayıtlı değil; ' +
+        'öneri yalnızca çevre ölçülerinize dayanıyor.',
+    });
+  }
 
   // Aradaki fark küçükse iki beden de eşit derecede olası demektir; bunu
   // güvene yansıtmazsak kullanıcı yazı-tura sonucuna kesinlik atfeder.

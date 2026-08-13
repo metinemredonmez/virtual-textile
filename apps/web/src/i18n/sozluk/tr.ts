@@ -75,6 +75,57 @@ export const tr = {
   },
 
   /**
+   * ⚠️ ÖLÇÜ EKRANININ METİNLERİ BURADA, JSX'te DEĞİL. Ekran ilk yazıldığında
+   *    metinler doğrudan bileşene gömülmüştü ve `gomulu-metin.test.ts` çeviri
+   *    borcunu 687'den 693'e çıkarıp KIRMIZI yandı. Testin kendi uyarısı:
+   *    "Tavanı BÜYÜTME — metni sözlüğe taşı." Doğru olan oydu.
+   */
+  olculerim: {
+    baslik: 'Ölçülerim',
+    girisMetni:
+      'Ölçüleriniz beden önerisinde kullanılır. Ne kadar çok ölçü girerseniz öneri o kadar güvenilir olur; hiçbiri zorunlu değil.',
+
+    nasilKullanilirBaslik: 'Ölçüler nasıl kullanılıyor?',
+    nasilKullanilir1:
+      'Göğüs, bel, kalça ve omuz ölçüleri doğrudan ürünün beden tablosuyla karşılaştırılır. İç bacak boyu yalnızca iki beden eşit yakın çıktığında hangisinin uygun olduğunu söyler.',
+    /** ⚠️ Bu paragraf bir DÜRÜSTLÜK NOTU: motorun ne YAPMADIĞINI söylüyor. */
+    nasilKullanilir2:
+      'Boy ve kilodan beden tahmin edilmez: aynı boy-kiloda göğüs çevresi 15 cm kadar değişebiliyor ve elimizde bunu güvenilir biçimde çeviren bir model yok. İkisi yalnızca girdiğiniz ölçülerin birbiriyle tutarlı olup olmadığını denetlemek için kullanılır.',
+    nasilKullanilir3:
+      'Ölçüleriniz yalnızca size gösterilir ve öneride kullanılır; satıcıyla paylaşılmaz. İstediğiniz zaman bir alanı boşaltıp kaydederek silebilirsiniz.',
+
+    boy: 'Boy',
+    boyIpucu: 'Ayakkabısız, duvara sırtınızı dayayarak.',
+    kilo: 'Kilo',
+    kiloIpucu: 'Sabah, aç karnına ölçmek en tutarlısı.',
+    gogus: 'Göğüs çevresi',
+    gogusIpucu: 'Göğsün en geniş yerinden, mezura yere paralel.',
+    bel: 'Bel çevresi',
+    belIpucu: 'Belin en dar yerinden; nefesinizi tutmayın.',
+    kalca: 'Kalça çevresi',
+    kalcaIpucu: 'Kalçanın en geniş yerinden, ayaklar bitişik.',
+    omuz: 'Omuz genişliği',
+    omuzIpucu: 'Sırttan, bir omuz ucundan diğerine.',
+    icBoy: 'İç bacak boyu',
+    icBoyIpucu: 'Ağdan ayak bileğine, bacağın içinden.',
+
+    normalBeden: 'Normalde giydiğiniz beden',
+    normalBedenIpucu: 'Ölçülerinizle çeliştiğinde motor bunu söyler; sessizce birini seçmez.',
+    kalipTercihi: 'Kalıp tercihiniz',
+    kalipSlim: 'Dar sevmem, bol olsun',
+    kalipRegular: 'Normal',
+    kalipOversize: 'Bol sevmem, dar olsun',
+
+    ayrintiAc: 'Daha fazla ölçü (isteğe bağlı)',
+    kaydet: 'Ölçüleri kaydet',
+    kaydediliyor: 'Kaydediliyor…',
+    kaydedildi: 'Kaydedildi.',
+    kaydedilemedi: 'Ölçüler kaydedilemedi.',
+    kisayolAciklama:
+      'Beden önerisinin dayandığı ölçüler. Ne kadar çok ölçü, o kadar güvenilir öneri.',
+  },
+
+  /**
    * ⚠️ VİTRİN METİNLERİ SÖZLÜKTE, JSX'te DEĞİL. Ana sayfaya yedi bölüm
    *    eklendiğinde bu metinler doğrudan JSX'e yazılmıştı ve
    *    `gomulu-metin.test.ts` çeviri borcunu 687'den 694'e çıkararak KIRMIZI

@@ -42,68 +42,68 @@ enum UserStatus {
 }
 
 model User {
-  id            String     @id @default(uuid(7))
-  email         String?    @unique
-  phone         String?    @unique
-  passwordHash  String?
-  role          Role       @default(CUSTOMER)
-  status        UserStatus @default(ACTIVE)
+  id           String     @id @default(uuid(7))
+  email        String?    @unique
+  phone        String?    @unique
+  passwordHash String?
+  role         Role       @default(CUSTOMER)
+  status       UserStatus @default(ACTIVE)
 
-  firstName     String?
-  lastName      String?
-  locale        String     @default("tr-TR")
+  firstName String?
+  lastName  String?
+  locale    String  @default("tr-TR")
 
-  emailVerifiedAt DateTime?
-  phoneVerifiedAt DateTime?
-  twoFactorEnabled Boolean  @default(false)
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  twoFactorEnabled Boolean   @default(false)
 
   /// Hesap silme talebi — grace period sonunda hard delete + anonimleştirme.
   deletionRequestedAt DateTime?
 
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  addresses     Address[]
-  sessions      Session[]
-  socialAccounts SocialAccount[]
-  bodyProfile   BodyProfile?
-  consents      ConsentRecord[]
-  photos        UserPhoto[]
-  carts         Cart[]
-  orders        Order[]
-  reviews       Review[]
-  favorites     Favorite[]
-  outfits       Outfit[]
-  tryOnJobs     TryOnJob[]
+  addresses            Address[]
+  sessions             Session[]
+  socialAccounts       SocialAccount[]
+  bodyProfile          BodyProfile?
+  consents             ConsentRecord[]
+  photos               UserPhoto[]
+  carts                Cart[]
+  orders               Order[]
+  reviews              Review[]
+  favorites            Favorite[]
+  outfits              Outfit[]
+  tryOnJobs            TryOnJob[]
   stylistConversations StylistConversation[]
-  sellerMemberships SellerUser[]
-  wardrobeItems DigitalWardrobeItem[]
+  sellerMemberships    SellerUser[]
+  wardrobeItems        DigitalWardrobeItem[]
 
   @@index([status, createdAt])
   @@map("user_users")
 }
 
 model Session {
-  id              String   @id @default(uuid(7))
-  userId          String
+  id                  String    @id @default(uuid(7))
+  userId              String
   /// Refresh token'ın kendisi DEĞİL, SHA-256 özeti saklanır.
-  refreshTokenHash String  @unique
+  refreshTokenHash    String    @unique
   /// Rotasyon zinciri: bu oturum hangi oturumun yerine geçti.
   replacedBySessionId String?
-  revokedAt       DateTime?
+  revokedAt           DateTime?
   /// Yeniden kullanım tespit edildi mi — tespit edilirse kullanıcının
   /// TÜM oturumları düşürülür (token hırsızlığı sinyali).
-  reusedAt        DateTime?
+  reusedAt            DateTime?
 
-  ipAddress       String
-  userAgent       String
-  deviceLabel     String?
+  ipAddress   String
+  userAgent   String
+  deviceLabel String?
 
-  expiresAt       DateTime
-  createdAt       DateTime @default(now())
-  lastUsedAt      DateTime @default(now())
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
@@ -113,39 +113,39 @@ model Session {
 model SocialAccount {
   id             String   @id @default(uuid(7))
   userId         String
-  provider       String   // "google" | "apple"
+  provider       String // "google" | "apple"
   providerUserId String
   createdAt      DateTime @default(now())
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId])
   @@map("user_social_accounts")
 }
 
 model Address {
-  id             String   @id @default(uuid(7))
-  userId         String
-  title          String
-  firstName      String
-  lastName       String
-  phone          String
-  city           String
-  district       String
-  neighbourhood  String?
-  line1          String
-  postalCode     String?
-  companyName    String?
-  taxOffice      String?
+  id            String    @id @default(uuid(7))
+  userId        String
+  title         String
+  firstName     String
+  lastName      String
+  phone         String
+  city          String
+  district      String
+  neighbourhood String?
+  line1         String
+  postalCode    String?
+  companyName   String?
+  taxOffice     String?
   /// Uygulama katmanında AES-256-GCM ile şifrelenir.
-  taxNumberEnc   String?
-  isDefault      Boolean  @default(false)
-  archivedAt     DateTime?
+  taxNumberEnc  String?
+  isDefault     Boolean   @default(false)
+  archivedAt    DateTime?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, archivedAt])
   @@map("user_addresses")
@@ -158,17 +158,28 @@ enum FitPref {
 }
 
 model BodyProfile {
-  userId    String   @id
-  heightCm  Int?
-  weightKg  Int?
-  chestCm   Int?
-  waistCm   Int?
-  hipCm     Int?
-  usualSize String?
-  fitPref   FitPref?
-  updatedAt DateTime @updatedAt
+  userId     String   @id
+  heightCm   Int?
+  weightKg   Int?
+  chestCm    Int?
+  waistCm    Int?
+  hipCm      Int?
+  /// Omuz genişliği, TAM SANTİM (omuz ucundan omuz ucuna, sırttan).
+  /// VÜCUT ölçüsüdür, giysi ölçüsü değil — karşılığı seed
+  /// `UST_BEDEN_TABLOSU`ndaki `omuz` sütunudur.
+  /// ⚠️ NULL kalır ve kalmalıdır: kendi başına ölçmesi zor bir ölçü olduğu
+  ///    için formda "Daha fazla ölçü" altında İSTEĞE BAĞLI toplanır.
+  shoulderCm Int?
+  /// İç bacak boyu (ağdan ayak bileğine), TAM SANTİM.
+  /// Karşılığı seed `ALT_BEDEN_TABLOSU`ndaki `icBoy` sütunudur — o sütun
+  /// bugün tabloda VAR ama motorda hiç okunmuyordu; bu alan onu okunur kılar.
+  /// ⚠️ Bir UZUNLUK ölçüsüdür: motorda yalnız beraberlik bozar, güven üretmez.
+  inseamCm   Int?
+  usualSize  String?
+  fitPref    FitPref?
+  updatedAt  DateTime @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_body_profiles")
 }
@@ -187,17 +198,17 @@ enum ConsentType {
 /// Kullanıcı hesabını silse bile bu kayıtlar (anonim kimlikle) korunur —
 /// rızanın varlığı/yokluğu denetlenebilir olmalıdır.
 model ConsentRecord {
-  id        String      @id @default(uuid(7))
-  userId    String
-  type      ConsentType
-  granted   Boolean
+  id              String      @id @default(uuid(7))
+  userId          String
+  type            ConsentType
+  granted         Boolean
   /// Onaylanan aydınlatma metninin sürümü, ör. "v1.2"
   documentVersion String
-  ipAddress String
-  userAgent String
-  createdAt DateTime    @default(now())
+  ipAddress       String
+  userAgent       String
+  createdAt       DateTime    @default(now())
 
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, createdAt])
   @@map("consent_records")
@@ -212,27 +223,27 @@ enum PhotoPurpose {
 /// Private bucket'ta durur, yalnızca imzalı URL ile erişilir, süreli saklanır.
 /// Yönetici hesapları dahil serbest erişim YOKTUR (break-glass + AuditLog).
 model UserPhoto {
-  id           String       @id @default(uuid(7))
-  userId       String
-  storageKey   String       @unique
-  purpose      PhotoPurpose
+  id            String       @id @default(uuid(7))
+  userId        String
+  storageKey    String       @unique
+  purpose       PhotoPurpose
   /// Yükleme anında hesaplanan kalite skoru (0-100). Eşiğin altı reddedilir.
-  qualityScore Int?
-  qualityIssues Json?       // ["too_dark","no_person","cropped"]
+  qualityScore  Int?
+  qualityIssues Json? // ["too_dark","no_person","cropped"]
   /// Aynı fotoğrafın try-on önbelleğinde anahtar olarak kullanılması için içerik özeti.
-  contentHash  String
-  widthPx      Int
-  heightPx     Int
-  sizeBytes    Int
+  contentHash   String
+  widthPx       Int
+  heightPx      Int
+  sizeBytes     Int
 
   /// Bu tarihten sonra silme cron'u tarafından kaldırılır.
-  expiresAt    DateTime
-  deletedAt    DateTime?
+  expiresAt DateTime
+  deletedAt DateTime?
 
-  createdAt    DateTime     @default(now())
+  createdAt DateTime @default(now())
 
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tryOnJobs    TryOnJob[]
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tryOnJobs TryOnJob[]
 
   @@index([expiresAt, deletedAt])
   @@index([userId, createdAt])
@@ -249,16 +260,16 @@ enum SellerStatus {
 }
 
 model Seller {
-  id             String       @id @default(uuid(7))
-  legalName      String
-  displayName    String
+  id           String @id @default(uuid(7))
+  legalName    String
+  displayName  String
   /// Şifreli saklanır (AES-256-GCM).
-  taxNumberEnc   String
-  taxOffice      String
+  taxNumberEnc String
+  taxOffice    String
   /// Şifreli saklanır. Payout dışında hiçbir yerde çözülmez.
-  ibanEnc        String
-  contactEmail   String
-  contactPhone   String
+  ibanEnc      String
+  contactEmail String
+  contactPhone String
 
   status         SellerStatus @default(PENDING)
   statusReason   String?
@@ -268,18 +279,18 @@ model Seller {
   qualityScore   Int          @default(50)
   vacationMode   Boolean      @default(false)
 
-  approvedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  approvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  store          Store?
-  documents      SellerDocument[]
-  members        SellerUser[]
-  products       Product[]
-  packages       OrderPackage[]
-  ledgerEntries  LedgerEntry[]
-  payouts        PayoutRequest[]
-  coupons        Coupon[]
+  store           Store?
+  documents       SellerDocument[]
+  members         SellerUser[]
+  products        Product[]
+  packages        OrderPackage[]
+  ledgerEntries   LedgerEntry[]
+  payouts         PayoutRequest[]
+  coupons         Coupon[]
   commissionRules CommissionRule[]
 
   @@index([status])
@@ -294,8 +305,8 @@ model SellerUser {
   storeRole String   @default("staff")
   createdAt DateTime @default(now())
 
-  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([sellerId, userId])
   @@map("seller_users")
@@ -321,7 +332,7 @@ model SellerDocument {
   approved   Boolean?
   createdAt  DateTime           @default(now())
 
-  seller     Seller             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
 
   @@index([sellerId])
   @@map("seller_documents")
@@ -338,7 +349,7 @@ model Store {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
 
   @@map("seller_stores")
 }
@@ -346,18 +357,18 @@ model Store {
 // ═══════════════════════════════ KATALOG ══════════════════════════════════
 
 model Category {
-  id        String     @id @default(uuid(7))
-  parentId  String?
-  slug      String     @unique
-  name      String
+  id            String         @id @default(uuid(7))
+  parentId      String?
+  slug          String         @unique
+  name          String
   /// Sanal deneme kategorisi — null ise bu kategoride try-on gösterilmez.
   tryOnCategory TryOnCategory?
-  sortOrder Int        @default(0)
-  isActive  Boolean    @default(true)
+  sortOrder     Int            @default(0)
+  isActive      Boolean        @default(true)
 
-  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryTree")
-  products  Product[]
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]       @relation("CategoryTree")
+  products        Product[]
   commissionRules CommissionRule[]
 
   @@index([parentId, sortOrder])
@@ -407,51 +418,51 @@ enum ProductStatus {
 }
 
 model Product {
-  id          String        @id @default(uuid(7))
-  sellerId    String
-  categoryId  String
-  slug        String        @unique
-  title       String
-  description String
-  brandName   String
-  gender      Gender
-  season      String?
-  collection  String?
-  status      ProductStatus @default(DRAFT)
+  id           String        @id @default(uuid(7))
+  sellerId     String
+  categoryId   String
+  slug         String        @unique
+  title        String
+  description  String
+  brandName    String
+  gender       Gender
+  season       String?
+  collection   String?
+  status       ProductStatus @default(DRAFT)
   statusReason String?
 
   /// AI çıkarımı: {color, pattern, fabric, neckline, sleeve, fit}
   aiTags         Json?
   /// Satıcı AI etiketlerini onaylamadan ürün yayınlanamaz.
-  aiTagsApproved Boolean    @default(false)
+  aiTagsApproved Boolean @default(false)
 
   /// Try-On Uygunluk Skoru (0-100) — düşükse satıcıya somut iyileştirme önerilir.
-  tryOnScore     Int?
-  tryOnIssues    Json?      // ["missing_back_angle","low_resolution","busy_background"]
+  tryOnScore  Int?
+  tryOnIssues Json? // ["missing_back_angle","low_resolution","busy_background"]
 
   /// {"M":{"chest":98,"length":70,"sleeve":60}, ...} — beden öneri motoru okur.
-  sizeChart      Json?
+  sizeChart Json?
 
   /// Görsel embedding (SigLIP/CLIP, 768 boyut). Prisma Client sorgulayamaz;
   /// benzer ürün araması ham SQL ile yapılır (bkz. migration).
-  embedding      Unsupported("vector(768)")?
+  embedding    Unsupported("vector(768)")?
   /// Türkçe FTS — generated column, migration'da tanımlanır.
-  searchVector   Unsupported("tsvector")?
+  searchVector Unsupported("tsvector")?
 
-  viewCount      Int        @default(0)
-  tryOnCount     Int        @default(0)
-  popularityScore Int       @default(0)
+  viewCount       Int @default(0)
+  tryOnCount      Int @default(0)
+  popularityScore Int @default(0)
 
-  publishedAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  seller     Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  category   Category       @relation(fields: [categoryId], references: [id])
-  variants   Variant[]
-  images     ProductImage[]
-  reviews    Review[]
-  favorites  Favorite[]
+  seller         Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category       Category        @relation(fields: [categoryId], references: [id])
+  variants       Variant[]
+  images         ProductImage[]
+  reviews        Review[]
+  favorites      Favorite[]
   /// Vitrin afişinin üzerinde gösterildiği kartlar (bkz. SiteImageCard).
   siteImageCards SiteImageCard[]
 
@@ -467,9 +478,9 @@ model Product {
 }
 
 model Variant {
-  id             String   @id @default(uuid(7))
+  id             String  @id @default(uuid(7))
   productId      String
-  sku            String   @unique
+  sku            String  @unique
   color          String
   colorHex       String
   size           String
@@ -478,19 +489,19 @@ model Variant {
   /// Üstü çizili referans fiyat.
   listPriceMinor BigInt?
   barcode        String?
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
+  isActive       Boolean @default(true)
+  sortOrder      Int     @default(0)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  inventory      Inventory?
-  cartItems      CartItem[]
-  orderItems     OrderItem[]
-  tryOnJobs      TryOnJob[]
-  priceHistory   PriceHistory[]
-  wardrobeItems  DigitalWardrobeItem[]
+  product       Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory     Inventory?
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  tryOnJobs     TryOnJob[]
+  priceHistory  PriceHistory[]
+  wardrobeItems DigitalWardrobeItem[]
 
   @@unique([productId, color, size])
   @@index([productId, isActive])
@@ -508,7 +519,7 @@ model Inventory {
   version   Int      @default(0)
   updatedAt DateTime @updatedAt
 
-  variant   Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@map("catalog_inventory")
 }
@@ -523,7 +534,7 @@ model PriceHistory {
   changedBy      String
   createdAt      DateTime @default(now())
 
-  variant        Variant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@index([variantId, createdAt])
   @@map("catalog_price_history")
@@ -539,40 +550,40 @@ enum ImageAngle {
 }
 
 model ProductImage {
-  id         String     @id @default(uuid(7))
-  productId  String
-  storageKey String
-  angle      ImageAngle
-  isPrimary  Boolean    @default(false)
+  id           String     @id @default(uuid(7))
+  productId    String
+  storageKey   String
+  angle        ImageAngle
+  isPrimary    Boolean    @default(false)
   /// Arka planı temizlenmiş sürüm var mı — try-on kalitesini artırır.
   bgRemovedKey String?
-  blurhash   String?
-  widthPx    Int
-  heightPx   Int
-  sortOrder  Int        @default(0)
-  createdAt  DateTime   @default(now())
+  blurhash     String?
+  widthPx      Int
+  heightPx     Int
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
 
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
   @@map("catalog_product_images")
 }
 
 model Review {
-  id         String   @id @default(uuid(7))
-  productId  String
-  userId     String
-  orderItemId String? @unique
-  rating     Int
-  title      String?
-  body       String?
+  id          String   @id @default(uuid(7))
+  productId   String
+  userId      String
+  orderItemId String?  @unique
+  rating      Int
+  title       String?
+  body        String?
   /// Beden geri bildirimi — fit motorunu besler.
   fitFeedback String? // "TOO_SMALL" | "TRUE_TO_SIZE" | "TOO_LARGE"
-  isApproved Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  isApproved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([productId, userId])
   @@index([productId, isApproved, createdAt])
@@ -585,8 +596,8 @@ model Favorite {
   productId String
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
   @@map("catalog_favorites")
@@ -595,19 +606,19 @@ model Favorite {
 // ═══════════════════════════════ SEPET ════════════════════════════════════
 
 model Cart {
-  id        String     @id @default(uuid(7))
+  id        String   @id @default(uuid(7))
   userId    String?
   /// Misafir sepeti için tarayıcı oturum kimliği.
   sessionId String?
   couponId  String?
   expiresAt DateTime
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coupon    Coupon?    @relation(fields: [couponId], references: [id])
-  items     CartItem[]
-  outfits   Outfit[]
+  user    User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon  Coupon?    @relation(fields: [couponId], references: [id])
+  items   CartItem[]
+  outfits Outfit[]
 
   @@unique([userId])
   @@unique([sessionId])
@@ -616,20 +627,20 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(uuid(7))
-  cartId    String
-  variantId String
-  outfitId  String?
-  quantity  Int
+  id              String   @id @default(uuid(7))
+  cartId          String
+  variantId       String
+  outfitId        String?
+  quantity        Int
   /// Sepete eklendiği andaki fiyat — checkout'ta güncel fiyatla karşılaştırılır,
   /// değiştiyse kullanıcıya onay sorulur (CART_PRICE_CHANGED).
   addedPriceMinor BigInt
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  variant   Variant  @relation(fields: [variantId], references: [id])
-  outfit    Outfit?  @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant Variant @relation(fields: [variantId], references: [id])
+  outfit  Outfit? @relation(fields: [outfitId], references: [id], onDelete: SetNull)
 
   @@unique([cartId, variantId])
   @@map("cart_items")
@@ -638,18 +649,18 @@ model CartItem {
 /// Kombin — kombin tabanlı sepetin çekirdeği.
 /// Kullanıcı "Günlük", "İş görüşmesi" gibi kombinler oluşturur, tamamını sepete atar.
 model Outfit {
-  id         String     @id @default(uuid(7))
+  id         String   @id @default(uuid(7))
   userId     String?
   cartId     String?
   name       String
   /// Bu kombinin sanal deneme görseli (varsa).
   tryOnJobId String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cart       Cart?      @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  items      CartItem[]
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cart  Cart?      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  items CartItem[]
 
   @@index([userId, createdAt])
   @@map("cart_outfits")
@@ -662,22 +673,22 @@ model Outfit {
 ///    muamele görür ve tam olarak bu yüzden AYRI kolondadır — tek kolon olsaydı
 ///    bir sorgu ikisini aynı yoldan servis edebilirdi.
 model DigitalWardrobeItem {
-  id                String         @id @default(uuid(7))
-  userId            String
-  source            WardrobeSource
+  id     String         @id @default(uuid(7))
+  userId String
+  source WardrobeSource
 
   /// ⚠️ NULL OLABİLİR ve bu bir gereksinimdir: kullanıcı platformda satılmayan
   ///    kendi parçasını da ekleyebilmelidir, yoksa gardırop onun dolabını değil
   ///    yalnızca bizden aldıklarını gösterir.
-  variantId         String?
-  category          TryOnCategory
-  color             String
-  label             String?
+  variantId String?
+  category  TryOnCategory
+  color     String
+  label     String?
 
   /// ⚠️ private kova — kullanıcının kendi fotoğrafı. MANUAL kayıtlarda dolu.
-  photoKey          String?
+  photoKey        String?
   /// public kova — satın alınan ürünün görseli (snapshot).
-  productImageKey   String?
+  productImageKey String?
 
   /// ⚠️ MÜKERRER OTOMATİK EKLEMEYİ ENGELLEYEN DOĞAL ANAHTAR.
   ///    Teslimat olayı EN AZ BİR KEZ gelir ve iade reddi paketi
@@ -685,13 +696,13 @@ model DigitalWardrobeItem {
   ///    ikinci kez GERÇEKTEN üretilir (bkz. wardrobe.auto-add.ts).
   sourceOrderItemId String?
 
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// ⚠️ SetNull: ürün katalogdan kalkınca kullanıcının dolabındaki ceket yok
   ///    olmaz, yalnızca denenemez hâle gelir.
-  variant           Variant?       @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  variant Variant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   /// ⚠️ İDEMPOTENTLİĞİN TEK GERÇEK DAYANAĞI. PostgreSQL'de NULL'lar birbirinden
   ///    farklı sayılır; MANUAL kayıtlar (sourceOrderItemId NULL) etkilenmez.
@@ -710,27 +721,27 @@ enum DiscountType {
 }
 
 model Coupon {
-  id              String       @id @default(uuid(7))
-  code            String       @unique
+  id                String       @id @default(uuid(7))
+  code              String       @unique
   /// null = platform kuponu, dolu = mağaza kuponu
-  sellerId        String?
-  discountType    DiscountType
+  sellerId          String?
+  discountType      DiscountType
   /// PERCENTAGE için basis point (1000 = %10), FIXED_AMOUNT için kuruş.
-  discountValue   BigInt
+  discountValue     BigInt
   /// Yüzdesel indirimde azami indirim tutarı (kuruş).
-  maxDiscountMinor BigInt?
-  minCartMinor    BigInt       @default(0)
-  usageLimit      Int?
-  usageLimitPerUser Int        @default(1)
-  usedCount       Int          @default(0)
-  validFrom       DateTime
-  validTo         DateTime
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
+  maxDiscountMinor  BigInt?
+  minCartMinor      BigInt       @default(0)
+  usageLimit        Int?
+  usageLimitPerUser Int          @default(1)
+  usedCount         Int          @default(0)
+  validFrom         DateTime
+  validTo           DateTime
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
 
-  seller          Seller?      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  carts           Cart[]
-  redemptions     CouponRedemption[]
+  seller      Seller?            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  carts       Cart[]
+  redemptions CouponRedemption[]
 
   @@index([code, isActive])
   @@index([sellerId, isActive])
@@ -738,14 +749,14 @@ model Coupon {
 }
 
 model CouponRedemption {
-  id        String   @id @default(uuid(7))
-  couponId  String
-  userId    String
-  orderId   String
+  id          String   @id @default(uuid(7))
+  couponId    String
+  userId      String
+  orderId     String
   amountMinor BigInt
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
 
   @@unique([couponId, orderId])
   @@index([couponId, userId])
@@ -778,15 +789,15 @@ enum PackageStatus {
 }
 
 model Order {
-  id          String      @id @default(uuid(7))
+  id          String  @id @default(uuid(7))
   /// Kullanıcıya gösterilen numara: VT-260811-0042
-  orderNumber String      @unique
+  orderNumber String  @unique
   userId      String?
   /// Misafir siparişinde de zorunlu — bildirim ve takip için.
   email       String
   phone       String
 
-  status      OrderStatus @default(PENDING_PAYMENT)
+  status OrderStatus @default(PENDING_PAYMENT)
 
   // ── Para (kuruş) ──
   itemsTotalMinor    BigInt
@@ -801,19 +812,19 @@ model Order {
 
   /// Stok rezervasyonunun düşme zamanı — ödeme tamamlanmazsa serbest bırakılır.
   reservationExpiresAt DateTime?
-  paidAt      DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
+  paidAt               DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User?       @relation(fields: [userId], references: [id])
-  packages    OrderPackage[]
-  items       OrderItem[]
-  events      OrderEvent[]
-  payment     PaymentIntent?
-  returns     ReturnRequest[]
+  user     User?           @relation(fields: [userId], references: [id])
+  packages OrderPackage[]
+  items    OrderItem[]
+  events   OrderEvent[]
+  payment  PaymentIntent?
+  returns  ReturnRequest[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -825,31 +836,31 @@ model Order {
 /// A satıcısı kargolarken B satıcısı iptal edebilir; Order.status
 /// paketlerin bileşkesinden HESAPLANIR, ayrı kolonda tutulmaz.
 model OrderPackage {
-  id          String        @id @default(uuid(7))
-  orderId     String
-  sellerId    String
-  status      PackageStatus @default(AWAITING_APPROVAL)
+  id       String        @id @default(uuid(7))
+  orderId  String
+  sellerId String
+  status   PackageStatus @default(AWAITING_APPROVAL)
 
   itemsTotalMinor    BigInt
   shippingMinor      BigInt @default(0)
   /// Bu pakete düşen indirim payı (allocate ile kuruş kaybı olmadan dağıtılır).
   discountShareMinor BigInt @default(0)
 
-  carrier     String?
-  trackingNo  String?
+  carrier      String?
+  trackingNo   String?
   /// Satıcının kargoya verme son tarihi.
-  slaDeadline DateTime
-  shippedAt   DateTime?
-  deliveredAt DateTime?
-  cancelledAt DateTime?
+  slaDeadline  DateTime
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
   cancelReason String?
 
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  seller      Seller        @relation(fields: [sellerId], references: [id])
-  items       OrderItem[]
+  order  Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller Seller      @relation(fields: [sellerId], references: [id])
+  items  OrderItem[]
 
   @@unique([orderId, sellerId])
   @@index([sellerId, status])
@@ -867,7 +878,7 @@ model OrderItem {
   productId      String
   productTitle   String
   brandName      String
-  variantLabel   String   // "Siyah / M"
+  variantLabel   String // "Siyah / M"
   sku            String
   imageKey       String
   unitPriceMinor BigInt
@@ -883,12 +894,12 @@ model OrderItem {
 
   createdAt DateTime @default(now())
 
-  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  package   OrderPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  variant   Variant      @relation(fields: [variantId], references: [id])
+  order                 Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  package               OrderPackage          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  variant               Variant               @relation(fields: [variantId], references: [id])
   commissionRuleVersion CommissionRuleVersion @relation(fields: [commissionRuleVersionId], references: [id])
-  returnItems ReturnItem[]
-  ledgerEntries LedgerEntry[]
+  returnItems           ReturnItem[]
+  ledgerEntries         LedgerEntry[]
 
   @@index([orderId])
   @@index([packageId])
@@ -907,13 +918,13 @@ enum ActorType {
 model OrderEvent {
   id        String    @id @default(uuid(7))
   orderId   String
-  type      String    // "payment.captured", "package.shipped", "return.approved"
+  type      String // "payment.captured", "package.shipped", "return.approved"
   actorType ActorType
   actorId   String?
   payload   Json
   createdAt DateTime  @default(now())
 
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
   @@map("order_events")
@@ -943,26 +954,26 @@ enum ReturnReason {
 }
 
 model ReturnRequest {
-  id          String       @id @default(uuid(7))
-  returnNumber String      @unique
-  orderId     String
-  status      ReturnStatus @default(REQUESTED)
-  reason      ReturnReason
-  note        String?
+  id           String       @id @default(uuid(7))
+  returnNumber String       @unique
+  orderId      String
+  status       ReturnStatus @default(REQUESTED)
+  reason       ReturnReason
+  note         String?
   /// İade kanıt fotoğrafları — private bucket.
-  photoKeys   String[]
+  photoKeys    String[]
 
-  refundAmountMinor BigInt @default(0)
-  decidedBy   String?
-  decidedAt   DateTime?
-  rejectReason String?
-  refundedAt  DateTime?
+  refundAmountMinor BigInt    @default(0)
+  decidedBy         String?
+  decidedAt         DateTime?
+  rejectReason      String?
+  refundedAt        DateTime?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  items       ReturnItem[]
+  order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items ReturnItem[]
 
   @@index([orderId])
   @@index([status, createdAt])
@@ -996,13 +1007,13 @@ enum PaymentStatus {
 }
 
 model PaymentIntent {
-  id          String        @id @default(uuid(7))
-  orderId     String        @unique
-  provider    String        @default("iyzico")
+  id             String  @id @default(uuid(7))
+  orderId        String  @unique
+  provider       String  @default("iyzico")
   /// Sağlayıcının işlem kimliği.
-  providerRef String?
+  providerRef    String?
   /// Idempotency: retry sırasında AYNI değer gönderilir, çifte tahsilatı engeller.
-  conversationId String     @unique
+  conversationId String  @unique
 
   status      PaymentStatus @default(CREATED)
   amountMinor BigInt
@@ -1010,10 +1021,10 @@ model PaymentIntent {
   installment Int           @default(1)
 
   /// Yalnızca maskeli gösterim — tam kart verisi ASLA saklanmaz (PCI kapsamı dışı).
-  cardMask    String?
-  cardBrand   String?
+  cardMask  String?
+  cardBrand String?
   /// Sağlayıcının ürettiği saklı kart tokenı.
-  cardToken   String?
+  cardToken String?
 
   failureCode    String?
   failureMessage String?
@@ -1022,12 +1033,12 @@ model PaymentIntent {
 
   authorizedAt DateTime?
   capturedAt   DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  attempts    PaymentAttempt[]
-  refunds     Refund[]
+  order    Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  attempts PaymentAttempt[]
+  refunds  Refund[]
 
   @@index([status, createdAt])
   @@index([providerRef])
@@ -1035,18 +1046,18 @@ model PaymentIntent {
 }
 
 model PaymentAttempt {
-  id          String   @id @default(uuid(7))
-  intentId    String
-  attemptNo   Int
-  status      PaymentStatus
-  providerCode String?
+  id              String        @id @default(uuid(7))
+  intentId        String
+  attemptNo       Int
+  status          PaymentStatus
+  providerCode    String?
   providerMessage String?
   /// Kullanıcıya gösterilen Türkçe mesaja çevrilmiş hâli.
   mappedErrorCode String?
-  latencyMs   Int?
-  createdAt   DateTime @default(now())
+  latencyMs       Int?
+  createdAt       DateTime      @default(now())
 
-  intent      PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  intent PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
 
   @@unique([intentId, attemptNo])
   @@map("payment_attempts")
@@ -1064,7 +1075,7 @@ model Refund {
   failureCode String?
   createdAt   DateTime @default(now())
 
-  intent      PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  intent PaymentIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
 
   @@index([intentId])
   @@map("payment_refunds")
@@ -1081,9 +1092,9 @@ model CommissionRule {
   label      String
   createdAt  DateTime @default(now())
 
-  category   Category? @relation(fields: [categoryId], references: [id])
-  seller     Seller?   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  versions   CommissionRuleVersion[]
+  category Category?               @relation(fields: [categoryId], references: [id])
+  seller   Seller?                 @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  versions CommissionRuleVersion[]
 
   /// ⚠️ Benzersizlik Prisma ile ifade EDİLEMEZ.
   /// Normal bir @@unique([categoryId, sellerId]) burada işe yaramaz: Postgres'te
@@ -1109,8 +1120,8 @@ model CommissionRuleVersion {
   createdBy     String
   createdAt     DateTime  @default(now())
 
-  rule          CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  orderItems    OrderItem[]
+  rule       CommissionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
 
   @@index([ruleId, validFrom])
   @@map("finance_commission_rule_versions")
@@ -1144,11 +1155,11 @@ model LedgerEntry {
   description String
   /// Hakedişin ödenebilir hâle geldiği tarih (iade penceresi sonrası).
   availableAt DateTime?
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime  @default(now())
 
-  seller      Seller     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
-  payout      PayoutRequest? @relation(fields: [payoutId], references: [id])
+  seller    Seller         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  orderItem OrderItem?     @relation(fields: [orderItemId], references: [id])
+  payout    PayoutRequest? @relation(fields: [payoutId], references: [id])
 
   @@index([sellerId, createdAt])
   @@index([sellerId, availableAt])
@@ -1174,16 +1185,16 @@ model PayoutRequest {
   /// Idempotency anahtarı — sağlayıcıya retry'da aynı değer gider.
   payoutRef   String       @unique
 
-  approvedBy  String?
-  approvedAt  DateTime?
-  providerRef String?
-  sentAt      DateTime?
+  approvedBy    String?
+  approvedAt    DateTime?
+  providerRef   String?
+  sentAt        DateTime?
   failureReason String?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  seller      Seller       @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  seller        Seller        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   ledgerEntries LedgerEntry[]
 
   @@index([sellerId, status])
@@ -1208,40 +1219,40 @@ enum JobStatus {
 }
 
 model TryOnJob {
-  id            String    @id @default(uuid(7))
-  userId        String?
-  sessionId     String?
-  userPhotoId   String
-  variantId     String
-  mode          TryOnMode @default(FAST)
-  status        JobStatus @default(QUEUED)
+  id          String    @id @default(uuid(7))
+  userId      String?
+  sessionId   String?
+  userPhotoId String
+  variantId   String
+  mode        TryOnMode @default(FAST)
+  status      JobStatus @default(QUEUED)
 
   /// ⚠️ EN BÜYÜK MALİYET KALDIRACI.
   /// sha256(photoContentHash + variantId + mode + promptVersion)
   /// Aynı foto + aynı ürün ikinci kez ÜRETİLMEZ, önbellekten döner.
-  cacheKey      String    @unique
+  cacheKey String @unique
 
-  provider      String?
-  providerJobId String?
-  resultKey     String?
+  provider         String?
+  providerJobId    String?
+  resultKey        String?
   /// Görsel güven skoru (0-100). Beden güveninden AYRI gösterilir.
   visualConfidence Int?
 
-  attempts      Int       @default(0)
-  errorCode     String?
-  errorMessage  String?
+  attempts     Int     @default(0)
+  errorCode    String?
+  errorMessage String?
 
   /// Gerçek maliyet — sağlayıcının döndürdüğü değerden yazılır.
-  costMicroUsd  BigInt?
-  latencyMs     Int?
+  costMicroUsd BigInt?
+  latencyMs    Int?
 
-  queuedAt      DateTime  @default(now())
-  startedAt     DateTime?
-  finishedAt    DateTime?
+  queuedAt   DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
 
-  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userPhoto     UserPhoto @relation(fields: [userPhotoId], references: [id], onDelete: Cascade)
-  variant       Variant   @relation(fields: [variantId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userPhoto UserPhoto @relation(fields: [userPhotoId], references: [id], onDelete: Cascade)
+  variant   Variant   @relation(fields: [variantId], references: [id])
 
   @@index([userId, queuedAt])
   @@index([status, queuedAt])
@@ -1300,26 +1311,26 @@ model StylistConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  StylistMessage[]
+  user     User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages StylistMessage[]
 
   @@index([userId, updatedAt])
   @@map("ai_stylist_conversations")
 }
 
 model StylistMessage {
-  id             String   @id @default(uuid(7))
-  conversationId String
-  role           String   // "user" | "assistant"
-  content        String
+  id                  String   @id @default(uuid(7))
+  conversationId      String
+  role                String // "user" | "assistant"
+  content             String
   /// LLM'in çağırdığı araçlar ve dönen ürünler — "uydurma ürün" denetimi için.
-  toolCalls      Json?
+  toolCalls           Json?
   /// Bu mesajda önerilen ürün kimlikleri.
   suggestedProductIds String[]
-  costMicroUsd   BigInt?
-  createdAt      DateTime @default(now())
+  costMicroUsd        BigInt?
+  createdAt           DateTime @default(now())
 
-  conversation   StylistConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation StylistConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@map("ai_stylist_messages")
@@ -1333,9 +1344,9 @@ model StylistMessage {
 /// durumu oluşmaz.
 model OutboxEvent {
   id          String    @id @default(uuid(7))
-  aggregate   String    // "order"
+  aggregate   String // "order"
   aggregateId String
-  type        String    // "order.paid"
+  type        String // "order.paid"
   payload     Json
   publishedAt DateTime?
   attempts    Int       @default(0)
@@ -1384,10 +1395,10 @@ model WebhookEvent {
 /// Hassas işlemlerin denetim izi: komisyon değişikliği, satıcı askıya alma,
 /// kullanıcı fotoğrafına break-glass erişim, payout onayı.
 model AuditLog {
-  id         String    @id @default(uuid(7))
+  id         String   @id @default(uuid(7))
   actorId    String
   actorRole  Role
-  action     String    // "commission.rule.updated"
+  action     String // "commission.rule.updated"
   entityType String
   entityId   String
   before     Json?
@@ -1395,7 +1406,7 @@ model AuditLog {
   /// Break-glass erişimlerde zorunlu gerekçe.
   reason     String?
   ipAddress  String
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
@@ -1404,9 +1415,9 @@ model AuditLog {
 
 /// Arama eş anlamlıları — admin yönetir. "sneaker" ↔ "spor ayakkabı"
 model SearchSynonym {
-  id      String   @id @default(uuid(7))
-  term    String
-  synonyms String[]
+  id        String   @id @default(uuid(7))
+  term      String
+  synonyms  String[]
   createdAt DateTime @default(now())
 
   @@unique([term])

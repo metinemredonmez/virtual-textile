@@ -56,6 +56,7 @@ export function AltBilgi() {
         { etiket: 'Giriş yap', adres: '/login' },
         { etiket: 'Hesap oluştur', adres: '/register' },
         { etiket: 'Siparişlerim', adres: '/account/orders' },
+        { etiket: 'Ölçülerim', adres: '/account/measurements' },
         { etiket: 'Gardırobum', adres: '/account/wardrobe' },
       ],
     },
