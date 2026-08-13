@@ -44,16 +44,31 @@ export const TEMA_SECENEKLERI = ['acik', 'koyu', 'sistem'] as const;
 export type TemaSecimi = (typeof TEMA_SECENEKLERI)[number];
 
 /**
- * ⚠️ VARSAYILAN `sistem`, ve YÖNETİM PANELİNE ÖZEL VARSAYILAN YOK.
- *    Rota önekine bakan bir dal (`pathname.startsWith('/admin')`) rota
- *    adının ÜÇÜNCÜ bir kopyasını doğururdu — ve o kopyanın bayatlaması
- *    varsayım değil: rota adları bu depoda BİR KEZ topluca değişti
- *    (`/yonetim` → `/admin`). Bedeli açıkça: açık temalı bir işletim sisteminde
- *    panele ilk giren yönetici artık AÇIK tema görür ve koyuyu tek tıkla
- *    seçer (seçim kalıcıdır). `design-system.md` koyuyu bir REFERANS TERCİHİ
- *    olarak yazıyor, işlevsel bir kısıt olarak değil.
+ * ⚠️ VARSAYILAN `acik` — ÜRÜN KARARI, teknik tercih değil.
+ *
+ *    Bir dönem `sistem` idi ve teknik olarak daha "doğru" görünüyordu:
+ *    kullanıcının işletim sistemi tercihine uy. Ama burası bir MODA VİTRİNİ ve
+ *    ayrıştırıcısı sanal deneme GÖRSELİ. `design-system.md`nin gerekçe bölümü
+ *    bunu söylüyor: o görselin işe yaraması için etrafın SUSMASI gerekir.
+ *
+ *    Ürün fotoğrafları beyaz/nötr fonda çekiliyor. Koyu zeminde aynı görsel
+ *    kesik bir kare gibi durur ve kumaşın rengi olduğundan farklı algılanır —
+ *    satın alma kararının tam da dayandığı şey. Bu, tema tercihinden daha
+ *    ağır basar.
+ *
+ * ⚠️ BEDELİ AÇIKÇA: işletim sisteminde koyu tema seçmiş bir kullanıcı bu siteyi
+ *    AÇIK açar; onun için bir sürprizdir. Karşılığında ürün görselinin doğru
+ *    göründüğü bir vitrin alıyoruz. Seçim tek tıkla değişir ve KALICIDIR
+ *    (çerez, bir yıl) — sürpriz bir kez yaşanır.
+ *
+ * ⚠️ YÖNETİM PANELİNE ÖZEL VARSAYILAN YOK ve olmayacak. Rota önekine bakan bir
+ *    dal (`pathname.startsWith('/admin')`) rota adının ÜÇÜNCÜ bir kopyasını
+ *    doğururdu; o kopyanın bayatlaması varsayım değil — rota adları bu depoda
+ *    BİR KEZ topluca değişti (`/yonetim` → `/admin`). `design-system.md` koyuyu
+ *    yönetim için REFERANS TERCİHİ olarak yazıyor, işlevsel kısıt olarak değil;
+ *    yönetici koyuyu tek tıkla seçer ve seçimi kalır.
  */
-export const TEMA_VARSAYILAN: TemaSecimi = 'sistem';
+export const TEMA_VARSAYILAN: TemaSecimi = 'acik';
 
 /** 1 yıl. Tercih oturumdan uzun yaşar. */
 export const TEMA_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
