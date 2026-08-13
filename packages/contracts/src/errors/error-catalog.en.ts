@@ -169,6 +169,11 @@ export const ERROR_CATALOG_EN = {
   PAYOUT_BELOW_MINIMUM: 'A payout request must be at least {minAmount}.',
   COMMISSION_RULE_NOT_FOUND: 'Commission rule not found. The operation could not be completed.',
 
+  // ── SİTE İÇERİĞİ ──────────────────────────────────────────────────────
+  SITE_IMAGE_NOT_FOUND: 'Site image not found.',
+  SITE_IMAGE_TARGET_INVALID: 'The selected target is not valid for this image type: {slot}',
+  SITE_IMAGE_TOO_MANY_CARDS: 'A banner can carry at most {max} product cards.',
+
   // ── GENEL ─────────────────────────────────────────────────────────────
   VALIDATION_FAILED: 'There are errors in the information you submitted.',
   NOT_FOUND: 'Record not found.',

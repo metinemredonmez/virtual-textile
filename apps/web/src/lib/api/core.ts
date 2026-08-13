@@ -41,7 +41,16 @@ export type IdempotentPath =
   | `/me/photos/${string}/confirm`
   | `/logistics/packages/${string}/delivered`
   | `/admin/orders/${string}/refund`
-  | `/admin/payouts/${string}/approve`;
+  | `/admin/payouts/${string}/approve`
+  /**
+   * ⚠️ Site görseli ONAY adımı listede OLMAK ZORUNDA: uç `@Idempotent()`
+   *    taşıyor (satır yaratıyor + public kovaya türev yazıyor) ve anahtarsız
+   *    istek `VALIDATION_FAILED` alır. Buraya yazılmazsa `apiFetch`e
+   *    `idempotencyKey` GEÇİLEMEZ (tip `never`) ve ekran DERLENMEZ.
+   *    BİLET ucu (`POST /admin/site-images`) burada YOK ve olmamalı — DB'ye
+   *    yazmıyor, yalnız imzalı adres üretiyor.
+   */
+  | `/admin/site-images/${string}/confirm`;
 
 type IdempotencyOption<P extends string> = P extends IdempotentPath
   ? { idempotencyKey: string }

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Fiyat } from '@/components/fiyat/fiyat';
 import { BedenOnerisi } from './beden-onerisi';
-import { SepeteEkle } from './sepete-ekle';
+import { SepeteEkle } from '@/components/urun/sepete-ekle';
 
 /**
  * EYLEM BLOĞU — ürün detayının üç bloğundan biri.

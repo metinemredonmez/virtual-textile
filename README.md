@@ -244,6 +244,14 @@ doğrulanır; bir anahtar eksik veya bozuksa süreç BAŞLAMAZ.** Üç hafta son
 `apps/web/.env.local` (ayrı ve dar): `API_URL` `APP_URL` `SESSION_REDIS_URL` `SESSION_SECRET`
 `NEXT_PUBLIC_MEDIA_URL`.
 
+> ⚠️ `NEXT_PUBLIC_MEDIA_URL` **iki ortamda aynı değildir ve olmamalıdır.** Yerelde
+> doğrudan R2'nin `pub-<hash>.r2.dev` adresi; üretimde `http://91.99.183.64/medya`,
+> yani kendi nginx'imizin önbelleklediği yol. Sebep ölçüldü: `r2.dev` Cloudflare'in
+> GELİŞTİRME adresi ve hız sınırlı — aynı anahtar arka arkaya çekildiğinde TLS el
+> sıkışması düşüyor ve vitrin görseli yer tutucuya iniyor. Kod bu ayrımda
+> DALLANMAZ; fark yalnızca bu değerde. Ayrıntı ve dağıtım kapısı:
+> [`docs/medya-dagitimi.md`](docs/medya-dagitimi.md).
+
 Üretimde boş bırakılamayan 10 anahtar `env.ts` içinde `superRefine` ile ayrıca zorlanır ve
 her biri **sonucuyla birlikte** hata verir (`FAL_KEY` eksikse: "sanal deneme çalışmaz").
 

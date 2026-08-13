@@ -67,10 +67,14 @@ export interface MediaStoragePort {
  *    Kullanıcı fotoğrafında staging gerekmez: nihai adresi zaten private
  *    kovadadır, temizlenmiş sürüm aynı anahtarın üzerine yazılır.
  *
- * ⚠️ ENTEGRASYON NOTU: `visibilityForKey()` (adapters) `staging/` ön ekini
- *    bilmiyor ve bilinmeyen önekleri "public" sayıyor. Bu modül her çağrıda
- *    `visibility`'yi AÇIKÇA veriyor, o yüzden burada risk yok; yine de şema
- *    sahibinin `privatePrefixes` listesine `'staging/'` eklemesi doğru olur.
+ * ⚠️ YUKARIDAKİ NOT BAYATLAMIŞTI, DÜZELTİLDİ. Eski hâli "`visibilityForKey()`
+ *    `staging/` ön ekini bilmiyor" diyordu; ÖLÇTÜM — artık biliyor:
+ *    `storage.provider.ts` → `privatePrefixes` ve `r2.config.ts` →
+ *    `KNOWN_KEY_PREFIXES` listelerinin ikisinde de var. Yani `staging/…`
+ *    anahtarına yanlışlıkla `visibility: 'public'` verilirse çağrı artık
+ *    SESSİZCE çalışmaz, `assertVisibilityMatchesKey` fırlatır. Not olduğu gibi
+ *    bırakılsaydı bir sonraki okuyucu var olmayan bir açığı kapatmaya çalışır
+ *    ya da daha kötüsü, "bu liste güncellenmiyor" diye kendi önekini yazmazdı.
  */
 export const mediaKeys = {
   /** ⚠️ private kova — ham, EXIF'li yükleme. İşlendikten sonra SİLİNİR. */
@@ -94,6 +98,35 @@ export const mediaKeys = {
    * kalmaz — yanlış kimlik, var olmayan bir anahtara işaret eder.
    */
   userPhoto: (userId: string, photoId: string): string => `user-photos/${userId}/${photoId}`,
+
+  // ── Site görselleri (adminden yönetilen afiş / kapak) ────────────────────
+  //
+  // ⚠️ Görev metnindeki "GENEL kovaya yazılır" ifadesi İKİYE AYRILIR, çünkü
+  //    olduğu gibi uygulanırsa ürün görselinde bilerek kapatılmış bir açığı
+  //    afiş yolundan geri açar:
+  //
+  //      NİHAİ NESNE için DOĞRU  → `site/banner/<id>/…` = PUBLIC kova.
+  //                                Afiş sır değildir, CDN'den imzasız gider.
+  //      İMZALI PUT HEDEFİ için YANLIŞ → ham dosya ASLA public kovaya inmez.
+  //
+  //    Gerekçe ürün görselindekiyle birebir aynı (bkz. yukarısı): imzalı URL
+  //    ile gelen dosya EXIF taşır. Afişi çeken de bir insandır; doğrudan
+  //    public kovaya yazsaydık, biz işleyene kadar — işleme hiç çalışmazsa
+  //    sonsuza kadar — çekim konumu CDN'den indirilebilir olurdu.
+  //
+  //    Ham yükleme bu yüzden `staging/site/<siteImageId>` altına iner. Önek
+  //    `staging/` olduğu için iki gizlilik listesi de onu ZATEN tanıyor; yeni
+  //    bir private önek açılmıyor, yani unutulacak bir satır da yok.
+
+  /** ⚠️ private kova — ham, EXIF'li afiş yüklemesi. İşlenince SİLİNİR. */
+  siteImageStaging: (siteImageId: string): string => `staging/site/${siteImageId}`,
+
+  /** public kova — EXIF'i temizlenmiş asıl afiş. */
+  siteImageOriginal: (siteImageId: string): string => `site/banner/${siteImageId}/original`,
+
+  /** public kova — afiş türevleri. Genişlikler `SITE_BANNER_WIDTHS`ten. */
+  siteImage: (siteImageId: string, width: number): string =>
+    `site/banner/${siteImageId}/${width}.webp`,
 } as const;
 
 // ══════════════════════════ KATALOG (ÜRÜN GÖRSELİ) ══════════════════════════

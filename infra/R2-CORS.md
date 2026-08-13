@@ -48,9 +48,25 @@ yapılır.
 
 `r2-cors.json` — kova: `R2_BUCKET_PRIVATE` (`vt-private-user-photos`).
 
-`AllowedOrigins` **üretimde `APP_URL` ile değiştirilir**; `*` yazılmaz. İmzalı
-URL'ler kısa ömürlüdür ama süre dolana kadar herhangi bir sitenin
-tarayıcıdan kullanmasına izin vermek için bir sebep yok.
+`AllowedOrigins` **iki kökeni de sayar**: `http://localhost:3000` (geliştirme) ve
+`http://91.99.183.64` (üretim `APP_URL`i). `*` yazılmaz — imzalı URL'ler kısa
+ömürlüdür ama süre dolana kadar herhangi bir sitenin tarayıcıdan kullanmasına
+izin vermek için bir sebep yok.
+
+> ⚠️ **ESKİDEN "üretimde `APP_URL` ile DEĞİŞTİRİLİR" YAZIYORDU; DEĞİŞTİ.**
+> Dosyada yalnız `localhost:3000` duruyordu, yani kural bir İNSAN ADIMIna
+> bırakılmıştı. O adım atlanırsa arıza SESSİZDİR ve tam olarak yukarıda
+> ölçülen biçimde döner: `curl PUT` 200 verir (curl CORS uygulamaz), sunucu
+> ve imza doğrudur, yalnız **tarayıcının** ön uçuşu 403 alır — yerelde çalışan
+> akış canlıda kırılır ve hiçbir log satırı bunu söylemez. İki köken aynı
+> listede durunca atlanacak adım kalmıyor.
+>
+> Bu kayıt yeni **site görselleri** (afiş/kapak) yüklemesini de kapsar: aynı
+> imzalı akış, aynı özel kova (`staging/site/…`), aynı `PUT` + `content-type`.
+> Ayrı bir CORS kaydı gerekmez.
+>
+> Alan adı bağlanınca `https://…` kökeni bu listeye EKLENİR; eskisi geçiş
+> bitene kadar silinmez.
 
 Genel ürün kovasına (`R2_BUCKET_PUBLIC`) CORS **gerekmez**: o görseller
 `next/image` üzerinden SUNUCUDAN çekiliyor, tarayıcı çapraz köken isteği

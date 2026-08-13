@@ -166,6 +166,17 @@ export const RETRY_POLICY = {
   PAYOUT_PENDING_EXISTS: YOK,
   PAYOUT_BELOW_MINIMUM: YOK,
   COMMISSION_RULE_NOT_FOUND: YOK,
+  /*
+    ⚠️ ÜÇÜ DE `YOK` VE ÜÇÜ DE BİLİNÇLİ. Site görseli hataları yönetici
+       kararlarının sonucudur, geçici arıza değil: kayıt başkası tarafından
+       silinmiş (`NOT_FOUND`), seçilen kategori/koleksiyon artık yok
+       (`TARGET_INVALID`), ya da kart sınırı dolmuş (`TOO_MANY_CARDS`).
+       Hiçbirinde aynı isteği tekrarlamak sonucu değiştirmez; "Tekrar dene"
+       düğmesi çıkarmak yöneticiyi aynı duvara defalarca çarptırırdı.
+  */
+  SITE_IMAGE_NOT_FOUND: YOK,
+  SITE_IMAGE_TARGET_INVALID: YOK,
+  SITE_IMAGE_TOO_MANY_CARDS: YOK,
   VALIDATION_FAILED: YOK,
   NOT_FOUND: YOK,
   DUPLICATE_RESOURCE: YOK,

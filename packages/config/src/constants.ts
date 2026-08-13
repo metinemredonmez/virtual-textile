@@ -103,6 +103,69 @@ export const SIGNED_URL_TTL_SECONDS = {
   aiProviderInput: 600,
 } as const;
 
+// ── Site görselleri (adminden yönetilen afiş / kapak) ──────────────────────
+
+/**
+ * YÖNETİLEN SİTE GÖRSELİ YÜZEYLERİ.
+ *
+ * ⚠️ POSTGRESQL ENUM'I DEĞİL, BİLİNÇLİ OLARAK. `ALTER TYPE ... ADD VALUE`
+ *    GERİ ALINAMAZ (ölçüldü: `20260812150000_tryon_category_accessories`) ve
+ *    bu, sıradan bir ürün kararı için fazla ağır bir taahhüt: dördüncü yüzeyi
+ *    eklemek ikinci bir geri alınamaz migration demek olurdu.
+ *
+ * ⚠️ SERBEST METİN DE DEĞİL. Uç `slot: string` kabul etseydi `home.her0` yazan
+ *    bir istek 201 döner, satır yazılır ve vitrinde HİÇBİR ŞEY değişmezdi —
+ *    bu depoda altı kez yaşanan "yazıldı ama hiçbir yere bağlanmadı"
+ *    arızasının tam biçimi.
+ *
+ * Üçüncü yol: geçerli değerler BURADA, tek kaynakta; Zod enum'ı buradan
+ * TÜRETİLİR (`siteImageSlotSchema`) ve bir test ucun kabul ettiği her değerin
+ * bu listede olduğunu ölçer. O test olmadan serbest listenin bütün dezavantajı
+ * geri gelir.
+ *
+ * Emsal: `MEDIA.productImageWidths`, `TRYON_PROVIDER_CAPABILITIES`.
+ */
+export const SITE_IMAGE_SLOTS = ['HERO', 'CATEGORY_COVER', 'COLLECTION_COVER'] as const;
+export type SiteImageSlot = (typeof SITE_IMAGE_SLOTS)[number];
+
+/**
+ * Afiş türev genişlikleri — `MEDIA.productImageWidths` DEĞİL.
+ *
+ * Ürün görseli 4:5 dikey ve bir ızgara hücresinde 320px'e kadar küçülür. Afiş
+ * 16/7 yatay ve ekranın tamamını kaplar; 320px'lik bir türev hiçbir kırılma
+ * noktasında seçilmez, yalnızca her yüklemede boşuna üretilip depolanır.
+ */
+export const SITE_BANNER_WIDTHS = [640, 1024, 1600, 2048] as const;
+
+/**
+ * Afişin üzerinde duran ürün kartı sayısı tavanı.
+ *
+ * ⚠️ Bu bir YERLEŞİM ÖLÇÜMÜdür, keyfi bir sayı değil: 1280px ekranda kap
+ *    1248px, afişin alt kenarına yaslanan şeritte kart 240px + 16px boşluk.
+ *    Dördüncü kart 1024px'te taşar. Tavanı SUNUCU da uygular; "istemci zaten
+ *    üç gösteriyor" demek, 400 dönmesi gereken bir isteği kabul etmektir.
+ */
+export const SITE_IMAGE_MAX_CARDS = 3;
+
+/**
+ * Koleksiyon iniş sayfalarının slug listesi.
+ *
+ * ⚠️ BURADA OLMASININ SEBEBİ ÖLÇÜLDÜ. Metin `apps/web/app/(magaza)/collection/
+ *    koleksiyonlar.ts` içinde ve orada KALIR (başlık, SSS, kategori adayları —
+ *    hepsi ekran metni). Ama `COLLECTION_COVER` kapağının `targetKey`'ini
+ *    API'nin doğrulaması gerekiyor ve `apps/api` o dosyayı GÖREMİYOR:
+ *    `apps/api/tsconfig.json`'da yol eşlemesi yok, `apps/api` ve `packages`
+ *    içinde tek bir `koleksiyonlar` referansı yok. Doğrulama olmasaydı
+ *    yönetici `spor-gıyım` yazar, satır yazılır, kapak hiçbir sayfada
+ *    görünmezdi.
+ *
+ *    Paylaşılan şey YALNIZCA slug listesi. `koleksiyonlar.ts` kendini buna
+ *    `satisfies Record<(typeof KOLEKSIYON_SLUGLARI)[number], Koleksiyon>` ile
+ *    bağlar → iki tarafın ayrışması DERLEMEYİ KIRAR, sessizce sapmaz.
+ */
+export const KOLEKSIYON_SLUGLARI = ['denim', 'gelinlik', 'spor-giyim', 'elbise'] as const;
+export type KoleksiyonSlug = (typeof KOLEKSIYON_SLUGLARI)[number];
+
 // ── Kullanıcı fotoğrafı saklama (KVKK) ────────────────────────────────────
 export const PHOTO_RETENTION = {
   /** "Yalnızca bu işlem için kullan" seçilirse. */

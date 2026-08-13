@@ -69,15 +69,22 @@ export const en = {
   },
 
   vitrin: {
-    baslik: 'See it on you before you buy.',
+    baslik: 'Independent brands, one place.',
     aciklama:
-      'Use virtual try-on to see how a garment looks on you, and check the fit with a separate score.',
+      'Discover products from independent brands, buy from several stores in a single basket — and see it on your own photo before you buy.',
     urunleriKesfet: 'Explore products',
+
+    yeniGelenler: 'New arrivals',
+    yeniGelenlerNot: 'The latest pieces added by our stores.',
+    indirimdekiler: 'On sale',
+    indirimdekilerNot: 'Products currently below their list price.',
     vitrinde: 'Featured',
     oneCikanlar: 'Featured',
     tumunuGor: 'See all',
     tumu: 'All',
     tumKategoriler: 'All categories',
+
+    afistekiParcalar: 'Items in this banner',
 
     nasilCalisir: 'How it works',
     adim1Baslik: 'Upload your photo',
@@ -112,7 +119,13 @@ export const en = {
     koleksiyonlarNot: 'Entry points curated around what you are looking for.',
     magazalar: 'Stores',
     magazalarNot:
-      'Try pieces from different stores in the same outfit and buy them in a single basket.',
+      'Every store manages its own products; you buy pieces from several of them in a single basket.',
+    magazaUrunSayisi: '{adet} products in this selection',
+
+    saticiOl: 'Sell your brand here',
+    saticiOlMetin:
+      'A marketplace built for small brands: you manage your own products while payments and shipping run on the platform. Work out the commission and your payout in advance.',
+    saticiOlDugme: 'Calculate payout',
     danismanBaslik: 'Not sure what to wear?',
     danismanMetin:
       'The style advisor weighs what is already in your wardrobe together with what you liked, then suggests outfits.',
@@ -222,5 +235,117 @@ export const en = {
     JEWELRY: 'Jewellery',
     BAG: 'Bags',
     ACCESSORY: 'Accessories',
+  },
+
+  medyaYukleme: {
+    dosyaSecin: 'Choose a file first.',
+    bicimGecersiz: 'Only JPG, PNG or WebP files can be uploaded.',
+    boyutAsildi: 'The file can be at most {mb} MB.',
+    /**
+     * ⚠️ Does NOT say "try again" — retrying cannot work. Measured
+     *    (`infra/R2-CORS.md`): the private bucket has no CORS rules, so the
+     *    preflight returns 403 while `curl PUT` to the same URL returns 200.
+     *    This is a bucket setting, not a transient failure.
+     */
+    depoEngellendi:
+      'The file could not be uploaded to storage: the browser request was blocked by the storage service. This is not a problem with the file — until CORS rules are applied to the R2 bucket (infra/r2-cors.json), no browser upload can complete. Retrying will not change the result. The same error also appears if your connection dropped.',
+    depoHatasi: 'The file could not be uploaded to storage (HTTP {durum}).',
+  },
+
+  siteGorselleri: {
+    baslik: 'Site images',
+    aciklama:
+      'Storefront banners and cover images are managed here. These are SITE images, not product photos: they are independent of seller uploads and stay in place even if a product is unpublished.',
+    yuzeySekmesi: 'Image surface',
+    kategoriOkunamadi:
+      'The category list could not be loaded, so no new cover can be uploaded on this tab. Please refresh the page.',
+
+    slot: {
+      HERO: 'Storefront banner',
+      CATEGORY_COVER: 'Category cover',
+      COLLECTION_COVER: 'Collection cover',
+    },
+
+    bos: {
+      HERO: 'No storefront banner is defined — the home page still works.',
+      HEROAciklama:
+        'While no banner is defined, the home page storefront shows the photo of the first product in the list. Publishing an uploaded banner replaces it; unpublishing it returns the site to the first product’s image.',
+      CATEGORY_COVER: 'No category has a cover image.',
+      CATEGORY_COVERAciklama:
+        'A category page without a cover is drawn without one and does not break. When uploading a cover you must choose which category it belongs to.',
+      COLLECTION_COVER: 'No collection has a cover image.',
+      COLLECTION_COVERAciklama:
+        'Collection copy is defined in code and cannot be edited here; the only managed item is the cover image. A collection without a cover is drawn without one.',
+    },
+
+    alan: {
+      baslik: 'Title',
+      altBaslik: 'Subtitle',
+      bagAdresi: 'Link target',
+      sira: 'Order',
+      istegeBagli: '(optional)',
+      bagIpucu:
+        'An in-site path starting with a single slash (e.g. /collection/denim). External addresses are rejected.',
+      vazgec: 'Cancel',
+    },
+
+    yukle: {
+      dugme: 'Upload {yuzey}',
+      formBasligi: 'New image — {yuzey}',
+      dosya: 'File',
+      dosyaIpucu:
+        'JPG, PNG or WebP · at most {mb} MB. The storefront banner is cropped wide (16/7); a narrow image loses its top and bottom.',
+      kategori: 'Category',
+      koleksiyon: 'Collection',
+      secin: 'Select…',
+      kategoriIpucu:
+        'The cover is bound to the category id, not its address: the cover stays in place even if the category address changes.',
+      koleksiyonIpucu: 'Collection copy is defined in code; only the cover image is managed here.',
+      pasifUyarisi:
+        'An uploaded image starts out unpublished; use “Publish” on its row to make it visible on the site.',
+      sonuc: 'Image uploaded ({en}×{boy}). You can publish it from the list below.',
+      adimBilet: 'Requesting address…',
+      adimYukleme: 'Uploading…',
+      adimOnay: 'Processing…',
+      gonder: 'Upload',
+    },
+
+    satir: {
+      basliksiz: 'Untitled image',
+      yayinda: 'Published',
+      pasif: 'Unpublished',
+      hedef: 'Target: {etiket}',
+      hedefYok: 'not found ({anahtar}) — this cover is not shown on the site',
+      siraNo: 'order {n}',
+      bag: 'link: {yol}',
+      yayinaAl: 'Publish',
+      yayindanKaldir: 'Unpublish',
+      duzenle: 'Edit',
+      kaydediliyor: 'Saving…',
+      medyaAdresiYok: 'Media address is not configured (NEXT_PUBLIC_MEDIA_URL)',
+      sil: 'Delete',
+      silOnay: 'Delete the image permanently',
+      silEngeli:
+        'A published image cannot be deleted — unpublish it first, check the site, then delete.',
+    },
+
+    kartlar: {
+      baslik: 'Product cards on the banner',
+      bos: 'No cards selected. The banner is shown on its own and no “Try It On” button appears on the home page. Select 2-3 products to show try-on right on the banner.',
+      denemeKapali: 'Try-on unavailable — the card shows only “Add to Cart”',
+      denemeKapaliKisa: 'Try-on unavailable',
+      varyantYok: 'No active variant — “Add to Cart” will not appear either',
+      kaldir: 'Remove',
+      urunEkle: 'Add product',
+      dolu: 'The card slots are full. Remove one to add another product.',
+      urunAra: 'Search products',
+      ornek: 'linen shirt',
+      araniyor: 'Searching…',
+      sonucYok: 'No published product matches. An unpublished product cannot be linked to a card.',
+      ekle: 'Add',
+      ekli: 'Added',
+      kismiUyari:
+        'The “Try-on unavailable” badge here reads only half of the gate; the definitive state appears in the list once the card is added. A product without try-on can still be selected — its card shows only “Add to Cart”.',
+    },
   },
 } satisfies Sozluk;

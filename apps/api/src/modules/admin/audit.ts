@@ -66,6 +66,19 @@ export const AUDIT_ACTION = {
   payoutApproved: 'payout.approved',
   payoutRejected: 'payout.rejected',
   photoBreakGlass: 'user.photo.break_glass_access',
+  /**
+   * Site içeriği — vitrin afişi, kategori/koleksiyon kapağı.
+   *
+   * ⚠️ Denetleniyor çünkü bu kayıtlar SİTENİN YÜZÜNÜ değiştirir: afişi kimin
+   *    ne zaman değiştirdiği, "ana sayfada bu neden duruyor" sorusunun tek
+   *    cevabıdır. `storageKey` kayda yazılmaz — `SENSITIVE_KEYS` onu zaten
+   *    gizliyor ve gerek de yok: hangi görsel olduğunu `entityId` taşıyor.
+   */
+  siteImageCreated: 'site.image.created',
+  siteImageUpdated: 'site.image.updated',
+  siteImageDeleted: 'site.image.deleted',
+  siteImageCardAdded: 'site.image.card.added',
+  siteImageCardRemoved: 'site.image.card.removed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

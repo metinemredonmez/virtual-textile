@@ -36,7 +36,20 @@ export const YONETIM_MENUSU: readonly MenuGrubu[] = [
   },
   {
     baslik: 'Katalog',
-    satirlar: [{ ad: 'Kategoriler', ikon: 'kategori', yol: '/admin/categories' }],
+    satirlar: [
+      { ad: 'Kategoriler', ikon: 'kategori', yol: '/admin/categories' },
+      /**
+       * ⚠️ YOL DÜZ METİN OLARAK YAZILI, DEĞİŞKENE ALINMADI. `yan-menu.test.ts:33`
+       *    bu dosyayı DÜZ METİN OLARAK okuyup bir düzenli ifadeyle tarıyor,
+       *    import etmiyor; sabite çıkarılan bir yol testin gözünde YOK olur ve
+       *    "menüde var, sayfası yok" kapısı sessizce açılır.
+       *
+       * ⚠️ Bu yorumda o düzenli ifadenin KENDİSİ YAZILAMAZ: tarama bu dosyayı
+       *    ham metin olarak okuduğu için desen kendi kendini yakalıyor ve test
+       *    "([^" adında olmayan bir rota bildiriyordu (ÖLÇÜLDÜ).
+       */
+      { ad: 'Site görselleri', ikon: 'gorsel', yol: '/admin/site-gorselleri' },
+    ],
   },
   {
     baslik: 'Finans',

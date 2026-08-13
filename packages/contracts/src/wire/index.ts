@@ -22,6 +22,9 @@ export * from './size.js';
 export * from './media.js';
 export * from './search.js';
 export * from './account.js';
+// ⚠️ `catalog.js`ten SONRA gelir: `site.js` ondan `TryOnCategoryWire` okuyor,
+//    böylece vitrin kartı ile ürün detayı o union'ın TEK kopyasını paylaşıyor.
+export * from './site.js';
 // ⚠️ Panel tel tipleri. `seller.js` ÖNCE gelir: `admin.js` ondan
 //    `ProductStatusWire`/`SellerStatusWire`/`PayoutStatusWire` okuyor ve iki
 //    panel bu enum'ların TEK kopyasını paylaşıyor.

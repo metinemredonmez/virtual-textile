@@ -15,6 +15,7 @@ export {
   assertVisibilityMatchesKey,
   resolveSignedUrlTtl,
   r2ConfigFromEnv,
+  KNOWN_KEY_PREFIXES,
   MAX_SIGNED_URL_TTL_SECONDS,
   type R2Config,
 } from './r2.config.js';

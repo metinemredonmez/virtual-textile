@@ -1,4 +1,8 @@
-import type { TryOnCategoryName } from '@vt/config/constants';
+import {
+  KOLEKSIYON_SLUGLARI,
+  type KoleksiyonSlug,
+  type TryOnCategoryName,
+} from '@vt/config/constants';
 
 /**
  * İNİŞ SAYFALARININ TEK VERİ KAYNAĞI.
@@ -177,12 +181,35 @@ const KOLEKSIYONLAR = {
       },
     ],
   },
-} as const satisfies Record<string, Koleksiyon>;
+  /**
+   * ⚠️ `Record<string, …>` DEĞİL, `Record<KoleksiyonSlug, …>` — VE BU FARK
+   *    BİR DERLEME KAPISIDIR, süs değil.
+   *
+   *    Slug listesi artık iki tarafça okunuyor: ekran metni BURADA, ama
+   *    `COLLECTION_COVER` kapağının `targetKey` doğrulaması API'de
+   *    (`admin-site-image.service.ts` → `@vt/config` → `KOLEKSIYON_SLUGLARI`).
+   *    `apps/api` bu dosyayı GÖREMİYOR (tsconfig yol eşlemesi yok), yani iki
+   *    liste ancak TİP düzeyinde bağlanabilir.
+   *
+   *    `Record<string, …>` her iki yönde de sessizdi: buraya "trençkot"
+   *    eklenirse yönetici kapak yükleyemez (API slug'ı tanımaz), config'e
+   *    eklenip buraya eklenmezse yönetici kapağı YÜKLER ve kapak hiçbir
+   *    sayfada görünmez. İkisi de derlemeyi kırmadan geçerdi.
+   *
+   *    `satisfies` iki yönü de kapatıyor: eksik anahtar → "missing property",
+   *    fazla anahtar → object literal fazlalık denetimi.
+   */
+} as const satisfies Record<KoleksiyonSlug, Koleksiyon>;
 
-export type KoleksiyonSlug = keyof typeof KOLEKSIYONLAR;
+/**
+ * ⚠️ Tek kaynak `@vt/config`; burada YENİDEN TÜRETİLMİYOR (`Object.keys` idi).
+ *    Türetilseydi yukarıdaki `satisfies` kapısı sağlanmış olsa bile "liste"
+ *    iki ayrı diziden gelirdi. Yeniden dışa aktarım, çağıranların tek bir
+ *    import noktası görmesi için.
+ */
+export { KOLEKSIYON_SLUGLARI, type KoleksiyonSlug };
 
-export const KOLEKSIYON_SLUGLARI = Object.keys(KOLEKSIYONLAR) as KoleksiyonSlug[];
-
+/** Ekran sırası = bu dosyadaki bildirim sırası (config dizisiyle aynı). */
 export const KOLEKSIYON_LISTESI: readonly Koleksiyon[] = Object.values(KOLEKSIYONLAR);
 
 /** Bilinmeyen slug `undefined` döner — çağıran taraf `notFound()` çağırır. */

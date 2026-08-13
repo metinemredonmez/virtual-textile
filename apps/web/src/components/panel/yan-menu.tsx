@@ -9,6 +9,7 @@ import {
   Boxes,
   ClipboardCheck,
   FolderTree,
+  Image as ImageIcon,
   LayoutDashboard,
   Menu,
   Package,
@@ -91,6 +92,9 @@ const IKONLAR = {
   moderasyon: ClipboardCheck,
   uyari: ShieldAlert,
   kategori: FolderTree,
+  // ⚠️ `Image` DEĞİL `ImageIcon` diye alındı: `next/image`in varsayılan dışa
+  //    aktarımı da `Image` ve bu dosyaya bir gün o da girerse ad çakışırdı.
+  gorsel: ImageIcon,
   komisyon: Percent,
   rapor: BarChart3,
   denetim: ScrollText,

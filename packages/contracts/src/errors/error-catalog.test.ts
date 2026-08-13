@@ -21,9 +21,14 @@ import { errorMessage, wireErrorMessage } from './error-message.js';
  *      düzeyinde görünmez.
  */
 describe('hata kataloğu — diller arası tutarlılık', () => {
-  it('her dil TAM 111 kod taşır ve anahtar kümeleri birebir eşittir', () => {
+  it('her dil TAM 114 kod taşır ve anahtar kümeleri birebir eşittir', () => {
     // ⚠️ Alt sınır iddiası: tarama boşalırsa test var olmamasıyla aynı şeydir.
-    expect(ERROR_CODES.length).toBe(111);
+    //
+    // 111 → 114: site içeriği turunda üç kod eklendi (SITE_IMAGE_NOT_FOUND,
+    // SITE_IMAGE_TARGET_INVALID, SITE_IMAGE_TOO_MANY_CARDS). Sayının ELLE
+    // güncellenmesi gerekmesi bir zahmet değil, TASARIM: kod eklemek bilinçli
+    // bir karar olmalı ve bu satır o kararın kaydı.
+    expect(ERROR_CODES.length).toBe(114);
 
     for (const locale of LOCALES) {
       expect(Object.keys(ERROR_MESSAGES[locale]).sort()).toEqual([...ERROR_CODES].sort());

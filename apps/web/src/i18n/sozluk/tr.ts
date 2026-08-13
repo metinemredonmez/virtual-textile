@@ -82,15 +82,42 @@ export const tr = {
    *    Doğru olan oydu; tavan yükseltilmedi.
    */
   vitrin: {
-    baslik: 'Satın almadan önce üzerinizde görün.',
+    /**
+     * ⚠️ BU İKİ CÜMLE BU TURDA DEĞİŞTİ, ÇÜNKÜ YANLIŞ İŞİ ANLATIYORDU.
+     *
+     *    Eskisi: "Satın almadan önce üzerinizde görün." + sanal deneme açıklaması.
+     *    Yani ana sayfa kendini bir SANAL DENEME ARACI olarak tanıtıyordu.
+     *
+     *    Oysa burası bir PAZARYERİ: küçük markalar kendi ürünlerini satıyor,
+     *    müşteri platformun. Sanal deneme bu işin bir ÖZELLİĞİ — en ayırt
+     *    edici olanı, ama işin kendisi değil.
+     *
+     * ⚠️ AYIRT EDİCİ İDDİA "sanal deneme" DEĞİL, "TEK SEPET". Sanal denemeyi
+     *    yapan başkaları da var; farklı markaların parçalarını AYNI sepette tek
+     *    ödemeyle satmak bizim tarafımızda. Alt başlık ikisini birlikte söylüyor.
+     */
+    baslik: 'Küçük markalar, tek adres.',
     aciklama:
-      'Sanal deneme ile kıyafetin üzerinizde nasıl durduğunu görün, bedeninize uygun olup olmadığını ayrı bir skorla değerlendirin.',
+      'Bağımsız markaların ürünlerini keşfedin, farklı mağazalardan seçtiklerinizi tek sepette satın alın — ve satın almadan önce kendi fotoğrafınızda deneyin.',
     urunleriKesfet: 'Ürünleri keşfet',
+
+    yeniGelenler: 'Yeni gelenler',
+    yeniGelenlerNot: 'Mağazaların en son eklediği parçalar.',
+    indirimdekiler: 'İndirimdekiler',
+    indirimdekilerNot: 'Liste fiyatının altına düşen ürünler.',
     vitrinde: 'Vitrinde',
     oneCikanlar: 'Öne çıkanlar',
     tumunuGor: 'Tümünü gör',
     tumu: 'Tümü',
     tumKategoriler: 'Tüm kategoriler',
+
+    /**
+     * ⚠️ Afişin altına inen mobil şeridin ekran okuyucu adı.
+     *    Kartların DÜĞME metinleri burada DEĞİL: `urun.uzerimdeDene` ve
+     *    `urun.sepeteEkle` zaten yazılıydı ve hiçbir yerden okunmuyordu.
+     *    İkinci bir kopya açmak, aynı düğmenin iki ekranda ayrışması demekti.
+     */
+    afistekiParcalar: 'Afişteki parçalar',
 
     nasilCalisir: 'Nasıl çalışır',
     adim1Baslik: 'Fotoğrafınızı yükleyin',
@@ -129,7 +156,14 @@ export const tr = {
     koleksiyonlarNot: 'Aradığınız şeye göre hazırlanmış giriş noktaları.',
     magazalar: 'Mağazalar',
     magazalarNot:
-      'Farklı mağazaların parçalarını aynı kombinde deneyebilir, tek sepette satın alabilirsiniz.',
+      'Her mağaza kendi ürünlerini yönetir; farklı mağazaların parçalarını tek sepette satın alırsınız.',
+    /** ⚠️ "bu seçkide" — TOPLAM DEĞİL. Sayı 48'lik örneklemden geliyor. */
+    magazaUrunSayisi: 'Bu seçkide {adet} ürün',
+
+    saticiOl: 'Markanızı burada satın',
+    saticiOlMetin:
+      'Küçük markalar için kurulmuş bir pazaryeri: ürünlerinizi siz yönetirsiniz, ödeme ve kargo süreci platformda işler. Komisyon oranını ve elinize geçecek tutarı önceden hesaplayın.',
+    saticiOlDugme: 'Kazancı hesapla',
     danismanBaslik: 'Ne giyeceğinize karar veremiyorsanız',
     danismanMetin:
       'Stil danışmanı dolabınızdaki parçaları ve beğendiklerinizi birlikte değerlendirip kombin önerir.',
@@ -274,6 +308,143 @@ export const tr = {
     JEWELRY: 'Takı',
     BAG: 'Çanta',
     ACCESSORY: 'Aksesuar',
+  },
+
+  /**
+   * İMZALI YÜKLEMENİN İSTEMCİ TARAFI METİNLERİ (`lib/media/use-imzali-yukleme`).
+   *
+   * ⚠️ BU ÜÇ METİN `ERROR_CATALOG`A KOYULAMAZ ve koyulmamalı: kataloğun
+   *    anahtarı `ErrorCode`tur ve bu üç durumun hiçbiri sunucudan gelmiyor —
+   *    ikisi istek daha atılmadan istemcide yakalanıyor, üçüncüsü ise
+   *    tarayıcının ön uçuşta düşürdüğü bir istek (`OPTIONS` 403). Sunucunun
+   *    haberi olmayan bir arızanın kodu da olamaz.
+   */
+  medyaYukleme: {
+    dosyaSecin: 'Önce bir dosya seçin.',
+    bicimGecersiz: 'Yalnızca JPG, PNG veya WebP yükleyebilirsiniz.',
+    boyutAsildi: 'Dosya en fazla {mb} MB olabilir.',
+    /**
+     * ⚠️ "Tekrar deneyin" DEMEZ, ÇÜNKÜ TEKRAR DENEMEK ÇALIŞMAZ. Ölçüldü
+     *    (`infra/R2-CORS.md`): özel kovada CORS tanımlı olmadığı için ön uçuş
+     *    403 dönüyor, aynı adrese `curl PUT` 200. Bu bir kova AYARI; metin
+     *    bunu söylemezse yönetici aynı dosyayı beş kez dener.
+     */
+    depoEngellendi:
+      'Dosya depoya yüklenemedi: tarayıcı isteği depo tarafından engellendi. Bu bir dosya hatası değil — R2 kovasında CORS tanımlı olmadığı sürece hiçbir tarayıcı yüklemesi tamamlanamaz (infra/r2-cors.json kovaya uygulanmalı). Tekrar denemek sonucu değiştirmez. İnternet bağlantınız koptuysa da aynı hata görünür.',
+    depoHatasi: 'Dosya depoya yüklenemedi (HTTP {durum}).',
+  },
+
+  /**
+   * YÖNETİM → SİTE GÖRSELLERİ.
+   *
+   * ⚠️ BU EKRANIN METNİ SÖZLÜKTE, kardeş yönetim ekranlarınınki JSX'te. Fark
+   *    bilinçli: `gomulu-metin.test.ts` circiri "borç ARTMADI" diyor ve yeni
+   *    bir ekranın metnini JSX'e gömmek o sayıyı ARTIRIR. Tavanı büyütmek
+   *    (dosyanın kendi uyarısı) bir kararı sessizce geri almak olurdu; doğru
+   *    hamle metni buraya taşımak. Kardeş ekranlar taşındıkça fark kapanır.
+   */
+  siteGorselleri: {
+    baslik: 'Site görselleri',
+    aciklama:
+      'Vitrin afişi ve kapak görselleri buradan yönetilir. Bunlar SİTE görselidir, ürün fotoğrafı değil: satıcıların yüklediği görsellerden bağımsızdır ve ürün yayından kalksa bile yerinde durur.',
+    yuzeySekmesi: 'Görsel yüzeyi',
+    kategoriOkunamadi:
+      'Kategori listesi okunamadı; bu sekmede yeni kapak yüklenemez. Sayfayı yenileyin.',
+
+    slot: {
+      HERO: 'Vitrin afişi',
+      CATEGORY_COVER: 'Kategori kapağı',
+      COLLECTION_COVER: 'Koleksiyon kapağı',
+    },
+
+    /**
+     * ⚠️ BOŞ DURUM "KAYIT YOK" DEMEZ. Afiş tanımlanmamışsa ana sayfa
+     *    BOZULMUYOR, bugünkü davranışına (ilk ürünün görseli) düşüyor — ve
+     *    bunu söyleyen başka hiçbir yer yok. Metin bunu söylemezse yönetici
+     *    "sayfa bozuldu mu" diye bakar.
+     */
+    bos: {
+      HERO: 'Tanımlı vitrin afişi yok — ana sayfa çalışmaya devam ediyor.',
+      HEROAciklama:
+        'Afiş tanımlanmadığı sürece ana sayfanın vitrininde listedeki ilk ürünün fotoğrafı gösterilir. Yüklediğiniz afişi yayına aldığınızda onun yerini alır; yayından kaldırdığınızda site yine ilk ürünün görseline döner.',
+      CATEGORY_COVER: 'Hiçbir kategorinin kapak görseli yok.',
+      CATEGORY_COVERAciklama:
+        'Kapağı olmayan kategori sayfası kapaksız çizilir, bozulmaz. Kapak yüklerken hangi kategoriye ait olduğunu seçmeniz gerekir.',
+      COLLECTION_COVER: 'Hiçbir koleksiyonun kapak görseli yok.',
+      COLLECTION_COVERAciklama:
+        'Koleksiyon metinleri kodda tanımlı ve buradan değiştirilemez; yönetilen tek şey kapak görselidir. Kapağı olmayan koleksiyon kapaksız çizilir.',
+    },
+
+    alan: {
+      baslik: 'Başlık',
+      altBaslik: 'Alt başlık',
+      bagAdresi: 'Bağlantı adresi',
+      sira: 'Sıra',
+      istegeBagli: '(isteğe bağlı)',
+      bagIpucu:
+        'Site içi bir yol, tek eğik çizgiyle başlar (ör. /collection/denim). Dış adres kabul edilmez.',
+      vazgec: 'Vazgeç',
+    },
+
+    yukle: {
+      dugme: '{yuzey} yükle',
+      formBasligi: 'Yeni görsel — {yuzey}',
+      dosya: 'Dosya',
+      dosyaIpucu:
+        'JPG, PNG veya WebP · en fazla {mb} MB. Vitrin afişi geniş kesilir (16/7); dar bir görselin üstü ve altı kırpılır.',
+      kategori: 'Kategori',
+      koleksiyon: 'Koleksiyon',
+      secin: 'Seçin…',
+      kategoriIpucu:
+        'Kapak kategorinin kimliğine bağlanır, adresine değil: kategori adresi değişse de kapak yerinde kalır.',
+      koleksiyonIpucu:
+        'Koleksiyon metinleri kodda tanımlı; buradan yalnızca kapak görseli yönetilir.',
+      pasifUyarisi:
+        'Yüklenen görsel pasif başlar; sitede görünmesi için listedeki satırdan “Yayına al” deyin.',
+      sonuc: 'Görsel yüklendi ({en}×{boy}). Aşağıdaki listeden yayına alabilirsiniz.',
+      adimBilet: 'Adres alınıyor…',
+      adimYukleme: 'Yükleniyor…',
+      adimOnay: 'İşleniyor…',
+      gonder: 'Yükle',
+    },
+
+    satir: {
+      basliksiz: 'Başlıksız görsel',
+      yayinda: 'Yayında',
+      pasif: 'Pasif',
+      hedef: 'Hedef: {etiket}',
+      hedefYok: 'bulunamadı ({anahtar}) — bu kapak sitede gösterilmiyor',
+      siraNo: 'sıra {n}',
+      bag: 'bağlantı: {yol}',
+      yayinaAl: 'Yayına al',
+      yayindanKaldir: 'Yayından kaldır',
+      duzenle: 'Düzenle',
+      kaydediliyor: 'Kaydediliyor…',
+      medyaAdresiYok: 'Medya adresi tanımsız (NEXT_PUBLIC_MEDIA_URL)',
+      sil: 'Sil',
+      silOnay: 'Görseli kalıcı olarak sil',
+      silEngeli:
+        'Yayındaki görsel silinemez — önce “Yayından kaldır” deyin, siteyi kontrol edin, sonra silin.',
+    },
+
+    kartlar: {
+      baslik: 'Afişin üstündeki ürün kartları',
+      bos: 'Kart seçilmedi. Afiş tek başına gösterilir ve ana sayfada “Üzerimde Dene” düğmesi çıkmaz. 2-3 ürün seçerek denemeyi afişin üstünde gösterebilirsiniz.',
+      denemeKapali: 'Deneme kapalı — kartta yalnız “Sepete Ekle” çıkar',
+      denemeKapaliKisa: 'Deneme kapalı',
+      varyantYok: 'Aktif varyant yok — “Sepete Ekle” de çıkmaz',
+      kaldir: 'Kaldır',
+      urunEkle: 'Ürün ekle',
+      dolu: 'Kart sayısı doldu. Yeni ürün eklemek için birini kaldırın.',
+      urunAra: 'Ürün ara',
+      ornek: 'keten gömlek',
+      araniyor: 'Aranıyor…',
+      sonucYok: 'Eşleşen yayındaki ürün yok. Yayında olmayan ürün karta bağlanamaz.',
+      ekle: 'Ekle',
+      ekli: 'Ekli',
+      kismiUyari:
+        'Buradaki “Deneme kapalı” rozeti kapının yalnız yarısını okur; kesin durum kart eklendikten sonra listede görünür. Denenemeyen ürün de seçilebilir — kartında yalnız “Sepete Ekle” çıkar.',
+    },
   },
 } as const;
 

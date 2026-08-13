@@ -74,6 +74,20 @@ export const storageKeys = {
   returnPhoto: (returnId: string, index: number): string => `returns/${returnId}/${index}.webp`,
 
   storeLogo: (storeId: string): string => `stores/${storeId}/logo.webp`,
+
+  /**
+   * SİTE GÖRSELİ — vitrin afişi, kategori/koleksiyon kapağı.
+   *
+   * ⚠️ ÜRÜN GÖRSELİ DEĞİL ve `products/` altına YAZILMAZ: sahibi satıcı değil
+   *    platformdur, silinmesi satıcı verisiyle birlikte olmamalıdır.
+   *
+   * public kova — site afişi sır değildir, CDN'den imzasız servis edilir.
+   * Ham yükleme yine de `staging/site/<id>` altına iner (bkz. mediaKeys).
+   */
+  siteImage: (siteImageId: string, width: number): string =>
+    `site/banner/${siteImageId}/${width}.webp`,
+
+  siteImageOriginal: (siteImageId: string): string => `site/banner/${siteImageId}/original`,
 } as const;
 
 /**
@@ -92,6 +106,24 @@ export const storageKeys = {
  *               adres bütün profili açar.
  *   staging/  → işlenmemiş HAM yükleme. EXIF'i, dolayısıyla çekildiği yerin
  *               GPS koordinatını hâlâ taşır (bkz. media.ports.ts → mediaKeys).
+ *
+ * ⚠️ `site/` ÖNEKİ PUBLIC'TİR VE LİSTEYE GİRMEZ — ama bu satır yine de
+ *    YAZILIR, çünkü "listede yok" iki ayrı şey demek olabiliyor: (a) düşünüldü,
+ *    public olduğuna karar verildi, (b) eklemek UNUTULDU. İkisi kodda
+ *    birbirinden ayırt edilemez ve (b) sessiz bir sızıntıdır. Buradaki not, bir
+ *    sonraki okuyucuya kararın (a) olduğunu söyler:
+ *
+ *      site/ → adminden yönetilen vitrin afişi ve kategori/koleksiyon kapağı.
+ *              Herkese gösterilmek ÜZERE yüklenir; imzalı okuma anlamsız
+ *              olurdu (afişi görmek için oturum gerekmez) ve her görüntülemede
+ *              imza üretmek vitrini yavaşlatırdı. Kişisel veri taşımaz: EXIF
+ *              onay adımında temizlenir, ham dosya `staging/site/…` altında
+ *              private kalır ve işlem biter bitmez silinir.
+ *
+ *    Karar `r2.config.ts` → `KNOWN_KEY_PREFIXES` içinde de görünür olmalıdır;
+ *    orada olmasaydı `put({ key: 'site/…', visibility: 'private' })` sessizce
+ *    kabul edilir, nesne private kovaya iner ve `publicUrl()` yine de geçerli
+ *    görünen ama 404 dönen bir adres üretirdi.
  */
 export function visibilityForKey(key: string): StorageVisibility {
   const privatePrefixes = [

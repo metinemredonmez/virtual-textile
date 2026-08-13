@@ -452,6 +452,8 @@ model Product {
   images     ProductImage[]
   reviews    Review[]
   favorites  Favorite[]
+  /// Vitrin afişinin üzerinde gösterildiği kartlar (bkz. SiteImageCard).
+  siteImageCards SiteImageCard[]
 
   @@index([sellerId, status])
   @@index([categoryId, status, publishedAt])
@@ -1409,4 +1411,102 @@ model SearchSynonym {
 
   @@unique([term])
   @@map("search_synonyms")
+}
+
+// ═══════════════════════════ SİTE İÇERİĞİ ═════════════════════════════════
+
+/// Adminden yönetilen SİTE görseli — ürün görseli DEĞİL.
+///
+/// Bugün vitrin afişi ilk ürünün fotoğrafıdır ve yönetici onu seçemez. Bu
+/// tablo o kararı yöneticiye verir: afiş, kategori kapağı ve koleksiyon
+/// kapağı buradan gelir.
+///
+/// ⚠️ `Category.coverKey` YOLU REDDEDİLDİ. Anahtarı kategori satırına bir
+///    kolon olarak eklemek genişlik/yükseklik/blurhash/yükleyen/denetim
+///    bilgisini kaybettirir ve admin panelinde İKİNCİ bir yükleme aracı
+///    doğurur; üç yüzey de aynı tablodan yönetilince yükleme akışı tektir.
+///
+/// ⚠️ `slot` STRING'dir, PostgreSQL enum'ı değil. Gerekçe @vt/config →
+///    SITE_IMAGE_SLOTS: `ALTER TYPE ... ADD VALUE` geri alınamaz. Geçerli
+///    değerler config'te tek kaynakta ve uç onları Zod ile dayatıyor.
+///
+/// ⚠️ ÇOK DİLLİLİK: `title`/`subtitle` TEK KOLON, kaynak dil (TR). İkinci bir
+///    kolon (`titleEn`) BU TURDA AÇILMAZ çünkü `aktifLocale()` sabit
+///    `VARSAYILAN_LOCALE` döndürüyor ve `[locale]` rotası yok — yazılır ama
+///    hiçbir yerden okunmazdı. İleri şekil hazır: `SiteImageTranslation
+///    (siteImageId, locale, title, subtitle) @@unique([siteImageId, locale])`.
+///    Düşme kuralı ŞİMDİDEN geçerli: çeviri yoksa kaynak dil, asla boş.
+model SiteImage {
+  id   String @id @default(uuid(7))
+  /// @vt/config → SITE_IMAGE_SLOTS. 'HERO' | 'CATEGORY_COVER' | 'COLLECTION_COVER'
+  slot String
+
+  /// Kapağın bağlandığı hedef. HERO'da NULL (site tektir, hedefi yoktur).
+  ///
+  /// ⚠️ CATEGORY_COVER'da `Category.id`dir, SLUG DEĞİL: slug @unique ama
+  ///    değişmez değil, admin bir gün düzeltir ve kapak sessizce boşa düşerdi.
+  ///    COLLECTION_COVER'da koleksiyon slug'ıdır — koleksiyonun DB karşılığı
+  ///    yok, iniş sayfaları statik (@vt/config → KOLEKSIYON_SLUGLARI).
+  ///    Bu yüzden FK YOK; doğrulama YAZMA anında yapılır, okuma HOŞGÖRÜLÜdür
+  ///    (kategori sonradan silinirse o kapak yok sayılır, sayfa kırılmaz).
+  targetKey String?
+
+  /// Public kovadaki nesne anahtarı (`site/banner/<id>/original`).
+  ///
+  /// ⚠️ @unique: onay ucu ağ zaman aşımında tekrarlanabilir; aynı nesne için
+  ///    ikinci bir satır açılmamalı.
+  storageKey String @unique
+
+  widthPx  Int
+  heightPx Int
+  blurhash String?
+
+  title    String?
+  subtitle String?
+  /// Afişe tıklanınca gidilecek yer. Boşsa afiş bir bağlantı değildir.
+  linkHref String?
+
+  /// ⚠️ Varsayılan KAPALI. Yükleme biter bitmez canlıya çıkmaz; yönetici
+  ///    görseli görüp açar. Ters olsaydı yarım kalan bir deneme vitrine düşerdi.
+  isActive  Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  /// Yükleyen yönetici (User.id). FK YOK: yönetici hesabı KVKK ile silinse
+  /// bile afiş sitede durmalı — kapak, kişisel veri değildir.
+  createdBy String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cards SiteImageCard[]
+
+  /// Vitrin okuması: slot + aktiflik + sıra.
+  @@index([slot, isActive, sortOrder])
+  /// Kategori/koleksiyon kapağı okuması.
+  @@index([slot, targetKey, sortOrder])
+  @@map("content_site_images")
+}
+
+/// Afişin ÜZERİNDE duran ürün kartı — hangi ürünün gösterileceğini admin seçer.
+///
+/// ⚠️ `productIds String[]` DEĞİL, JOIN TABLOSU. Dizide silinmiş bir ürün
+///    kimliği kalır ve hero kırık bir kart çizer; FK + cascade ile kart
+///    kendiliğinden düşer.
+///
+/// ⚠️ FK YAYIN DURUMUNU BİLMEZ. Ürün ARCHIVED'a çekilince satır durur ama
+///    kart gösterilmemelidir; okuma sorgusu AYRICA `status = PUBLISHED`
+///    filtreler.
+model SiteImageCard {
+  id          String @id @default(uuid(7))
+  siteImageId String
+  productId   String
+  sortOrder   Int    @default(0)
+
+  siteImage SiteImage @relation(fields: [siteImageId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Aynı ürün aynı afişe iki kez bağlanmaz.
+  @@unique([siteImageId, productId])
+  @@index([siteImageId, sortOrder])
+  @@map("content_site_image_cards")
 }

@@ -8,7 +8,7 @@ import { Fiyat } from '@/components/fiyat/fiyat';
 import { DenemeGorseli } from './deneme-gorseli';
 import { GuvenSkorlari } from './guven-skorlari';
 import { ParcaKaruseli } from './parca-karuseli';
-import { SepeteEkle } from './sepete-ekle';
+import { SepeteEkle } from '@/components/urun/sepete-ekle';
 import { FotografAdimi } from './fotograf-adimi';
 import { FotografIslemeRizasi, YurtDisiAktarimRizasi } from './riza-modallari';
 import { useDeneme } from './use-deneme';

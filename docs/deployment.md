@@ -258,6 +258,34 @@ server {
 > saldırgan başlığı uydurup hız limitini atlatabilirdi. Proxy sayısı değişirse bu
 > sayı da güncellenmelidir.
 
+### 5.1 Medya önbelleği — **iki dosya, ikisi de kopyalanır**
+
+Canlıdaki gerçek yapılandırma `infra/nginx/` altındadır ve **tek dosya değildir**:
+
+```bash
+cp infra/nginx/vt.conf       /etc/nginx/sites-available/vt
+cp infra/nginx/vt-cache.conf /etc/nginx/conf.d/vt-cache.conf     # ⚠️ ZORUNLU
+install -d -o www-data -g www-data -m 0700 /var/cache/nginx/vt-medya
+nginx -t && systemctl reload nginx
+```
+
+`vt-cache.conf` yalnızca `proxy_cache_path` içerir. **Ayrı dosya olması zorunlu**:
+bu yönerge yalnızca `http{}` bağlamında geçerlidir, `vt.conf` ise baştan sona tek
+bir `server{}` bloğudur. `vt.conf`a konursa `nginx -t` _"directive is not allowed
+here"_ der ve dağıtım o adımda durur.
+
+Ürün görselleri `pub-<hash>.r2.dev`den **doğrudan** değil, `location /medya/`
+üzerinden **önbelleklenerek** servis edilir. Sebep bir tercih değil bir ölçümdür:
+o adres Cloudflare'in geliştirme adresidir ve hız sınırlıdır — aynı anahtara
+8 istekte 4'ü TLS el sıkışmasında düşüyor. Ayrıntı, ölçümler ve özel alan adı
+bağlandığında **ne kaldırılacağı**: [`docs/medya-dagitimi.md`](medya-dagitimi.md).
+
+> ⚠️ Web ortamında `NEXT_PUBLIC_MEDIA_URL=http://91.99.183.64/medya` olmalı ve
+> **mutlak** yazılmalıdır. Değer `next build` sırasında pakete gömülür — PM2
+> restart yetmez. `scripts/deploy.sh` hem bunu hem önbellek dizininin ve havuzun
+> varlığını denetler, ardından önbelleği ısıtıp `X-Medya-Onbellek` başlığını
+> kanıt olarak okur; başlık yoksa dağıtımı durdurur.
+
 ---
 
 ## 6. Sağlık kontrolü

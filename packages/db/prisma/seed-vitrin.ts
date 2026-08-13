@@ -46,6 +46,7 @@ import { hesaplariYaz } from './seed/hesap.js';
 import { katalogYaz } from './seed/katalog.js';
 import { musteriYaz } from './seed/musteri.js';
 import { depolamaKur } from './seed/gorsel.js';
+import { siteGorselleriYaz } from './seed/site-gorsel.js';
 
 /**
  * KAPI — tam seed'inkinden DAR ama daha az değil.
@@ -131,6 +132,26 @@ async function main(): Promise<void> {
       `  ✓ müşteri: ${musteri.yorumSayisi} yorum · ${musteri.favoriSayisi} favori · ` +
         `${musteri.sepetKalemi} sepet kalemi · ${musteri.gardiropSayisi} gardırop parçası`,
     );
+
+    /**
+     * ⚠️ SİTE GÖRSELLERİ EN SONDA, ÇÜNKÜ İKİ ŞEYE BAĞLI: kategori kimlikleri
+     *    (`katalogYaz`) ve yönetici kullanıcı (`hesaplariYaz` → `createdBy`).
+     *
+     * ⚠️ YÖNETİCİ YOKSA ATLANIR, ATMAZ. `createdBy` zorunlu bir alan; hesap
+     *    seed'i bir sebeple yöneticiyi yazmadıysa burada patlamak, çalışmış
+     *    olan katalog seed'ini de anlamsız bir hatanın arkasına gömerdi.
+     */
+    const yoneticiId = hesap.kullaniciId.get('yonetici@example.com');
+    if (!yoneticiId) {
+      console.warn('  ⚠️ site görseli ATLANDI — yönetici hesabı bulunamadı (createdBy zorunlu)');
+    } else {
+      const site = await siteGorselleriYaz(prisma, storage, katalog.kategoriId, yoneticiId);
+      console.log(`  ✓ site görseli: ${site.yazilan} satır (afiş + kategori/koleksiyon kapakları)`);
+      if (site.atlanan.length > 0) {
+        console.log(`    ↳ ${site.atlanan.length} atlandı: ${site.atlanan.join(', ')}`);
+        console.log('      (üretmek için: FAL_KEY=… pnpm --filter @vt/db seed:vitrin-varlik)');
+      }
+    }
 
     console.log('\n✅ Vitrin seed tamam. Ledger ve sipariş tablolarına DOKUNULMADI.\n');
   } finally {

@@ -846,6 +846,41 @@ export const ERROR_CATALOG = define({
     message: 'Komisyon kuralı bulunamadı. İşlem tamamlanamadı.',
   },
 
+  // ── SİTE İÇERİĞİ (adminden yönetilen afiş / kapak) ────────────────────
+  SITE_IMAGE_NOT_FOUND: {
+    status: 404,
+    family: 'domain',
+    retryable: false,
+    message: 'Site görseli bulunamadı.',
+  },
+  /**
+   * `slot` ile `targetKey` birbirini tutmuyor.
+   *
+   * ⚠️ Ayrı bir kod, çünkü `VALIDATION_FAILED`in göremeyeceği bir şeyi
+   *    söylüyor: Zod `targetKey`in bir dize olduğunu doğrulayabilir ama o
+   *    kategorinin VAR OLUP OLMADIĞINI bilemez. Tek mesajda toplansaydı
+   *    yöneticiye yalnızca "Gönderilen bilgilerde hata var." denirdi ve
+   *    reddin gerçek sebebi kaybolurdu.
+   */
+  SITE_IMAGE_TARGET_INVALID: {
+    status: 422,
+    family: 'domain',
+    retryable: false,
+    message: 'Seçilen hedef bu görsel türü için geçerli değil: {slot}',
+    params: { slot: 'metin' },
+  },
+  /**
+   * Afişe bağlanabilecek kart sayısı tavanı (`SITE_IMAGE_MAX_CARDS`).
+   * Tavan bir YERLEŞİM ölçümüdür: dördüncü kart dar ekranda afişten taşar.
+   */
+  SITE_IMAGE_TOO_MANY_CARDS: {
+    status: 409,
+    family: 'domain',
+    retryable: false,
+    message: 'Bir afişe en fazla {max} ürün kartı eklenebilir.',
+    params: { max: 'sayi' },
+  },
+
   // ── SİSTEM & ALTYAPI ──────────────────────────────────────────────────
   VALIDATION_FAILED: {
     status: 400,

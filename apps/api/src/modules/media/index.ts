@@ -7,6 +7,7 @@ import { PrismaService } from '../../infra/prisma.service.js';
 import { APP_LOGGER } from '../../infra/infra.module.js';
 import type { Logger } from '../../common/logger.js';
 import { MeMediaController, SellerMediaController } from './media.controller.js';
+import { MediaPublicController } from './media-public.controller.js';
 import { MediaService } from './media.service.js';
 import { MediaProductService } from './media-product.service.js';
 import { MEDIA_IMAGE_PROCESSOR, type ImageProcessor } from './image-processor.js';
@@ -84,7 +85,7 @@ export function createImageProcessor(): ImageProcessor {
  * deploy edilen şey yeni bir kod değil, yeni bir env'dir.
  */
 @Module({
-  controllers: [SellerMediaController, MeMediaController],
+  controllers: [SellerMediaController, MeMediaController, MediaPublicController],
   providers: [
     // ── Geçici köprüler (bkz. media.bridges.ts) ──
     {
@@ -141,6 +142,7 @@ export {
   type ProductImageView,
 } from './media-product.service.js';
 export { MeMediaController, SellerMediaController } from './media.controller.js';
+export { MediaPublicController } from './media-public.controller.js';
 
 // Saf çekirdek — diğer modüller bu kuralları yeniden yazmasın.
 export {

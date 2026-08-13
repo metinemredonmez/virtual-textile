@@ -31,6 +31,8 @@ ayrışması teorik değil, ÖLÇÜLMÜŞ bir olay (ürün kartının bir kopyas
 | Para gösterimi                                | `components/fiyat/fiyat.tsx`                               |
 | Para okuma / "sıfırdan büyük mü"              | `lib/money.ts` (`readMinor`, `formatMinor`, `paraPozitif`) |
 | Ürün kartı / ızgara / boş sonuç               | `components/urun/`                                         |
+| Sepete ekle düğmesi                           | `components/urun/sepete-ekle.tsx`                          |
+| Adminden yönetilen site görseli (afiş/kapak)  | `components/vitrin/site-gorseli.ts`                        |
 | Genel (kimliksiz) sunucu isteği               | `lib/api/server.ts` → `serverFetch`                        |
 | **Kimlikli** Sunucu Bileşeni isteği           | `lib/api/server-authed.ts` (`kimligiCoz`, `hesapFetch`)    |
 | Vekil (tarayıcıdan gelen her kimlikli istek)  | `lib/api/proxy.ts`                                         |

@@ -65,8 +65,13 @@ export function bucketFor(config: R2Config, visibility: StorageVisibility): stri
 /**
  * Anahtar şemasında (storage.provider.ts) TANIMLI olan önekler. Yalnızca
  * bunlar için gizlilik sınıfı hakkında kesin konuşabiliriz.
+ *
+ * ⚠️ DIŞA AÇIK: `media-public.controller.ts` bunu BEYAZ LİSTE olarak kullanıyor.
+ *    Orada `visibilityForKey` tek başına yetmiyor — o fonksiyon bilinmeyen her
+ *    öneki 'public' SAYIYOR, yani listeye yazılmayı unutulan private bir alanı
+ *    sessizce açardı. Bu liste varsayılanı KAPALI yapan ikinci kapıdır.
  */
-const KNOWN_KEY_PREFIXES = [
+export const KNOWN_KEY_PREFIXES = [
   'products/',
   'stores/',
   'user-photos/',
@@ -79,6 +84,15 @@ const KNOWN_KEY_PREFIXES = [
   'wardrobe/',
   'exports/',
   'staging/',
+  // ⚠️ `site/` PUBLIC'tir ve TAM DA BU YÜZDEN buraya yazılması zorunlu.
+  //    Aşağıdaki `assertVisibilityMatchesKey` tanınmayan önekte sessizce
+  //    `return` ediyor. `site/` listede olmasaydı, yanlışlıkla
+  //    `put({ key: 'site/banner/…', visibility: 'private' })` yazan bir çağrı
+  //    hiçbir uyarı üretmezdi: nesne private kovaya inerdi, `publicUrl()` kova
+  //    varlığını kontrol etmediği için yine de geçerli GÖRÜNEN bir adres
+  //    dönerdi, yönetici "yükledim" derdi, satır yazılırdı, sayfa 200 dönerdi —
+  //    ve görsel 404 olurdu. Önek burada olduğu için o çağrı artık patlıyor.
+  'site/',
 ] as const;
 
 /**

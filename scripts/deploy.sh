@@ -231,12 +231,16 @@ if [ -d "$KOK/apps/web" ]; then
     hata "    ln -sfn /etc/virtual-textile/web.env $KOK/apps/web/.env.production"
     exit 1
   fi
-  for anahtar in API_URL APP_URL SESSION_SECRET; do
+  # ⚠️ NEXT_PUBLIC_MEDIA_URL BU LİSTEDE: değeri `next build` sırasında pakete
+  #    GÖMÜLÜR. Eksikse `mediaUrl()` her anahtara `null` döndürür ve site
+  #    GÖRSELSİZ derlenir — derleme yeşil, sayfa 200, tek belirti kırık vitrin.
+  for anahtar in API_URL APP_URL SESSION_SECRET NEXT_PUBLIC_MEDIA_URL; do
     grep -q "^$anahtar=" "$KOK/apps/web/.env.production" \
       || { hata "web ortamında $anahtar eksik"; exit 1; }
   done
   bilgi "web ortamı yerinde"
 fi
+
 
 BOS_MB=$(df -Pm "$KOK" | awk 'NR==2 {print $4}')
 [ "$BOS_MB" -gt 2048 ] || uyari "Disk alanı düşük: ${BOS_MB} MB"
@@ -261,6 +265,110 @@ bilgi "yeni   : $(git log --oneline -1)"
 if [ "$ONCEKI_COMMIT" = "$(git rev-parse HEAD)" ]; then
   bilgi "(değişiklik yok — yine de derlenip yeniden yüklenecek)"
 fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+adim "2b/9  Medya kökü ve nginx önbelleği"
+#
+# ⚠️ SIRA: KOD ÇEKİLDİKTEN SONRA, DERLEMEDEN ÖNCE. Sonra olmalı çünkü aşağıdaki
+#    karşılaştırma DEPODAKİ nginx dosyalarını okur ve onlar bu adımdan önce
+#    güncellenmiş olmalı. Önce olmalı çünkü `NEXT_PUBLIC_MEDIA_URL` `next build`
+#    sırasında pakete GÖMÜLÜR — yanlışsa derlemeye hiç girmemek gerekir.
+#
+# ⚠️ BU BLOK BİR ARIZADAN DOĞDU: `pub-<hash>.r2.dev` Cloudflare'in GELİŞTİRME
+#    adresidir ve hız sınırlıdır. Ölçüldü — aynı anahtara 8 istekte 4'ü TLS el
+#    sıkışmasında düşüyor (curl çıkış kodu 35, 429 değil). Çözüm: görseller
+#    kendi nginx'imizden önbelleklenerek servis edilir (`/medya/`).
+#    Gerekçe ve ölçümler: docs/medya-dagitimi.md
+#
+# Burada iki şey KANITLANIR, varsayılmaz:
+#   1. Medya kökü BİZE bakıyorsa nginx tarafı GERÇEKTEN kurulu mu,
+#   2. Depodaki nginx dosyaları sunucudakiyle aynı mı.
+MEDYA_KOK=""
+MEDYA_YOLU=""
+if [ -r "$KOK/apps/web/.env.production" ]; then
+  MEDYA_KOK=$(grep '^NEXT_PUBLIC_MEDIA_URL=' "$KOK/apps/web/.env.production" | cut -d= -f2- | tr -d '"')
+fi
+
+# Kök `/medya` taşıyorsa önbellek yolu KULLANILIYOR demektir.
+case "$MEDYA_KOK" in
+  */medya|*/medya/) MEDYA_YOLU=1 ;;
+esac
+
+# ⚠️ GÖRELİ ADRES SESSİZCE KIRAR. Next `/` ile başlayan `src`i YEREL sayıp
+#    kendi istek işleyicisine yönlendirir; nginx'i hiç görmez ve her görsel
+#    404 olur. Derleme ve testler bunu göremez.
+case "$MEDYA_KOK" in
+  /*) hata "NEXT_PUBLIC_MEDIA_URL GÖRELİ ($MEDYA_KOK) — mutlak olmalı."
+      hata "    doğrusu: http://91.99.183.64/medya"
+      exit 1 ;;
+esac
+
+if [ -n "$MEDYA_YOLU" ]; then
+  bilgi "medya kökü bize bakıyor: $MEDYA_KOK"
+
+  # ⚠️ ÖNBELLEK DİZİNİ — YOKSA nginx `location /medya/`yı hiç servis edemez.
+  #    `proxy_cache_path` dizini kendi yaratabilir ama ÜST dizin ve sahiplik
+  #    tutmazsa nginx başlangıçta düşer.
+  if [ "$(id -u)" = "0" ]; then
+    if [ ! -d /var/cache/nginx/vt-medya ]; then
+      install -d -o www-data -g www-data -m 0700 /var/cache/nginx/vt-medya
+      bilgi "/var/cache/nginx/vt-medya oluşturuldu (soğuk önbellek)"
+    else
+      bilgi "/var/cache/nginx/vt-medya var ($(du -sh /var/cache/nginx/vt-medya 2>/dev/null | cut -f1))"
+    fi
+  else
+    uyari "root değilsin — önbellek dizini kontrol edilemedi. Bir kez:"
+    uyari "    sudo install -d -o www-data -g www-data -m 0700 /var/cache/nginx/vt-medya"
+  fi
+
+  # ⚠️ HAVUZ TANIMI OLMADAN `location /medya/` `nginx -t`i düşürür
+  #    ("zone vt_medya not found"). Yani env çevrilmiş ama conf.d dosyası
+  #    kopyalanmamışsa TÜM SİTE görselsiz kalır. Bunu dağıtımdan önce söyle.
+  if [ ! -r /etc/nginx/conf.d/vt-cache.conf ]; then
+    hata "NEXT_PUBLIC_MEDIA_URL /medya'ya bakıyor ama nginx önbellek havuzu KURULU DEĞİL."
+    hata "    /etc/nginx/conf.d/vt-cache.conf yok → her ürün görseli 404 olur."
+    hata "Bir kez kurun:"
+    hata "    cp $KOK/infra/nginx/vt-cache.conf /etc/nginx/conf.d/vt-cache.conf"
+    hata "    cp $KOK/infra/nginx/vt.conf       /etc/nginx/sites-available/vt"
+    hata "    nginx -t && systemctl reload nginx"
+    exit 1
+  fi
+else
+  # ⚠️ BU ARTIK "ARALIKLI" DEĞİL, ÖLÇÜLMÜŞ BİR ARIZA. 2026-08-13 ölçümü:
+  #    aynı anahtara 8 istek → 8 zaman aşımı (curl rc=28). TCP kuruluyor, TLS
+  #    el sıkışması düşürülüyor; aynı anda cloudflare.com 200, R2'nin S3 ucu
+  #    400 (yani kova ayakta). Yani r2.dev kökü ile site GÖRSELSİZ açılır.
+  hata "NEXT_PUBLIC_MEDIA_URL doğrudan R2'ye bakıyor: ${MEDYA_KOK:-tanımsız}"
+  hata "    r2.dev ölçüldü: 8 istekte 8 zaman aşımı — TÜM görseller kırılır."
+  hata "    Doğrusu: /etc/virtual-textile/web.env içinde"
+  hata "        NEXT_PUBLIC_MEDIA_URL=http://91.99.183.64/medya"
+  hata "    (nginx /medya/ bloğu artık vt-api'nin /v1/media ucunu vekilliyor)"
+  exit 1
+fi
+
+# ⚠️ nginx YAPILANDIRMASI DEPODA DEĞİŞİP SUNUCUDA GÜNCELLENMEMİŞ OLABİLİR.
+#    `git reset --hard` dosyayı depoda günceller; /etc altındaki KOPYAYA
+#    dokunmaz. Bu sessizliği bu betik kapatır: fark varsa yüksek sesle söyle.
+#    ⚠️ Dağıtımı DURDURMAZ — nginx'i buradan reload etmek, çalışan siteyi
+#       gözden geçirilmemiş bir yapılandırmayla değiştirmek olurdu.
+nginx_farki_bildir() {
+  local depo="$1" kurulu="$2"
+  [ -r "$depo" ] || return 0
+  if [ ! -r "$kurulu" ]; then
+    uyari "nginx: $kurulu YOK (depoda $depo var)"
+    uyari "    cp $depo $kurulu && nginx -t && systemctl reload nginx"
+    return 0
+  fi
+  if ! cmp -s "$depo" "$kurulu"; then
+    uyari "nginx yapılandırması DEĞİŞMİŞ ama sunucuya uygulanmamış:"
+    uyari "    depo   : $depo"
+    uyari "    kurulu : $kurulu"
+    uyari "    cp $depo $kurulu && nginx -t && systemctl reload nginx"
+    diff -u "$kurulu" "$depo" 2>/dev/null | head -20 | sed 's/^/      /' || true
+  fi
+}
+nginx_farki_bildir "$KOK/infra/nginx/vt.conf"       /etc/nginx/sites-available/vt
+nginx_farki_bildir "$KOK/infra/nginx/vt-cache.conf" /etc/nginx/conf.d/vt-cache.conf
 
 # ═══════════════════════════════════════════════════════════════════════════
 adim "3/9  Bağımlılıklar"
@@ -498,6 +606,93 @@ else
   uyari "nginx üzerinden /health → ${DIS_KOD:-yanıt yok}"
   uyari "  Host: $NGINX_HOST ile soruldu. Sunucu bloğu bu adı tanıyor mu?"
   uyari "  nginx -t && systemctl reload nginx"
+fi
+
+# ── Medya önbelleği: ÖLÇ ve ISIT ───────────────────────────────────────────
+#
+# ⚠️ SOĞUK ÖNBELLEK DALGASI, DÜZELTMENİN KENDİSİNİN EN RİSKLİ ANIDIR.
+#    `NEXT_PUBLIC_MEDIA_URL` değişince Next'in görsel önbelleği tamamen
+#    geçersizleşir (anahtar tam adresi içerir) ve nginx önbelleği de boştur.
+#    İlk trafik dalgası %100 MISS → r2.dev'e ardışık yüzlerce taze istek → hız
+#    sınırını tetiklemek için İDEAL koşul. `proxy_cache_use_stale` burada
+#    TANIMI GEREĞİ yardım edemez: elde bayat kopya yoktur.
+#    ÖLÇÜLDÜ (2026-08-13, 9 gerçek anahtar, soğuk önbellek):
+#        doğrudan r2.dev  : 2/8 başarılı
+#        nginx üzerinden  : 4/8 başarılı   ← tek deneme YETMİYOR
+#        6 denemeye kadar : 9/9 başarılı, toplam 14 istek
+#    Yani ısıtma DENEMELİ olmalı; tek geçişlik bir döngü işe yaramaz.
+if [ -n "${MEDYA_YOLU:-}" ] && [ -s /tmp/vt-web.html ]; then
+  adim "9b/9  Medya önbelleği"
+
+  # Ana sayfanın kendi HTML'inden gerçek anahtarları çıkar — sabit liste
+  # tutmak, listenin bir gün gerçekle ayrışması demektir.
+  MEDYA_ANAHTARLARI=$(python3 - "$MEDYA_KOK" <<'PY' || true
+import re, sys, urllib.parse
+kok = sys.argv[1].rstrip('/')
+try:
+    html = open('/tmp/vt-web.html', encoding='utf-8', errors='replace').read()
+except OSError:
+    sys.exit(0)
+bulunan = []
+for ham in re.findall(r'/_next/image\?url=([^&"\']+)', html):
+    # ⚠️ TEK çözme. İki kez çözmek, anahtarında `%` geçen bir nesneyi bozardı;
+    #    `url=` parametresi zaten tek kez kodlanmış (canlı HTML'de ölçüldü).
+    adres = urllib.parse.unquote(ham)
+    if adres.startswith(kok + '/'):
+        anahtar = adres[len(kok) + 1:]
+        if anahtar and anahtar not in bulunan:
+            bulunan.append(anahtar)
+print('\n'.join(bulunan))
+PY
+)
+
+  if [ -z "$MEDYA_ANAHTARLARI" ]; then
+    uyari "Ana sayfada $MEDYA_KOK kökünden görsel bulunamadı."
+    uyari "  Ya sayfada görsel yok ya da paket ESKİ kökle derlenmiş."
+    uyari "  Değer derleme zamanında gömülür: PM2 restart YETMEZ, 'next build' gerekir."
+  else
+    ISINAN=0; TOPLAM=0; BASARISIZ=""
+    while IFS= read -r anahtar || [ -n "$anahtar" ]; do
+      [ -n "$anahtar" ] || continue
+      TOPLAM=$((TOPLAM + 1))
+      for _ in 1 2 3 4 5 6; do
+        MK=$(curl -s -o /dev/null -w '%{http_code}' --max-time 25 \
+             -H "Host: $NGINX_HOST" "http://127.0.0.1/medya/$anahtar" || true)
+        [ "$MK" = "200" ] && break
+        sleep 2
+      done
+      if [ "$MK" = "200" ]; then
+        ISINAN=$((ISINAN + 1))
+      else
+        BASARISIZ="$BASARISIZ $anahtar"
+      fi
+    done <<EOF
+$MEDYA_ANAHTARLARI
+EOF
+
+    bilgi "ısıtıldı: $ISINAN/$TOPLAM anahtar"
+    [ -n "$BASARISIZ" ] && uyari "ısınmayan:$BASARISIZ"
+
+    # ⚠️ KABUL ÖLÇÜTÜ. Başlık HİÇ YOKSA `location /medya/` devrede değildir:
+    #    istek `location /`a düşüp Next'e gitmiştir ve HER ürün görseli kırıktır.
+    #    Bu, bu deponun altı kez yaşadığı "yazıldı ama bağlanmadı" sınıfıdır ve
+    #    tam olarak burada yakalanır.
+    ILK_ANAHTAR=$(printf '%s\n' "$MEDYA_ANAHTARLARI" | head -1)
+    MEDYA_BASLIK=$(curl -s -D - -o /dev/null --max-time 25 \
+      -H "Host: $NGINX_HOST" "http://127.0.0.1/medya/$ILK_ANAHTAR" \
+      | grep -i '^x-medya-onbellek:' | tr -d '\r' | cut -d' ' -f2- || true)
+
+    if [ -z "$MEDYA_BASLIK" ]; then
+      hata "X-Medya-Onbellek başlığı YOK → nginx 'location /medya/' devrede değil."
+      hata "    Site görselsiz servis ediliyor olabilir. Kur ve yeniden yükle:"
+      hata "    cp $KOK/infra/nginx/vt.conf       /etc/nginx/sites-available/vt"
+      hata "    cp $KOK/infra/nginx/vt-cache.conf /etc/nginx/conf.d/vt-cache.conf"
+      hata "    nginx -t && systemctl reload nginx"
+      exit 1
+    fi
+    bilgi "X-Medya-Onbellek: $MEDYA_BASLIK  (HIT bekleniyor)"
+    [ "$MEDYA_BASLIK" = "HIT" ] || uyari "HIT değil — önbellek yazmıyor olabilir (izin? disk?)"
+  fi
 fi
 
 # Süreçler gerçekten ayakta mı — 'online' yetmez, ÇÖKÜP DURUYOR olabilir.

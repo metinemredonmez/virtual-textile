@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MEDIA, SIGNED_URL_TTL_SECONDS } from '@vt/config';
 import { AppError } from '@vt/contracts';
-import { storageKeys } from '../storage.provider.js';
+import { storageKeys, visibilityForKey } from '../storage.provider.js';
 import { R2StorageProvider } from './r2.provider.js';
-import { resolveSignedUrlTtl, type R2Config } from './r2.config.js';
+import { assertVisibilityMatchesKey, resolveSignedUrlTtl, type R2Config } from './r2.config.js';
 import type { R2Driver, R2HeadResult, R2PresignInput, R2PutInput } from './r2.driver.js';
 
 const config: R2Config = {
@@ -254,6 +254,52 @@ describe('R2StorageProvider — anahtar doğrulama', () => {
   it('boş anahtarı reddeder', () => {
     const { provider } = setup();
     expect(() => provider.publicUrl('')).toThrow(AppError);
+  });
+});
+
+/**
+ * ═══════════════ SİTE GÖRSELİ ÖN EKİ — `site/` ══════════════════════════════
+ *
+ * ⚠️ BU ÜÇ TEST BİRLİKTE BİR KAPIDIR ve kapının koruduğu şey ölçülmüş bir
+ *    sessizliktir: `assertVisibilityMatchesKey` TANINMAYAN önekte hiçbir şey
+ *    yapmadan `return` ediyor. `site/` iki listeye de yazılmasaydı
+ *    `put({ key: 'site/banner/…', visibility: 'private' })` sessizce kabul
+ *    edilir, nesne private kovaya inerdi — ve `publicUrl()` kova varlığını
+ *    kontrol etmediği için yine de geçerli GÖRÜNEN bir adres üretirdi.
+ *    Sonuç: yönetici "yükledim" der, satır yazılır, sayfa 200 döner, görsel
+ *    404'tür. Testler o yolu kapatıyor.
+ */
+describe('site görseli öneki — gizlilik sınıfı', () => {
+  it('⚠️ `site/` PUBLIC sayılır — afiş herkese gösterilmek üzere yüklenir', () => {
+    expect(visibilityForKey(storageKeys.siteImageOriginal('si-1'))).toBe('public');
+    expect(visibilityForKey(storageKeys.siteImage('si-1', 1600))).toBe('public');
+  });
+
+  it('⚠️ `site/` anahtarı private olarak yazılmak istenirse FIRLATIR', () => {
+    expect(() => assertVisibilityMatchesKey(storageKeys.siteImageOriginal('si-1'), 'private')) //
+      .toThrow(AppError);
+  });
+
+  it('afiş public kovaya, ham yükleme private kovaya gider', async () => {
+    const { provider, driver } = setup();
+
+    await provider.put({
+      key: storageKeys.siteImageOriginal('si-1'),
+      visibility: 'public',
+      body: Buffer.from('x'),
+      contentType: 'image/webp',
+    });
+
+    // Ham yükleme `staging/` önekindedir — afişin kendisi değil.
+    await provider.put({
+      key: 'staging/site/si-1',
+      visibility: 'private',
+      body: Buffer.from('x'),
+      contentType: 'image/jpeg',
+    });
+
+    expect(driver.puts[0]?.bucket).toBe(config.bucketPublic);
+    expect(driver.puts[1]?.bucket).toBe(config.bucketPrivate);
   });
 });
 
