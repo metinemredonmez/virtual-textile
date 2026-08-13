@@ -1,4 +1,10 @@
-import { Money, type MinorString, type MoneyValue } from '@vt/contracts';
+import {
+  Money,
+  VARSAYILAN_LOCALE,
+  type Locale,
+  type MinorString,
+  type MoneyValue,
+} from '@vt/contracts';
 
 /**
  * PARA — TEK OKUMA NOKTASI.
@@ -24,9 +30,18 @@ export function readMinor(value: MinorString): MoneyValue {
   return Money.money(BigInt(value));
 }
 
-/** 129000 → "1.290,00 ₺" */
-export function formatMinor(value: MinorString): string {
-  return Money.formatMoney(readMinor(value));
+/**
+ * 129000 → "₺1.290,00" (tr) · "TRY 1,290.00" (en)
+ *
+ * ⚠️ PARA BİRİMİ DİLE GÖRE DEĞİŞMEZ, yalnız AYRAÇ ve simgenin yeri değişir.
+ *    Dil değiştiren kullanıcı aynı fiyatı görmek zorunda; aksi hâlde sepetteki
+ *    tutarla ödenen tutar ayrışırdı.
+ *
+ * ⚠️ Yol yine `MinorString → BigInt → biçim`. Locale eklenmesi bu zincirin
+ *    HİÇBİR halkasını `Number`a çevirmez.
+ */
+export function formatMinor(value: MinorString, locale: Locale = VARSAYILAN_LOCALE): string {
+  return Money.formatMoney(readMinor(value), locale);
 }
 
 /** İndirim yüzdesi — yalnızca rozet metni için. Tutar hesabında kullanılmaz. */

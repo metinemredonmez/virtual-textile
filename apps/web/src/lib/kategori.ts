@@ -45,7 +45,7 @@ export function kategoriBul(agac: CategoryNodeWire[], slug: string): CategoryNod
  *    Artığın kendisi bu dosyanın sorunu değil, ama sınırsız çizen bir şerit
  *    ana sayfanın öğe bütçesini (3 bölüm) tek başına yiyor ve gerçek kategoriyi
  *    gürültünün içine gömüyor. Bütçe aşılıyorsa yeni bir ekran gerekir,
- *    sıkıştırma değil — o ekran `/kategori`.
+ *    sıkıştırma değil — o ekran `/category`.
  *
  * ⚠️ Sıralama ölçütü ALT KATEGORİSİ OLANLAR ÖNCE: alt dalı olan bir düğüm
  *    gerçek bir taksonomi başlığıdır, yaprak bir kök çoğunlukla tek ürünlük

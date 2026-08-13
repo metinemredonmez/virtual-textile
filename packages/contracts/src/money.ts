@@ -1,3 +1,5 @@
+import { INTL_ETIKET, VARSAYILAN_LOCALE, type Locale } from './i18n/locale.js';
+
 /**
  * PARA — kayan noktalı sayı kullanılmaz.
  *
@@ -160,15 +162,50 @@ export function allocate(m: Money, weights: readonly number[]): Money[] {
   return result;
 }
 
-const TRY_FORMATTER = new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  minimumFractionDigits: 2,
-});
+/**
+ * ⚠️ DİL BAŞINA BİR BİÇİMLEYİCİ — VE PARA BİRİMİ DEĞİŞMEZ.
+ *
+ *    `currency: 'TRY'` sabittir: kullanıcı arayüz dilini İngilizceye çevirdiğinde
+ *    ödeyeceği tutar değişmez. Locale yalnızca ayracı ve simgenin yerini seçer
+ *    ("1.290,00 ₺" ↔ "TRY 1,290.00"). Para birimini dile bağlamak, dil
+ *    değiştiren kullanıcıya BAŞKA BİR FİYAT göstermek olurdu.
+ *
+ * ⚠️ Tekil `TRY_FORMATTER` sabitinin yerine harita geçti; çağrı başına
+ *    `new Intl.NumberFormat` KURULMAZ. Ürün ızgarası tek çizimde 24 fiyat
+ *    basıyor ve `Intl` kurucusu bu depodaki en pahalı gösterim çağrısı.
+ */
+const PARA_BICIMLEYICI = new Map<Locale, Intl.NumberFormat>();
 
-/** Yalnızca gösterim: 12345n → "123,45 ₺" */
-export function formatMoney(m: Money): string {
-  return TRY_FORMATTER.format(toMajor(m));
+function paraBicimleyici(locale: Locale): Intl.NumberFormat {
+  let bicimleyici = PARA_BICIMLEYICI.get(locale);
+  if (!bicimleyici) {
+    bicimleyici = new Intl.NumberFormat(INTL_ETIKET[locale], {
+      style: 'currency',
+      currency: 'TRY',
+      minimumFractionDigits: 2,
+    });
+    PARA_BICIMLEYICI.set(locale, bicimleyici);
+  }
+  return bicimleyici;
+}
+
+/**
+ * Yalnızca gösterim: 12345n → "₺123,45" (tr) · "TRY 123.45" (en)
+ *
+ * ⚠️ Simgenin YERİ de locale'den gelir, elle eklenmez: Türkçede önde (`₺123,45`),
+ *    İngilizcede kod olarak önde (`TRY 123.45`). Bir dizgi birleştirmesiyle
+ *    "123,45 ₺" üretmek iki dilden birinde mutlaka yanlış olurdu. Ayraç
+ *    boşluğu bazı ICU sürümlerinde bölünmez boşluktur (U+00A0); metin
+ *    karşılaştıran testler bunu normalleştirmeli.
+ *
+ * ⚠️ İmza GERİYE UYUMLU: locale verilmezse Türkçe. Onlarca çağrı yerinin
+ *    hepsine ikinci argüman eklemek, bu turda dokunulmaması gereken dosyaları
+ *    da değiştirmek olurdu. Ekran kodunda bu fonksiyon zaten HİÇ görünmez
+ *    (AGENTS.md §3): telden gelen tutar `<Fiyat>`ten, kullanıcının yazdığı
+ *    `<Tutar>`dan geçer ve locale'i o iki bileşen taşır.
+ */
+export function formatMoney(m: Money, locale: Locale = VARSAYILAN_LOCALE): string {
+  return paraBicimleyici(locale).format(toMajor(m));
 }
 
 /** JSON'da bigint serileşmediği için API sınırında string'e çevrilir. */

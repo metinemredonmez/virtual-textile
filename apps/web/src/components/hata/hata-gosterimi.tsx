@@ -3,17 +3,23 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { AlertTriangle } from 'lucide-react';
-import { isApiFailure } from '@vt/contracts';
+import { useLocale, useTranslations } from 'next-intl';
+import { isApiFailure, type Locale } from '@vt/contracts';
 import { retryBehaviourFor } from '@/lib/api/retry-policy';
 import { Button } from '@/components/ui/button';
 
 /**
  * HATA GÖSTERİMİ — TEK GÖRSELLEŞTİRİCİ.
  *
- * ⚠️ `error.message` OLDUĞU GİBİ gösterilir. Backend her hatayı kullanıcıya
- *    gösterilebilir Türkçe mesajla döndürüyor; frontend'de yeniden yazmak İKİ
- *    metin kaynağı üretir ve ikisi zamanla ayrışır. Metin değişikliği
- *    `ERROR_CATALOG`ta yapılır.
+ * ⚠️ METİN KATALOGDAN GELİR — ve çok dilde de öyle. Kural hiçbir zaman "metin
+ *    telde gelir" değildi, "metin `ERROR_CATALOG`ta yazılır"dı. Değişen tek
+ *    şey kataloğun artık iki dili olması: `failure.mesaj(locale)` yine
+ *    katalogdan okuyor. Burada elle bir cümle yazmak İKİ metin kaynağı üretir
+ *    ve ikisi zamanla ayrışır.
+ *
+ * ⚠️ ESKİDEN BURADA ELLE YAZILMIŞ BİR TÜRKÇE CÜMLE VARDI
+ *    (`'Beklenmeyen bir hata oluştu.'`) ve zarfsız hatanın tek metniydi. Çok
+ *    dilde o cümle İngilizce arayüzde Türkçe kalırdı; artık sözlükten geliyor.
  *
  * ⚠️ `error.code` yalnızca DAVRANIŞ seçer (`retry-policy.ts`), metin seçmez.
  *
@@ -34,8 +40,16 @@ export function HataGosterimi({
   onRetry,
   className,
 }: HataGosterimiProps): React.ReactElement {
+  const t = useTranslations();
+  const locale = useLocale() as Locale;
+
   const failure = isApiFailure(error) ? error : null;
-  const mesaj = failure?.userMessage ?? 'Beklenmeyen bir hata oluştu.';
+  /**
+   * ⚠️ `failure.userMessage` DEĞİL `failure.mesaj(locale)`. İlki sunucunun
+   *    Türkçe metni ve artık yalnızca SÜRÜM SAPMASI yedeği: katalogda olmayan
+   *    bir kod geldiğinde `mesaj()` zaten ona düşüyor.
+   */
+  const mesaj = failure ? failure.mesaj(locale) : t('hata.beklenmeyen');
   const davranis = retryBehaviourFor(failure?.code ?? '');
   const kalan = failure?.retryAfterSeconds ?? null;
 
@@ -66,7 +80,7 @@ export function HataGosterimi({
       {onRetry &&
       (davranis.kind === 'dugme' || davranis.kind === 'otomatik' || failure === null) ? (
         <Button variant="ikincil" size="sm" className="mt-3" onClick={onRetry}>
-          Tekrar dene
+          {t('ortak.tekrarDene')}
         </Button>
       ) : null}
 
@@ -79,7 +93,13 @@ export function HataGosterimi({
       */}
       {davranis.kind === 'yonlendir' ? (
         <Button asChild variant="ikincil" size="sm" className="mt-3">
-          <Link href={davranis.href}>{davranis.etiket}</Link>
+          {/*
+            ⚠️ Etiket ANAHTAR olarak geliyor, hazır metin olarak değil.
+               `retry-policy.ts` bir DAVRANIŞ tablosu; oraya Türkçe cümle
+               yazılırsa katalog dışında ikinci bir metin kaynağı doğar ve
+               İngilizce arayüzde Türkçe bir düğme kalır.
+          */}
+          <Link href={davranis.href}>{t(davranis.etiketAnahtari)}</Link>
         </Button>
       ) : null}
 
@@ -88,13 +108,15 @@ export function HataGosterimi({
           geri sayım da çıkmaz — mesajın kendisi "yarın" diyor. */}
       {davranis.kind === 'geri-sayim' && kalan !== null ? (
         <p className="rakam mt-2 text-metin-soluk">
-          {Math.ceil(kalan / 60)} dakika sonra tekrar deneyebilirsiniz.
+          {t('hata.geriSayim', { dakika: Math.ceil(kalan / 60) })}
         </p>
       ) : null}
 
       {/* Destek için: bilinmeyen kodda bile requestId korunur, beyaz ekran yok. */}
       {failure ? (
-        <p className="rakam mt-2 text-xs text-metin-soluk">İstek no: {failure.requestId}</p>
+        <p className="rakam mt-2 text-xs text-metin-soluk">
+          {t('hata.istekNo', { requestId: failure.requestId })}
+        </p>
       ) : null}
     </div>
   );

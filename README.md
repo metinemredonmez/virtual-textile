@@ -67,6 +67,11 @@ pnpm db:seed
 pnpm dev
 ```
 
+`pnpm db:seed` 28 ürün, 6 satıcı, 16 sipariş ve çalışır hâlde bir ledger yazar;
+iki kez çalıştırmak güvenlidir ve hiçbir veri silinmez. Demo hesaplar, görsel
+şeması ve doğrulama adımı için: **[docs/demo-veri.md](docs/demo-veri.md)**
+(tüm demo hesapların parolası `DemoParola2026`).
+
 | Servis        | Adres                 |
 | ------------- | --------------------- |
 | Müşteri web   | http://localhost:3000 |
@@ -87,7 +92,7 @@ pnpm format         # Prettier
 
 pnpm db:migrate     # migration uygula
 pnpm db:studio      # Prisma Studio
-pnpm db:seed        # demo veri
+pnpm db:seed        # demo veri (docs/demo-veri.md)
 
 pnpm infra:up       # altyapı ayağa kalksın
 pnpm infra:reset    # ⚠️ volume'leri siler, sıfırdan kurar

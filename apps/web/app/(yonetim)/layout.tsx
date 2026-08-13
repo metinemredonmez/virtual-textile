@@ -1,14 +1,26 @@
 import type { ReactNode } from 'react';
 import { requireRole } from '@/lib/session/guard';
 import { YanMenuKabugu } from '@/components/panel/yan-menu';
-import { YONETIM_MENUSU } from './yonetim/_kabuk/yan-menu';
+import { YONETIM_MENUSU } from './admin/_kabuk/yan-menu';
 
 /**
- * YÖNETİM PANELİ — KOYU TEMA, TAMAMI korumalı.
+ * YÖNETİM PANELİ — TAMAMI korumalı.
  *
- * ⚠️ Koyu tema `.tema-koyu` sınıfıyla YALNIZCA burada açılır, `<html>` üzerinde
- *    değil. Kök düzeyde açılsaydı vitrin de koyulaşır ve beyaz fonlu ürün
- *    fotoğraflarının kesim çizgileri kaybolurdu.
+ * ⚠️ `.tema-koyu` SINIFI BURADAN KALDIRILDI ve bu bir üslup değişikliği değil,
+ *    YAPISAL BİR DÜZELTME. Sınıf burada dururken `Dialog`/`Sheet` içeriği
+ *    `document.body`ye portal edildiği için temalı kabuğun DIŞINA düşüyordu:
+ *    koyu panelde açılan ilk modal AÇIK temada çizilecekti (AGENTS.md §7 →
+ *    Portal tuzağı). Tema artık `<html>` üzerinde (`lib/tema.ts` → satır içi
+ *    betik), `document.body` zaten onun içinde, tuzak kapandı.
+ *
+ * ⚠️ YÖNETİME ÖZEL VARSAYILAN TEMA YOK — bilinçli. Rota önekine bakan bir dal
+ *    ("`/admin` altındaysa koyu") rota adının ÜÇÜNCÜ bir kopyasını doğururdu,
+ *    üstelik rota adları bu turda zaten değişiyor. Bedeli açıkça: açık temalı
+ *    bir işletim sisteminde panele ilk giren yönetici artık AÇIK tema görür ve
+ *    koyuyu tek tıkla seçer; seçim kalıcıdır. `design-system.md` koyuyu bir
+ *    REFERANS TERCİHİ olarak yazıyor (Linear/Supabase), işlevsel bir kısıt
+ *    olarak değil — ve kullanıcıya "seç" deyip tek ekranda seçimini yok saymak
+ *    anahtarın kendisini yalancı yapardı.
  *
  * ⚠️ Rol Redis'ten değil, her istekte `GET /auth/me`den okunur: yetkisi iptal
  *    edilen bir yönetici 30 gün boyunca paneli görmeye devam ederdi.
@@ -26,7 +38,7 @@ import { YONETIM_MENUSU } from './yonetim/_kabuk/yan-menu';
  * ⚠️ Menü ÇİZİMİ `components/panel/yan-menu.tsx`te ve satıcı paneliyle AYNI
  *    bileşendir; burada yalnızca içerik listesi (`YONETIM_MENUSU`) veriliyor.
  *    Liste rota tablosuyla ELLE senkron tutuluyor; yeni bir `yonetim/<ad>`
- *    ekleyen kişi `yonetim/_kabuk/yan-menu.tsx` içine de bir satır eklemek
+ *    ekleyen kişi `admin/_kabuk/yan-menu.tsx` içine de bir satır eklemek
  *    zorunda. Gerekçe (iki yönlü kural) o dosyanın başlığında.
  */
 export default async function YonetimLayout({ children }: { children: ReactNode }) {
@@ -41,7 +53,7 @@ export default async function YonetimLayout({ children }: { children: ReactNode 
          TAMAMI yatay kayıyordu (taşma 170px). Menünün mobil hâli ve Portal
          tuzağının neden buraya girmediği `panel/yan-menu.tsx` başlığında.
     */
-    <div className="tema-koyu flex min-h-dvh flex-col bg-zemin text-metin md:flex-row">
+    <div className="flex min-h-dvh flex-col bg-zemin text-metin md:flex-row">
       <YanMenuKabugu baslik="Yönetim" gruplar={YONETIM_MENUSU} etiket="Yönetim bölümleri" />
 
       <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>

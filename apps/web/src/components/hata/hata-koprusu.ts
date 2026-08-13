@@ -1,4 +1,4 @@
-import { isApiFailure, type ApiErrorBody } from '@vt/contracts';
+import { errorMessage, isApiFailure, type ApiErrorBody } from '@vt/contracts';
 
 /**
  * SUNUCU BİLEŞENİNDEN İSTEMCİ BİLEŞENİNE HATA GEÇİRME.
@@ -28,7 +28,7 @@ import { isApiFailure, type ApiErrorBody } from '@vt/contracts';
  *
  *    `redirect()` ve `notFound()` işlerini bir `throw` ile yapar. Panel
  *    sayfaları veriyi `try/catch` içinde okuduğu için o sinyal buraya
- *    düşüyordu: `hesapFetch` oturumsuz kullanıcıyı `/giris`e atmak isterken
+ *    düşüyordu: `hesapFetch` oturumsuz kullanıcıyı `/login`e atmak isterken
  *    çağıran onu yakalıyor ve "Beklenmeyen bir hata oluştu" kutusu basıyordu.
  *    Yani oturumu düşmüş kullanıcı giriş ekranı yerine bir hata görüyordu.
  *    Aynısı `notFound()` için de geçerli: 404 gövdesi yerine hata kutusu.
@@ -59,6 +59,9 @@ export function hataYuku(error: unknown): ApiErrorBody {
       message: error.userMessage,
       httpStatus: error.httpStatus,
       retryable: error.retryable,
+      // ⚠️ `params` DA TAŞINIR: istemci cümleyi kendi dilinde bununla kuruyor.
+      //    Unutulursa İngilizce arayüz "at most {available} units" yazar.
+      params: error.params,
       details: error.details,
       requestId: error.requestId,
       retryAfterSeconds: error.retryAfterSeconds,
@@ -69,9 +72,11 @@ export function hataYuku(error: unknown): ApiErrorBody {
   //    İki farklı şekil olsaydı istemci tarafı ikisini de bilmek zorunda kalır
   //    ve bilmediği biçimi "sunucuya ulaşılamıyor" diye gösterirdi.
   console.error('[hata-koprusu] zarfsız hata', error);
+  // ⚠️ Elle yazılmış Türkçe cümle YOK: metin katalogdan. Buradaki dizgi yalnız
+  //    sürüm sapması yedeği; ekranda gösterilecek olan `mesaj(locale)`.
   return {
     code: 'INTERNAL_ERROR',
-    message: 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.',
+    message: errorMessage('INTERNAL_ERROR', { params: { requestId: 'yok' } }),
     httpStatus: 500,
     retryable: true,
     requestId: 'yok',

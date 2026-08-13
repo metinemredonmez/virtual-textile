@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { TemaSecici } from '@/components/tema/tema-secici';
 
 /**
  * PANEL SOL MENÜSÜ — Linear kalıbı. SATICI VE YÖNETİM AYNI BİLEŞENİ KULLANIR.
@@ -38,9 +39,10 @@ import { Button } from '@/components/ui/button';
  *    gri, DURUM ikonu renkli. Seçili satırı renklendirmek, tablodaki gerçek
  *    durum rozetleriyle yarışan ikinci bir renk kaynağı üretirdi.
  *
- * ⚠️ TEK BİLEŞEN, İKİ PANEL. Satıcı paneli açık, yönetim koyu tema — ama menü
- *    yalnızca anlamsal token kullanıyor (`text-metin-soluk`, `bg-yuzey-vurgulu`)
- *    ve tema kabuğun kökündeki `.tema-koyu` sınıfından geliyor. İki ayrı menü
+ * ⚠️ TEK BİLEŞEN, İKİ PANEL. Tema artık kullanıcının seçimi ve `<html>`den
+ *    geliyor (`lib/tema.ts`); menü yalnızca anlamsal token kullandığı için
+ *    (`text-metin-soluk`, `bg-yuzey-vurgulu`) ikisinde de doğru çizilir —
+ *    bir dönem "satıcı açık, yönetim koyu" diye sabitti. İki ayrı menü
  *    yazılsaydı ikisi ayrışırdı: bu depoda satıcı menüsü aylarca `<Link>`siz
  *    kaldı, yönetim menüsü bağlantılıydı ve farkı kimse görmedi.
  *
@@ -62,7 +64,7 @@ import { Button } from '@/components/ui/button';
  * ⚠️ BU BİR ÜSLUP TERCİHİ DEĞİL, ÖLÇÜLMÜŞ BİR 500'ÜN KAPISI. `MenuSatiri`
  *    bir dönem `Ikon: LucideIcon` taşıyordu ve menü dizileri SUNUCU
  *    BİLEŞENİ olan kabuklarda (`(satici)/layout.tsx`,
- *    `yonetim/_kabuk/yan-menu.tsx`) tanımlıydı. Lucide ikonu bir
+ *    `admin/_kabuk/yan-menu.tsx`) tanımlıydı. Lucide ikonu bir
  *    `forwardRef` NESNESİDİR ve RSC sınırından GEÇEMEZ:
  *
  *      Error: Functions cannot be passed directly to Client Components…
@@ -193,11 +195,15 @@ export function YanMenu({
  *    kaydırılabilir yapıyordu (taşma 170px). Vitrin kabuğu aynı arızayı ölçüp
  *    `hidden sm:inline` ile kapatmıştı; panel kabukları o dersi almamıştı.
  *
- * ⚠️ `Sheet` KULLANILMADI ve bu bir üslup tercihi değil: `Sheet`/`Dialog`
- *    içeriği `document.body`ye PORTAL ediliyor, yani `.tema-koyu` kabuğunun
- *    DIŞINA. Yönetim panelinde açılan ilk çekmece AÇIK temada çizilirdi
- *    (AGENTS.md §7 → Portal tuzağı). Buradaki açılır menü portalsız: aynı DOM
- *    ağacında kalıyor, tema kabuktan miras alınıyor.
+ * ⚠️ `Sheet` KULLANILMADI — ama ESKİ GEREKÇESİ ARTIK GEÇERSİZ ve bunu yazmak
+ *    önemli. Gerekçe şuydu: `Sheet`/`Dialog` içeriğini `document.body`ye
+ *    PORTAL eder, yani `.tema-koyu` kabuğunun DIŞINA, ve yönetim panelinde
+ *    açılan ilk çekmece AÇIK temada çizilirdi. Tema sınıfı `<html>`e taşındı
+ *    (`lib/tema.ts`), `document.body` zaten onun içinde, o tuzak KAPANDI.
+ *    Bugün `Sheet`e geçmemenin sebebi yalnız şu: buradaki açılır menü bir
+ *    modal DEĞİL — odak tuzağı istemiyoruz, arkadaki içerik okunabilir kalmalı
+ *    ve ESC beklentisi yok. Yani karar artık tema değil ANLAM gerekçesiyle
+ *    duruyor.
  *
  * ⚠️ MENÜ `hidden` DEĞİL `hidden md:block`: mobilde gizlenen şey menünün
  *    KENDİSİ değil, VARSAYILAN AÇIKLIĞI. Düğme her zaman orada ve
@@ -259,6 +265,25 @@ export function YanMenuKabugu({
         onClick={() => setAcik(false)}
       >
         <YanMenu gruplar={gruplar} etiket={etiket} />
+
+        {/*
+          ⚠️ TEMA ANAHTARI PANELDE DE OLMAK ZORUNDA. Yönetim paneli bir dönem
+             ZORUNLU koyuydu (`(yonetim)/layout.tsx` üzerindeki `.tema-koyu`);
+             o sınıf Portal tuzağını doğurduğu için kaldırıldı ve yerine
+             yönetime özel bir varsayılan KONMADI. Anahtar burada olmasaydı
+             koyu temayı tercih eden yönetici onu yalnızca vitrinin alt
+             bilgisinden seçebilirdi — panelden hiç çıkmayan bir kullanıcı için
+             bu, seçeneğin pratikte olmaması demektir.
+
+             ⚠️ Kapsayıcının `onClick`i menüyü kapatıyor, yani mobilde tema
+                düğmesine basmak menüyü de kapatır. Bu KABUL EDİLDİ:
+                `stopPropagation` "bazı tıklamalar kapatır bazıları kapatmaz"
+                diye hatırlanması gereken bir kural doğururdu ve tema seçimi
+                zaten tek seferlik.
+        */}
+        <div className="mt-4 border-t border-kenar px-2 pt-4">
+          <TemaSecici />
+        </div>
       </div>
     </aside>
   );

@@ -10,7 +10,7 @@
  *    tutarsızlaşır ve hangisinin doğru olduğu anlaşılamaz.
  */
 import { FINANCE } from '@vt/config';
-import { Money, appError } from '@vt/contracts';
+import { appError } from '@vt/contracts';
 import type { LedgerType } from '@vt/db';
 
 /** Bakiye hesabı için gereken asgari defter satırı. */
@@ -148,8 +148,10 @@ export interface PayoutEligibilityInput {
  */
 export function assertPayoutEligible(input: PayoutEligibilityInput): void {
   if (input.requestedMinor < FINANCE.minPayoutMinor) {
+    // ⚠️ Tutar KURUŞ dizgisi olarak gider, biçimlenmiş metin olarak DEĞİL —
+    //    gerekçe `cart.service.ts`teki COUPON_MIN_AMOUNT ile aynı.
     throw appError('PAYOUT_BELOW_MINIMUM', {
-      params: { minAmount: Money.formatMoney(Money.money(FINANCE.minPayoutMinor)) },
+      params: { minAmount: FINANCE.minPayoutMinor.toString() },
       internalMessage: `İstenen ${input.requestedMinor}, asgari ${FINANCE.minPayoutMinor}`,
     });
   }

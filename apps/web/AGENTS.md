@@ -102,7 +102,7 @@ durum eklendiğinde hepsi birden derlemeyi kırar.
 | Kimlikli, **Sunucu Bileşeninden**         | Sunucu Bileşeni → **doğrudan API + Bearer** | `lib/api/server-authed.ts`      |
 | Kimlikli, **tarayıcıdan**                 | İstemci → **`/api/*` vekili**               | `lib/api/proxy.ts`, `client.ts` |
 
-Kalıp örneği: **`app/(magaza)/urunler/page.tsx`**. Yeni sayfa yazmadan önce onu okuyun.
+Kalıp örneği: **`app/(magaza)/products/page.tsx`**. Yeni sayfa yazmadan önce onu okuyun.
 
 - ⚠️ Erişim jetonu `localStorage`/`sessionStorage`'a **yazılmaz**. Tarayıcı yalnızca
   üç opak httpOnly çerez görür: `vt_sid`, `vt_gid` (ve API tarafında `vt_rt`).
@@ -116,7 +116,7 @@ Kalıp örneği: **`app/(magaza)/urunler/page.tsx`**. Yeni sayfa yazmadan önce 
 
 ### `server-authed.ts` içinde iki davranış var, karıştırmayın
 
-- `hesapFetch(path, donusYolu)` → oturum yoksa **`/giris`e yönlendirir**. Hesap,
+- `hesapFetch(path, donusYolu)` → oturum yoksa **`/login`e yönlendirir**. Hesap,
   sipariş, gardırop, KVKK ekranları.
 - `kimligiCoz()` + `kimlikBasliklari()` → ham kimlik. Misafirin de görebildiği
   kaynaklar (sepet, ödeme) bunu kullanır; girişe atmak, ürün eklemiş bir
@@ -211,7 +211,8 @@ biçimlenip doğru görünen yanlış rakam üretir). Biçimleri `lib/sayi-bicim
 - ⚠️ **`redirect()` VE `notFound()` HATA DEĞİLDİR — `hataYuku` onları yeniden
   fırlatır.** Next bu ikisini `throw` ile yapıyor; panel sayfaları veriyi
   `try/catch` içinde okuduğu için sinyal `catch`e düşüyordu ve oturumu düşmüş
-  kullanıcı `/giris` yerine "Beklenmeyen bir hata oluştu" kutusu görüyordu.
+  kullanıcı `/login` yerine "Beklenmeyen bir hata oluştu" kutusu görüyordu
+  (o gün adres `/giris`ti; ölçüm kaydı olduğu için tarihlendirildi).
   Kapı tek yerde (`hata-koprusu.ts`, `digest` öneki kontrolü); her `catch`
   bloğuna ayrı yazılsaydı bir sonraki ekranda unutulurdu.
 - Özel davranışlar: `CONSENT_REQUIRED` ve `CONSENT_CROSS_BORDER_REQUIRED`
@@ -267,13 +268,29 @@ biçimlenip doğru görünen yanlış rakam üretir). Biçimleri `lib/sayi-bicim
 - ⚠️ **"Üzerimde Dene" ile "Sepete Ekle" aynı ağırlıkta** — ikisi de
   `<Button variant="birincil" size="lg" className="w-full">`. HTML'de sınıf
   dizgileri BİREBİR aynı olmalı; bu ölçülebilir bir kuraldır.
-- ⚠️ Koyu tema **yalnızca** `(yonetim)` bölgesinde (`.tema-koyu` sınıfı).
-  ⚠️ **PORTAL TUZAĞI:** `Dialog`/`Sheet` içeriği `document.body`ye taşır, yani
-  `.tema-koyu` kabuğunun DIŞINA — koyu panelde açılan bir modal AÇIK temada
-  çizilir. Bugün hiçbir panel ekranı bu ikisini kullanmıyor, o yüzden arıza
-  görünmüyor; ilk kullananla birlikte görünür. Gerekçe ve düzeltme yönü
-  `components/ui/dialog.tsx` başlığında. Sabit renk sınıfı (`bg-white`,
-  `text-gray-*`) panelde HİÇ kullanılmaz — hepsi anlamsal token.
+- ⚠️ **KOYU TEMA ARTIK KULLANICININ SEÇİMİ VE SİTE GENELİNDE GEÇERLİ.** Üç
+  seçenek (`açık` / `koyu` / `sistem`, varsayılan `sistem`), çerez `vt_tema`,
+  sınıf `<html>` üzerinde. Tek kaynak `src/lib/tema.ts`; anahtar
+  `components/tema/tema-secici.tsx` (vitrin alt bilgisi + panel yan menüsü).
+  `(yonetim)` artık zorunlu koyu DEĞİL ve yönetime özel varsayılan da YOK —
+  gerekçesi `(yonetim)/layout.tsx` başlığında.
+  ⚠️ **FOUC yasağı:** tema sınıfını `<body>`nin İLK ÇOCUĞU olan bloklayan bir
+  satır içi betik yazar. Kök düzende `cookies()` **çağrılmaz** (§8'in statik
+  rota kapısını düşürür) ve `sistem` sunucuda zaten çözülemez.
+  **ÖLÇÜLDÜ** (üretim derlemesi, Chrome, x20 kısılmış CPU): 5 senaryoda da
+  tema sınıfı FCP'den 40–60 ms ÖNCE uygulandı; ekran kaydında beyaz kare 0.
+  Ölçümün duyarlı olduğu KONTROL KOŞUSUYLA kanıtlandı — betik HTML'den
+  sökülünce aynı kayıt 4–5 beyaz kare gördü.
+  ⚠️ DÜRÜST SINIR: **JS kapalıyken tema tercihi uygulanamaz**, sayfa açık
+  varsayılanda çizilir. Sunucu tarafı bir yol bilinçli olarak yok.
+  ⚠️ **PORTAL TUZAĞI KAPANDI (yapısal).** `Dialog`/`Sheet` içeriği hâlâ
+  `document.body`ye taşınıyor ama tema `<html>` üzerinde olduğu için
+  `document.body` zaten kapsamın İÇİNDE. `Portal`a `container` VERİLMEDİ
+  (gerekçe `components/ui/dialog.tsx` başlığında). **ÖLÇÜLDÜ**: koyu temada
+  açılan gerçek `Sheet` içeriğinin `backgroundColor` değeri `rgb(13, 14, 17)`.
+  Sabit renk sınıfı (`bg-white`, `text-gray-*`, `bg-black/40`) HİÇ kullanılmaz —
+  hepsi anlamsal token; modal perdesi `--perde`. Kapısı
+  `src/lib/tema.test.ts` (sabit renk taraması + `tema-koyu` elle yazılamaz).
 - ⚠️ **Öğe bütçesi**: ana sayfa 3 bölüm, ürün detay 3 blok. Dördüncü bir blok
   gerekiyorsa yeni bir EKRAN gerekiyordur, sıkıştırma değil.
 - ⚠️ **Panel ekranı elle iskelet çizmez.** Sayfa başlığı, süzgeç sekmeleri, boş
@@ -291,20 +308,20 @@ Kullanıcı doğru ekranı görür; arama motoru uydurma her adresi indekslenebi
 bir sayfa sanır.
 
 Kural: **`notFound()` çağıran bir rotanın üstünde `loading.tsx` olmaz.**
-Bu yüzden `(magaza)/loading.tsx`, `urun/[slug]/loading.tsx` ve
-`urun/[slug]/dene/loading.tsx` silindi.
+Bu yüzden `(magaza)/loading.tsx`, `product/[slug]/loading.tsx` ve
+`product/[slug]/try-on/loading.tsx` silindi.
 
-- 404 üretmeyen ekranlarda iskelet duruyor ve durmalı: `/urunler`, `/sepet`,
-  `/odeme`, `/hesabim`, `/koleksiyon`, `/hesaplayici`.
+- 404 üretmeyen ekranlarda iskelet duruyor ve durmalı: `/products`, `/cart`,
+  `/checkout`, `/account`, `/collection`, `/calculator`.
 - 404 üreten bir rotada iskelet isteniyorsa yol `generateStaticParams` +
-  `dynamicParams: false` (`koleksiyon/[koleksiyon]`, `hukuki/[belge]`).
+  `dynamicParams: false` (`collection/[koleksiyon]`, `legal/[belge]`).
   ⚠️ **VE O ROTADA `dynamic = 'force-dynamic'` YAZILMAZ.** `force-dynamic`
   `generateStaticParams`ı devre dışı bırakır, yönlendiricinin
   karşılaştıracağı slug listesi hiç oluşmaz ve kapı SESSİZCE düşer.
-  `koleksiyon/[koleksiyon]` tam olarak bu yüzden aylarca 200 döndü. Belirti
+  `collection/[koleksiyon]` tam olarak bu yüzden aylarca 200 döndü. Belirti
   `next build` rota tablosunda görünür: kapı çalışıyorsa satır `●` (SSG),
   düşmüşse `ƒ` (Dynamic).
-- `hesabim/loading.tsx` bilerek duruyor: altındaki `siparisler/[siparisNo]`
+- `account/loading.tsx` bilerek duruyor: altındaki `orders/[siparisNo]`
   yumuşak 404 üretir ama o ekran girişin arkasında, indekslenmiyor.
 
 ⚠️ **HER 404 İDDİASI `next build && next start` ÜZERİNDE ÖLÇÜLÜR.**
@@ -312,7 +329,7 @@ Bu yüzden `(magaza)/loading.tsx`, `urun/[slug]/loading.tsx` ve
 derlemesinde 200 dönüyordu ve bu fark bir ölçüm tablosunun tamamını
 geçersiz kıldı.
 
-**ÖLÇÜM (`next build && next start`, üretim derlemesi):**
+**ÖLÇÜM (`next build && next start`, üretim derlemesi) — ROTA GÖÇÜ ÖNCESİ:**
 
 ```
 /kategori/yok-boyle-kategori  404   /koleksiyon/canta      404
@@ -320,6 +337,24 @@ geçersiz kıldı.
 /hukuki/yok                   404   /koleksiyon/xyz        404
 /rastgele-adres               404   /magaza/atolye-nord    404
 ```
+
+⚠️ **YUKARIDAKİ TABLO BİR KAYITTIR, ÇALIŞTIRILACAK BİR LİSTE DEĞİL** — ve bugün
+tekrar çekilirse YANILTIR. Adresler o günden sonra İngilizceye taşındı; bu
+adreslerin bugün 404 vermesinin sebebi `dynamicParams:false` kapısı DEĞİL,
+rotanın hiç var olmamasıdır. Yani tablo bugün "geçiyor" gibi görünürken
+aslında hiçbir şey ölçmez. Kapıyı bugün ölçmek için İngilizce karşılıkları
+kullanın:
+
+```
+/category/yok-boyle-kategori  404   /collection/canta      404
+/product/yok-boyle-urun       404   /collection/yok-boyle  404
+/legal/yok                    404   /collection/xyz        404
+/rastgele-adres               404
+```
+
+Göç 301/308 haritası **kurmadı** (tek istisna ödeme dönüş köprüsü,
+`@vt/config` → `CHECKOUT_RESULT_LEGACY_PATH`): eski Türkçe adresler bilerek
+yüksek sesle 404 verir. Ölü bağlantı kapısı `src/rota/rota-tablosu.test.ts`.
 
 Beşi de aynı Türkçe ekranı, vitrin kabuğunun içinde gösteriyor
 (`components/hata/bulunamadi.tsx`). İki giriş noktası var ve ikisi de gerekli:
@@ -329,8 +364,12 @@ rotalarının yönlendirici düzeyindeki 404'ü için.
 
 ## 9. Yeni sayfa nasıl eklenir
 
-1. Doğru rota grubuna koyun: `(magaza)` açık tema/SEO, `(satici)` `/satici/*`,
-   `(yonetim)` `/yonetim/*` koyu tema.
+1. Doğru rota grubuna koyun: `(magaza)` vitrin/SEO, `(satici)` `/seller/*`,
+   `(yonetim)` `/admin/*`.
+   ⚠️ Rota grubu adları **Türkçe kalır** — URL'ye girmezler; İngilizceye geçen
+   yalnız URL segmentleridir (`app/(satici)/seller/…`).
+   ⚠️ "Yönetim koyu tema" **artık doğru değil**: tema kullanıcı tercihidir
+   (`src/lib/tema.ts`), rota grubuna bağlı değildir.
    ⚠️ Panel sayfaları URL öneki **almak zorunda** — `proxy.ts` matcher'ı ve
    `(magaza)` ile çakışmama buna bağlı.
 2. Tipi `@vt/contracts`'tan alın. Yoksa `packages/contracts/src/wire/` içine
@@ -360,7 +399,7 @@ Node`, `exports` alt yollarını görmez) ve kökten import eder. Aynı sabit ik
    menü dizilerini `app/**/page.tsx` taramasıyla karşılaştırıyor ve İKİ YÖNÜ de
    kırıyor — menüde olup sayfası olmayan da, sayfası olup menüde olmayan da.
    Test kırık yolun ADINI yazar. Yeni panel sayfası eklerken ilgili menü
-   dizisine (`(satici)/layout.tsx` ya da `yonetim/_kabuk/yan-menu.tsx`) satır
+   dizisine (`(satici)/layout.tsx` ya da `(yonetim)/admin/_kabuk/yan-menu.tsx`) satır
    eklemek zorunludur; eklemezseniz `vitest` kırmızı olur.
    ⚠️ Vitrin (`(magaza)`) gezinmesi bu testin kapsamında DEĞİL — bağlantılar
    orada düz metin içinde geçiyor, dizide değil. Oradaki kural hâlâ elle
@@ -370,12 +409,14 @@ Node`, `exports` alt yollarını görmez) ve kökten import eder. Aynı sabit ik
 
 Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
 
-- ~~**`/stil-danismani` ekranı YOK.**~~ **YAZILDI.** Ekran
-  `(magaza)/stil-danismani/`; akış `fetch` + `ReadableStream` ile okunuyor
+- ~~**`/stylist` ekranı YOK.**~~ **YAZILDI.** Ekran
+  `(magaza)/stylist/`; akış `fetch` + `ReadableStream` ile okunuyor
   (`EventSource` gövdeli `POST` atamaz), SSE çözücü `_lib/akis.ts`te ve orada
   test ediliyor. Gezinme bağlantısı `(magaza)/layout.tsx`e eklendi.
-  **ÖLÇÜLDÜ** (üretim derlemesi, canlı API, gerçek oturum):
-  oturumsuz `307 → /giris?next=%2Fstil-danismani`; oturumla `200`;
+  **ÖLÇÜLDÜ** (üretim derlemesi, canlı API, gerçek oturum — ⚠️ ölçüm ROTA
+  GÖÇÜNDEN ÖNCE alındı, adresler o günün adresleri):
+  oturumsuz `307 → /giris?next=%2Fstil-danismani` (bugünkü karşılığı
+  `307 → /login?next=%2Fstylist`); oturumla `200`;
   `POST /api/stylist/conversations` → `201`;
   `POST /api/stylist/conversations/:id/messages` → `200 text/event-stream`,
   `x-accel-buffering: no`, 7 çerçeve (`start` · 5×`delta` · `done`) ve gerçek
@@ -389,10 +430,10 @@ Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
   adres kurulmadı.
 - **`/magaza/[slug]` (satıcı vitrini) YOK.** Ürün detayında mağaza adı görünür
   ama bağlantı değildir. ⚠️ **Sepet paketi başlığı bu kurala uymuyordu**
-  (`sepet/paket.tsx` → `href="/magaza/${storeSlug}"`, canlıda 404); bağlantı
+  (`cart/paket.tsx` → `href="/magaza/${storeSlug}"`, canlıda 404); bağlantı
   kaldırıldı, metin kaldı. Kural iki yerde değil, HER yerde geçerli.
 - **`/kullanim-kosullari` ve `/aydinlatma-metni` sayfaları VAR, METİNLERİ YOK.**
-  `hukuki/metinler.ts` bilerek uydurulmuş bir sözleşme metni içermiyor; sayfa
+  `legal/metinler.ts` bilerek uydurulmuş bir sözleşme metni içermiyor; sayfa
   metnin yayınlanmadığını söylüyor ve `robots: noindex` taşıyor.
   ⚠️ **KVKK'da metnin gösterilmiş olması rızanın geçerlilik şartıdır** — yani
   bu, açılış öncesi kapatılması gereken bir eksiktir, kozmetik değil.
@@ -408,34 +449,70 @@ Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
   `next build`, `tsc` ve `vitest` üçü de sessizdi — arıza YALNIZCA rolü olan
   bir oturumla sayfa açıldığında görünüyor. İkon artık ADLA taşınıyor
   (`components/panel/yan-menu.tsx` → `IKONLAR`); dizgi her zaman serileşir.
-  **BUGÜN ÖLÇÜLEN** (üretim derlemesi + canlı API + gerçek oturum çerezi):
-  satıcı 8 rota `200`, yönetim 11 rota `200`, oturumsuz 19/19 `307 → /giris?next=…`.
+  **ROTA GÖÇÜNDEN ÖNCE ÖLÇÜLEN** (üretim derlemesi + canlı API + gerçek oturum
+  çerezi): satıcı 8 rota `200`, yönetim 11 rota `200`, oturumsuz 19/19
+  `307 → /giris?next=…` (bugünkü karşılığı `/login`).
   Dolu ekran: satıcı panosu "İncelemedeki ürün 1", yönetim moderasyon kuyruğu
   dolu tablo, "Defter toplamı ₺0,00". Yazma yolları: kupon `PATCH` (`200`,
   `usageLimit` kalıcı) ve ürün moderasyon reddi gerekçeyle (`200`, `REJECTED`).
-  ⚠️ HÂLÂ ÖLÇÜLMEDİ: kargo bildirimi, iade kararı ve payout kararı — üçü de
-  önce sipariş/defter verisi gerektiriyor.
-  ⚠️ Rol kapısı artık kod: `packages/db/scripts/rol-ata.ts`
-  (`pnpm --filter @vt/db rol:ata -- --eposta=… --rol=…`). Kullanıcı NORMAL
-  yoldan (`POST /v1/auth/register`) açılır, betik yalnız rolü yükseltir ve
-  SELLER_USER için APPROVED mağaza + üyelik kurar; parola özeti ikinci bir
-  yerde uygulanmaz. Üretimde çalışmayı reddediyor.
-  **"Panel çalışıyor" YAZILMADAN önce rolü olan bir oturumla dolu ekran
-  ölçülmelidir** — bu kural yerinde duruyor; yukarıdaki 500 tam olarak neden
-  durduğunu gösteriyor.
+  ⚠️ **307 BİR ROTA KANITI DEĞİLDİR — VE RAPORLARDA ÖYLE YAZILDI.**
+  `proxy.ts` matcher'ı `/admin/:path*` deseni taşıdığı için önek altındaki HER
+  yol 307 alır, rota olsun olmasın. ÖLÇÜLDÜ:
+  `/admin/kesinlikle-yok` → `307 → /login?next=%2Fadmin%2Fkesinlikle-yok`; aynı
+  uydurma ad önek DIŞINDA 404 (`/products/kesinlikle-yok`,
+  `/legal/olmayan-belge`, `/collection/olmayan`, `/product/olmayan-urun`). Yani
+  307 ölçümü "matcher çalışıyor"u kanıtlar, "rota var"ı DEĞİL.
+  **Panel iddiası İKİ şeyle yazılır ve ikisi de ölçüldü** (üretim derlemesi,
+  canlı API, gerçek oturum çerezi, 2026-08-13):
+  1. **Derleme manifestiyle eşleşme** — kaynaktaki 150 iç bağlantının 150'si
+     `.next/app-path-routes-manifest.json` ile oturuyor; panel bölgesindeki 73
+     bağlantı dahil, karşılığı olmayan **0**.
+  2. **ROLÜ OLAN oturumla `200` + DOLU EKRAN.** Ölçülen şey durum kodu DEĞİL,
+     `<main>` içindeki metin uzunluğu ve ilk cümlesi — 19/19 `500` arızası tam
+     olarak "200 sayıldı, içerik sayılmadı" yüzünden aylarca görünmemişti.
+     - **ADMIN** (`yonetici@example.com`), 10 rota `200`: `/admin` (582 karakter,
+       "Karar bekleyen işler") · `/admin/sellers` (2 619) · `/admin/moderation`
+       (1 578) · `/admin/orders` (1 319) · `/admin/categories` (25 950) ·
+       `/admin/commission` (4 124) · `/admin/payout` (755) · `/admin/reports`
+       (832) · `/admin/reports/ai` (1 645) · `/admin/audit` (7 717).
+     - **SELLER_USER** (`satici@mavra.example.com`), 8 rota `200`: `/seller`
+       ("Mavra · Onay bekleyen sipariş 5") · `/seller/products` ·
+       `/seller/products/new` · `/seller/products/bulk-upload` ·
+       `/seller/orders` · `/seller/returns` · `/seller/coupons` ·
+       `/seller/finance` (2 382).
+     - Oturumsuz: `/admin` · `/seller` · `/account` → `307 → /login?next=…`.
+     - Tarama boyunca sunucu logunda `⨯` satırı: **0**.
+       ⚠️ **ROLLE ÖLÇÜM YAPACAK BİR SONRAKİ AJAN İÇİN TUZAK:** `/api/auth/login`
+       vekili CSRF denetiminden geçiyor (`lib/api/csrf.ts`). Düz `curl` **403
+       `AUTH_FORBIDDEN`** alır ve bu "giriş bozuk" sanılır. Gerekli iki başlık:
+       `-H 'Origin: http://localhost:3000' -H 'Sec-Fetch-Site: same-origin'` — Origin
+       `APP_URL` ile BİREBİR eşleşmeli, `127.0.0.1` yazmak da 403 verir.
+       ⚠️ HÂLÂ ÖLÇÜLMEDİ: kargo bildirimi, iade kararı ve payout kararı — üçü de
+       önce sipariş/defter verisi gerektiriyor.
+       ⚠️ Rol kapısı artık kod: `packages/db/scripts/rol-ata.ts`
+       (`pnpm --filter @vt/db rol:ata -- --eposta=… --rol=…`). Kullanıcı NORMAL
+       yoldan (`POST /v1/auth/register`) açılır, betik yalnız rolü yükseltir ve
+       SELLER_USER için APPROVED mağaza + üyelik kurar; parola özeti ikinci bir
+       yerde uygulanmaz. Üretimde çalışmayı reddediyor.
+       **"Panel çalışıyor" YAZILMADAN önce rolü olan bir oturumla dolu ekran
+       ölçülmelidir** — bu kural yerinde duruyor; yukarıdaki 500 tam olarak neden
+       durduğunu gösteriyor.
 - **Bileşen testi yok.** `apps/web/vitest.config.ts` VAR ve kök projeye
   bağlı (`environment: 'node'`); SAF modüller ve dosya sistemi sapması test
   ediliyor — `lib/money.ts`, `lib/sayi.ts`, `lib/tarih.ts`,
-  `lib/api/retry-policy.ts`, `hesaplayici/hesap.ts`,
-  `urunler/_liste/liste-sorgusu.ts`, `satici/siparisler/_lib/sorgu.ts`,
-  `stil-danismani/_lib/akis.ts`, `components/panel/yan-menu.test.ts`.
+  `lib/api/retry-policy.ts`, `(magaza)/calculator/hesap.ts`,
+  `(magaza)/products/_liste/liste-sorgusu.ts`,
+  `(satici)/seller/orders/_lib/sorgu.ts`, `(magaza)/stylist/_lib/akis.ts`,
+  `components/panel/yan-menu.test.ts`, `src/rota/rota-tablosu.test.ts`,
+  `src/lib/tema.test.ts`, `src/i18n/*.test.ts`,
+  `components/hata/alan-hatalari.test.ts`.
   ⚠️ jsdom + testing-library kurulmadı; **render testi yok**. Yarım bir kurulum
   "bileşenler test ediliyor" yanılsaması üretirdi. Yani `components/panel/`
   altındaki iskelet bileşenlerinin ÇİZİMİ test edilmiyor — yalnızca menü
   içeriğinin rota tablosuyla tutarlılığı ediliyor.
   ⚠️ `yan-menu.test.ts` artık İKİ tarama yapıyor: menü dizileri **ve** panel
   ekranlarında SABİT yazılmış her `href`. İkincisi eklendi çünkü ilkinin
-  yapısal kör noktası ölçüldü — yönetim panosu, VAR OLAN `/yonetim/payout`
+  yapısal kör noktası ölçüldü — yönetim panosu, VAR OLAN `/admin/payout`
   ekranı için `href: null` taşıyor ve ekranda "Payout ekranı yok" yazıyordu;
   menü testi yeşildi çünkü pano kartlarının `href`ine hiç bakmıyordu.
   ⚠️ Bu dosya YOKKEN `pnpm exec vitest run` yeşildi ama `grep -c '|web|'`
@@ -455,20 +532,46 @@ Bunlar unutulmuş değil; her birinin gerekçesi ilgili dosyada yazılı.
   ⚠️ **Bu ayar yapılıp `OPTIONS` 204 dönmeden ve tarayıcıda bir deneme işi
   `QUEUED → SUCCEEDED` ölçülmeden "try-on çalışıyor" YAZILMAZ.** DEĞİŞMEZ
   KURAL #4'te ürünün kendisi diye tanımlanan özellik budur.
-- **Ürün görselleri 404** — seed'in işaret ettiği demo nesneler kovaya hiç
-  yüklenmemiş; nesneler bu depoda da yok, yani frontend'den kapatılamaz.
-  ⚠️ `next/image` üstteki 404'ü istemciye **500** olarak çeviriyordu ve
-  `blurhash` seed'de `null` olduğu için hiçbir yedek yoktu: kullanıcı KIRIK
-  RESİM İKONU görüyordu. `components/urun/urun-gorseli.tsx` artık `onError`
-  ile nötr bir kutuya düşüyor — eksikliği GİZLEMEZ, yalnız kırık ikonu
-  kaldırır.
+- ~~**Ürün görselleri 404** — demo nesneler kovaya hiç yüklenmemiş; nesneler bu
+  depoda da yok.~~ **BU ENGEL KAPANDI (2026-08-13 ölçümü).**
+  `packages/db/prisma/seed-assets/urunler/` 57 dosya / 680 KB taşıyor ve seed
+  onları kovaya yüklüyor. `/`, `/products`, `/product/keten-gomlek-oversize`,
+  `/collection/denim` sayfalarındaki 25 benzersiz `/_next/image` adresinin
+  **24'ü 200** (her biri 3 denemeli).
+  ⚠️ **YEDEK YİNE DE GEREKLİ VE KALDIRILMAYACAK.** Aynı ölçümde 24 üründen biri
+  (`e2e-gomlek-730f-50c-f3d8e649`, bir e2e artığı) üç denemenin üçünde de
+  **500** döndü — yani vitrinin İLK EKRANINDA bugün de bir kırık görsel var,
+  zarif yedek onu örtüyor. Bu bir seed sorunu değil ÜRÜN sorunu: üretimde
+  satıcının nesnesi de silinebilir, taşınabilir, CDN'de düşebilir.
+  ⚠️ Kirliliğin kendisi ayrı bir iş: yerel veritabanında yüzlerce e2e satırı
+  var ve `/category` hepsini listeliyor. Seed artık bunu SAYIYOR ve uyarı
+  basıyor (`prisma/seed/dogrula.ts` → `vitrinKirliligi`) ama SİLMİYOR — seed'in
+  ikinci değişmezi "hiçbir veri silinmez".
+  ⚠️ `next/image` nesne erişilemediğinde istemciye **404 ya da 500** döndürüyor
+  (ölçüldü: aynı sayfada ikisi birden) ve `blurhash` seed'de `null` olduğu için
+  hiçbir ara görsel yok: kullanıcı KIRIK RESİM İKONU görüyordu.
+  ⚠️ **YEDEK ARTIK İKİ KATMANLI ve asıl düzeltme ZAMANLA ilgiliydi.** ÖLÇÜLDÜ:
+  `onError` bir React sentetik olayı, hidrasyona kadar bağlanmıyor ve React
+  kaçırdığı `error`ı geri oynatmıyor → kırık ikon penceresi 316 ms (x4 CPU'da
+  501 ms), **JS kapalıyken kalıcı**. Birinci katman artık CSS:
+  `globals.css` → `.gorsel-yedek` (`::before` zemin + Lucide `ImageOff`,
+  `::after` **ürün adı**, `attr(data-yedek-ad)`), SSR HTML'inde bulunur, JS
+  gerektirmez. Üretilmiş içerik değiştirilmiş elemanlarda yalnız görsel
+  ÇİZİLEMEDİĞİNDE boyanır, yani sağlam görselde örtü hiç görünmez.
+  `onError` yolu GARANTİ katman olarak duruyor (Safari'de `::after` davranışı
+  tarihsel olarak tutarsız) ve İKİSİ AYNI CSS SINIFINI kullanır, ayrışamazlar.
+  Yedek eksikliği GİZLEMEZ; ürün adını taşıdığı için "boş gri kutu" da değildir.
+  ⚠️ Ürün fotoğrafı çerçevesi `--urun-zemin` (tema başına DEĞİŞMEZ) — koyu
+  temada beyaz fonlu fotoğrafın kesim çizgileri bu yüzden kaybolmuyor.
   ⚠️ Kabul ölçütü de değişti: "sayfa 200" YETMEZ, alt kaynakların durum
-  kodları da sayılır.
+  kodları da sayılır — ve "sonunda doğru" YETMEZ, İLK KAREDE doğru olmalı.
 - **`POST /v1/payments/3ds/callback` 200 + JSON dönüyor, 303 değil** →
   bankanın yönlendirdiği tarayıcı API kökeninde ham JSON'da kalıyor. Ödeme
-  akışının bugünkü kopuk halkası. (`/checkout/sonuc` → `/odeme/sonuc` köprüsü
-  `next.config.ts`te ve 308 döndüğü ölçüldü, ama köprü ancak tarayıcı buraya
-  GELİRSE işe yarar.)
+  akışının bugünkü kopuk halkası. (`/checkout/sonuc` → `/checkout/result`
+  köprüsü `next.config.ts`te ve 308 döndüğü ölçüldü, ama köprü ancak tarayıcı
+  buraya GELİRSE işe yarar. Dönüş yolunu artık backend de frontend de
+  `@vt/config` → `CHECKOUT_RESULT_PATH` üzerinden okuyor; köprü yalnız göç
+  anında uçuşta olan 3DS ödemeleri için duruyor.)
 - **Adres CRUD ucu yok** → `checkoutInitSchema` `addressId` kabul ediyor ama
   listeleyecek uç olmadığı için adres her seferinde gövdede gidiyor.
 - **`GET /me/photos` ucu yok** → fotoğraf kimliğini bilen tek yer istemci
@@ -483,7 +586,17 @@ pnpm exec turbo run build typecheck lint --force
 pnpm exec vitest run          # ⚠️ 1245'ten AŞAĞI DÜŞMEMELİ
 pnpm format && pnpm format:check
 pnpm --filter @vt/web verify:bundle
+pnpm i18n:kapsam              # ⚠️ üretim derlemesi ayaktayken
 ```
+
+⚠️ **`pnpm i18n:kapsam` BU LİSTEDE OLMAK ZORUNDA.** `docs/i18n.md` §8.A
+ertelemeyi bir ŞARTA bağlıyor — "her turda koşulur ve sayı küçülür" — ama betik
+uzun süre HİÇBİR `package.json`a bağlı değildi ve bu listede de yoktu. Yani
+"her turda koşulur" diyen mekanizmanın kendisi hiç koşmuyordu; erteleme
+görünmez olduğu an kalıcılaşır.
+⚠️ Bu betik ile `gomulu-metin.test.ts` AYNI ŞEYİ ÖLÇMEZ: birincisi ÇALIŞMA
+ZAMANI yüzeyini (çekilen HTML'de hangi dil), ikincisi KAYNAK borcunu (sözlüğe
+taşınmamış metin sayısı) ölçer. Biri diğerinin yerine geçmez.
 
 ⚠️ **TOPLAM SAYI FRONTEND HAKKINDA HİÇBİR ŞEY SÖYLEMEZ.** Bir dönem "1175 test
 geçti" bir doğrulama kanıtı gibi sunuldu; oysa `apps/web/vitest.config.ts`
@@ -501,6 +614,22 @@ görüntüsü veya `curl` çıktısı kanıttır; başarılı bir `build` kanıt
 ⚠️ **404 ve yönlendirme iddiaları `next dev`te ÖLÇÜLMEZ** — §8'deki gerekçe.
 Sayfa alt kaynakları da sayılır: `/_next/image` 500 dönerken "sayfa 200"
 demek, kullanıcının gördüğü kırık ekranı raporda görünmez kılar.
+
+⚠️ **DURUM KODU TEK BAŞINA KANIT DEĞİLDİR — VE BUNUN ÖLÇÜLMÜŞ İKİ BİÇİMİ VAR.**
+Bir tarama "hepsi 200" diyorsa yanıltıcı olabileceği iki yol biliniyor:
+
+1. **Hata sınırına düşmüş sayfa 200 döner.** Hız limiti kasten tetiklendiğinde
+   `/products?q=zzz1` → **200**, gövde 38 733 bayt, ürün kartı **0**, içerik
+   "Beklenmeyen bir hata". Sunucu logunda ise
+   `⨯ ApiFailure: RATE_LIMITED … httpStatus: 429, retryAfterSeconds: 50`.
+   → **KABUL ŞARTI: tarama boyunca web sunucusu logunda `⨯` satırı OLMAYACAK.**
+   Log okunduğu için bilinebiliyor: 443 çekimlik bir turda `⨯` sayısı 5'ti ve
+   beşi de kasten tetiklenen testin kendisiydi; kalan 438×200 gerçekten çizilmiş
+   sayfalardır.
+2. **Panel öneki altında 307 her zaman gelir.** `proxy.ts` matcher'ı
+   `/admin/:path*` deseni taşıdığı için `/admin/kesinlikle-yok` da `307` alır.
+   → **Panel rotası iddiası `.next/app-path-routes-manifest.json` ile eşleşme +
+   rolü olan oturumla `200` ile yazılır** (ayrıntı §10).
 
 API'yi ayağa kaldırmak (⚠️ kök `.env` **kendiliğinden yüklenmez**):
 

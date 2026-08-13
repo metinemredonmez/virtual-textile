@@ -58,6 +58,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message: error.userMessage,
         httpStatus: error.httpStatus,
         retryable: error.retryable,
+        /**
+         * ⚠️ YER TUTUCU DEĞERLERİ HAM GİDER, ve bu alan olmadan çok dillilik
+         *    ÇALIŞMAZ. İstemci cümleyi kendi dilinde kataloğa bakarak kuruyor
+         *    (`errorMessage(code, { locale, params })`); `params` gelmezse
+         *    İngilizce arayüzde "at most {available} units" yazar — yani
+         *    doldurulmamış yer tutucu. Derleme, tip kontrolü ve testler bunu
+         *    görmez, yalnız kullanıcı görür.
+         */
+        ...(error.params !== undefined ? { params: error.params } : {}),
         ...(details !== undefined ? { details } : {}),
         requestId,
         ...(error.retryAfterSeconds !== undefined

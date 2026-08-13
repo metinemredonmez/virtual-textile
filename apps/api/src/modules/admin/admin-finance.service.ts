@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { appError, Money } from '@vt/contracts';
+import { appError } from '@vt/contracts';
 import { FINANCE } from '@vt/config';
 import type { PayoutStatus } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -212,10 +212,9 @@ export class AdminFinanceService {
       this.assertPayoutTransition(payout.status, 'APPROVED', payoutId);
 
       if (payout.amountMinor < FINANCE.minPayoutMinor) {
+        // ⚠️ Tutar KURUŞ dizgisi — biçim gösterildiği dilde kurulur.
         throw appError('PAYOUT_BELOW_MINIMUM', {
-          params: {
-            minAmount: Money.formatMoney(Money.money(FINANCE.minPayoutMinor)),
-          },
+          params: { minAmount: FINANCE.minPayoutMinor.toString() },
           internalMessage: `Payout ${payoutId} tutarı ${payout.amountMinor} < ${FINANCE.minPayoutMinor}`,
         });
       }

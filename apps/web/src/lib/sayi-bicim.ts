@@ -1,4 +1,10 @@
-import type { Bps, MikroUsdString } from '@vt/contracts';
+import {
+  INTL_ETIKET,
+  VARSAYILAN_LOCALE,
+  type Bps,
+  type Locale,
+  type MikroUsdString,
+} from '@vt/contracts';
 
 /**
  * PARA OLMAYAN SAYILARIN BİÇİMİ — basis point, oran, mikro-USD, sayaç, ISO gün.
@@ -35,13 +41,14 @@ import type { Bps, MikroUsdString } from '@vt/contracts';
  *    DEĞİL (`discountValue` PERCENTAGE dalında bps, FIXED_AMOUNT dalında
  *    kuruştur — ikincisi asla buraya verilmez).
  */
-export function yuzdeBps(bps: Bps | string): string {
+export function yuzdeBps(bps: Bps | string, locale: Locale = VARSAYILAN_LOCALE): string {
   const ham = typeof bps === 'string' ? BigInt(bps) : BigInt(Math.trunc(bps));
   const negatif = ham < 0n;
   const mutlak = negatif ? -ham : ham;
   const tam = mutlak / 100n;
+  const ayrac = ondalikAyraci(locale);
   const kesir = (mutlak % 100n).toString().padStart(2, '0');
-  return `%${negatif ? '-' : ''}${tam.toLocaleString('tr-TR')},${kesir}`;
+  return `%${negatif ? '-' : ''}${tam.toLocaleString(INTL_ETIKET[locale])}${ayrac}${kesir}`;
 }
 
 /**
@@ -52,8 +59,8 @@ export function yuzdeBps(bps: Bps | string): string {
  *    100 ile çarpmayı unutmak "%0,71" yazdırır ve önbellek isabetini yüz kat
  *    kötü gösterir.
  */
-export function yuzdeOran(oran: number): string {
-  return `%${(oran * 100).toLocaleString('tr-TR', {
+export function yuzdeOran(oran: number, locale: Locale = VARSAYILAN_LOCALE): string {
+  return `%${(oran * 100).toLocaleString(INTL_ETIKET[locale], {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}`;
@@ -72,7 +79,7 @@ export function yuzdeOran(oran: number): string {
  *    yarım sentin altında. Panelin işi "maliyet nereye gidiyor"u göstermek;
  *    yuvarlayıp sıfırlamak o soruyu cevapsız bırakır.
  */
-export function mikroUsd(deger: MikroUsdString): string {
+export function mikroUsd(deger: MikroUsdString, locale: Locale = VARSAYILAN_LOCALE): string {
   const ham = BigInt(deger);
   const negatif = ham < 0n;
   const mutlak = negatif ? -ham : ham;
@@ -81,10 +88,31 @@ export function mikroUsd(deger: MikroUsdString): string {
   // 1e6 → 4 haneye indirgeme: kalanın ilk dört basamağı.
   const kesir = ((mutlak % 1_000_000n) / 100n).toString().padStart(4, '0');
 
-  return `${negatif ? '-' : ''}$${tam.toLocaleString('tr-TR')},${kesir}`;
+  return `${negatif ? '-' : ''}$${tam.toLocaleString(INTL_ETIKET[locale])}${ondalikAyraci(locale)}${kesir}`;
 }
 
 /** Sayaçlar (çağrı, sipariş, kalem) — binlik ayraçlı. Para değil. */
-export function sayi(deger: number): string {
-  return deger.toLocaleString('tr-TR');
+export function sayi(deger: number, locale: Locale = VARSAYILAN_LOCALE): string {
+  return deger.toLocaleString(INTL_ETIKET[locale]);
+}
+
+/**
+ * Dilin ondalık ayracı — virgül mü nokta mı?
+ *
+ * ⚠️ SABİT `','` YAZILAMAZ ve bu tam olarak çok dillilikte kaçırılan yer.
+ *    Yukarıdaki üç fonksiyon tam sayı kısmını `toLocaleString` ile
+ *    biçimlendiriyor ama ondalık kısmı KENDİ ekliyor (kayan nokta artığı
+ *    doğmasın diye — gerekçe `yuzdeBps` başlığında). İngilizce arayüzde
+ *    `toLocaleString` "1,250" üretirken elle eklenen virgül "%1,250,50" gibi
+ *    OKUNAMAZ bir sayı çıkarırdı: aynı karakter hem binlik hem ondalık ayracı.
+ *
+ * ⚠️ Ayraç TABLODAN DEĞİL `Intl`den okunuyor: elle yazılmış bir tablo üçüncü
+ *    dilde sessizce yanlış olurdu.
+ */
+function ondalikAyraci(locale: Locale): string {
+  return (
+    new Intl.NumberFormat(INTL_ETIKET[locale])
+      .formatToParts(1.1)
+      .find((parca) => parca.type === 'decimal')?.value ?? '.'
+  );
 }

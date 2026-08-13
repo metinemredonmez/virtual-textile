@@ -30,12 +30,17 @@ export type RetryBehaviour =
    * söylüyorsa (PAYMENT_TIMEOUT: "siparişlerinizi kontrol edin") o yeri
    * gösteren bir bağlantı ZORUNLUDUR.
    *
-   * ⚠️ `etiket` de burada duruyor, çağıran tarafta değil: bağlantının nereye
+   * ⚠️ Etiket de burada duruyor, çağıran tarafta değil: bağlantının nereye
    *    gittiğini bilen tek yer bu dosya. Metin `HataGosterimi`de yazılsaydı
    *    ikinci bir `yonlendir` kodu açıldığı gün ya jenerik ("Devam et") bir
    *    etiket doğardı ya da o bileşen kod kod dallanmaya başlardı.
+   *
+   * ⚠️ AMA METİN DEĞİL, SÖZLÜK ANAHTARI tutuluyor. Buraya Türkçe bir cümle
+   *    yazmak, kataloğun ve sözlüğün dışında ÜÇÜNCÜ bir metin kaynağı açardı;
+   *    İngilizce arayüzde hata kutusunun altında Türkçe bir düğme kalırdı ve
+   *    bunu ne `tsc` ne `next build` görürdü. Anahtar `t()`ye verilir.
    */
-  | { kind: 'yonlendir'; href: string; etiket: string }
+  | { kind: 'yonlendir'; href: string; etiketAnahtari: 'hata.siparislerimeGit' }
   /** Yalnızca mesaj. Tekrarlamak durumu değiştirmez. */
   | { kind: 'yok' };
 
@@ -52,7 +57,7 @@ export const RETRY_POLICY = {
   // Kullanıcıya HİÇBİR ŞEY gösterilmez: vekil tek uçuşla yeniler ve orijinal
   // isteği BİR KEZ tekrarlar. Buraya 'dugme' yazmak o akışı görünür kılardı.
   AUTH_TOKEN_EXPIRED: YOK,
-  // Yenileme DENENMEZ; oturum silinir, /giris?sebep=guvenlik. Katalog mesajı aynen gösterilir.
+  // Yenileme DENENMEZ; oturum silinir, /login?sebep=guvenlik. Katalog mesajı aynen gösterilir.
   AUTH_REFRESH_REUSED: YOK,
   AUTH_OTP_INVALID: YOK,
   AUTH_OTP_EXPIRED: YOK,
@@ -94,8 +99,8 @@ export const RETRY_POLICY = {
   //    kez para çekilmesi riskidir.
   PAYMENT_TIMEOUT: {
     kind: 'yonlendir',
-    href: '/hesabim/siparisler',
-    etiket: 'Siparişlerime git',
+    href: '/account/orders',
+    etiketAnahtari: 'hata.siparislerimeGit',
   },
   PAYMENT_ALREADY_CAPTURED: YOK,
   PAYMENT_PROVIDER_DOWN: DUGME,

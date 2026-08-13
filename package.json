@@ -21,6 +21,7 @@
     "db:push": "pnpm --filter @vt/db push",
     "db:studio": "pnpm --filter @vt/db studio",
     "db:seed": "pnpm --filter @vt/db seed",
+    "i18n:kapsam": "node scripts/i18n-kapsam.mjs",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "infra:reset": "docker compose -f infra/docker-compose.yml down -v && pnpm infra:up",

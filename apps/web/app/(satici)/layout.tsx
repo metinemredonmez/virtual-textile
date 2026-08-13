@@ -27,21 +27,21 @@ import { YanMenuKabugu, type MenuGrubu } from '@/components/panel/yan-menu';
 const MENU: readonly MenuGrubu[] = [
   {
     baslik: null,
-    satirlar: [{ ad: 'Pano', ikon: 'pano', yol: '/satici' }],
+    satirlar: [{ ad: 'Pano', ikon: 'pano', yol: '/seller' }],
   },
   {
     baslik: 'Satışlar',
     satirlar: [
-      { ad: 'Siparişler', ikon: 'siparis', yol: '/satici/siparisler', altRotalar: true },
-      { ad: 'İadeler', ikon: 'iade', yol: '/satici/iadeler', altRotalar: true },
-      { ad: 'Finans', ikon: 'finans', yol: '/satici/finans' },
+      { ad: 'Siparişler', ikon: 'siparis', yol: '/seller/orders', altRotalar: true },
+      { ad: 'İadeler', ikon: 'iade', yol: '/seller/returns', altRotalar: true },
+      { ad: 'Finans', ikon: 'finans', yol: '/seller/finance' },
     ],
   },
   {
     baslik: 'Katalog',
     satirlar: [
-      { ad: 'Ürünler', ikon: 'urun', yol: '/satici/urunler', altRotalar: true },
-      { ad: 'Kuponlar', ikon: 'kupon', yol: '/satici/kuponlar' },
+      { ad: 'Ürünler', ikon: 'urun', yol: '/seller/products', altRotalar: true },
+      { ad: 'Kuponlar', ikon: 'kupon', yol: '/seller/coupons' },
     ],
   },
 ];

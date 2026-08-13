@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
 import type { ApiErrorBody } from '@vt/contracts';
 import { cn } from '@/lib/utils';
 import { baglanti } from '@/lib/sorgu';
@@ -354,8 +355,15 @@ export function BosSonuc({
  * ⚠️ `sonrakiHref` üretimi çağıranda: "sonraki sayfa var mı" kararı yalnızca
  *    `nextCursor` değil, satır sayısı da olabilir (boş son sayfa). Çağıran
  *    `null` geçerek düğmeyi kapatır.
+ *
+ * ⚠️ `async` OLDU — ve bu bir davranış değişikliği DEĞİL: bileşen zaten yalnız
+ *    Sunucu Bileşenlerinden (panel `page.tsx`leri) çağrılıyor. `getTranslations`
+ *    sunucu tarafının tek okuma yolu; İstemci Bileşeninden çağrılırsa derleme
+ *    kırılır, yani kural kendini koruyor. `useTranslations` SEÇİLMEDİ çünkü o
+ *    bu dosyaya `'use client'` yazmayı gerektirirdi ve panel iskeletinin
+ *    tamamını istemciye indirirdi.
  */
-export function ImlecSayfalama({
+export async function ImlecSayfalama({
   ilkSayfaHref,
   sonrakiHref,
   ilkSayfada,
@@ -364,9 +372,11 @@ export function ImlecSayfalama({
   /** `null` → sonraki sayfa yok. */
   sonrakiHref: string | null;
   ilkSayfada: boolean;
-}): React.ReactElement | null {
+}): Promise<React.ReactElement | null> {
   // Tek sayfalık liste: ne ileri ne geri gidilecek bir yer var.
   if (sonrakiHref === null && ilkSayfada) return null;
+
+  const t = await getTranslations('panel');
 
   return (
     <div className="mt-6 flex items-center justify-between border-t border-kenar pt-4 text-sm">
@@ -376,7 +386,7 @@ export function ImlecSayfalama({
           className="text-metin-soluk hover:text-metin hover:underline"
           prefetch={false}
         >
-          İlk sayfaya dön
+          {t('ilkSayfa')}
         </Link>
       ) : (
         <span />
@@ -388,11 +398,11 @@ export function ImlecSayfalama({
           prefetch={false}
           className="inline-flex items-center gap-2 font-medium text-metin hover:underline"
         >
-          Sonraki sayfa
+          {t('sonrakiSayfa')}
           <ArrowRight className="size-4 text-ikon" strokeWidth={1.5} />
         </Link>
       ) : (
-        <span className="text-metin-soluk">Listenin sonundasınız.</span>
+        <span className="text-metin-soluk">{t('listeSonu')}</span>
       )}
     </div>
   );

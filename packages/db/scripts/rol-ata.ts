@@ -7,8 +7,10 @@
  *    tetikleniyor — yani ilk ADMIN'i doğuracak hiçbir yol yok.
  *    `POST /v1/auth/register` her kullanıcıyı CUSTOMER açıyor, rolü değiştiren
  *    uç yok. Sonucu somuttu: satıcı ve yönetim panelleri GERÇEK VERİYLE HİÇ
- *    ÖLÇÜLEMEDİ; kanıtlanabilen tek şey oturumsuz erişimin `/giris`e
- *    yönlenmesiydi. `e2e/destek/veritabani.ts` de aynı boşluğu kendi içinde
+ *    ÖLÇÜLEMEDİ; kanıtlanabilen tek şey oturumsuz erişimin giriş ekranına
+ *    yönlenmesiydi (o gün `/giris`, bugün `/login` — ölçüm kaydı olduğu için
+ *    adres değiştirilmedi, yalnız bugünkü karşılığı yazıldı).
+ *    `e2e/destek/veritabani.ts` de aynı boşluğu kendi içinde
  *    belgeliyor ("kod tabanında `role = 'SELLER_USER'` ataması hiç yok").
  *
  * ⚠️ PAROLA BURADA ÜRETİLMEZ. Kullanıcı önce `POST /v1/auth/register` ile

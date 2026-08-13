@@ -11,17 +11,11 @@ import { cn } from '@/lib/utils';
  * Radix Dialog üzerine kuruludur: odak tuzağı, ESC ve `aria-modal` davranışını
  * ikinci kez yazmamak için. Görsel olarak yandan girer, anlamsal olarak modaldır.
  *
- * ⚠️ **YÖNETİM PANELİNDE KULLANILMADAN ÖNCE OKUYUN — TEMA TUZAĞI.**
- *    `Portal` içeriği `document.body`ye taşır, yani `.tema-koyu` sınıfını
- *    taşıyan `(yonetim)` kabuğunun DIŞINA. Koyu panelde açılan bir modal bugün
- *    AÇIK temada çizilir: beyaz zemin, siyah metin, kenarlıklar kaybolur.
- *    Bugün yönetim ve satıcı ekranlarının hiçbiri bu bileşeni kullanmıyor, o
- *    yüzden arıza CANLIDA GÖRÜNMÜYOR — ilk kullanan ekranla birlikte görünür.
- *    Kullanmadan önce doğru düzeltme: `Portal`a `container` verip temalı
- *    ağacın içine çizdirmek (ya da içeriğe `tema-koyu` sınıfını taşıtmak).
- *    ⚠️ Karar `next build && next start` üzerinde GÖZLE doğrulanmadan
- *       "çalışıyor" YAZILMAZ; bu bir CSS değişkeni kapsamı sorunu, tip sistemi
- *       yakalamaz.
+ * ⚠️ **PORTAL TEMA TUZAĞI KAPANDI.** Gerekçenin tamamı `dialog.tsx`
+ *    başlığında (iki bileşen aynı Radix ilkelini sarıyor; kural iki yere
+ *    yazılsaydı biri düzeltilip diğeri eski kalırdı — bu depoda yaşandı).
+ *    Özeti: tema sınıfı artık `(yonetim)` kabuğunda değil `<html>` üzerinde,
+ *    `document.body` zaten onun içinde, portal kapsamdan ÇIKAMIYOR.
  */
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
@@ -44,7 +38,8 @@ export function SheetContent({
 
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      {/* ⚠️ `bg-black/40` DEĞİL — gerekçe `dialog.tsx`teki aynı satırda. */}
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-perde" />
       <DialogPrimitive.Content
         className={cn('fixed z-50 border-kenar bg-zemin p-6 text-metin', konum, className)}
         {...props}

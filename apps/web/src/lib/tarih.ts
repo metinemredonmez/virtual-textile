@@ -1,3 +1,5 @@
+import { INTL_ETIKET, VARSAYILAN_LOCALE, type Locale } from '@vt/contracts';
+
 /**
  * TARİH BİÇİMİ — TEK NOKTA.
  *
@@ -8,25 +10,37 @@
  *    yeniden çizer; kullanıcı siparişini bir an "11 Ağustos", sonra
  *    "12 Ağustos" olarak görür. Sabit dilim iki tarafı da aynı cümleye zorlar.
  *
- * ⚠️ `'tr-TR'` de sabit: `undefined` bırakmak sunucuda `en-US` üretirdi.
+ * ⚠️ SAAT DİLİMİ DİLE BAĞLI DEĞİL ve olmamalı. İngilizce arayüz de
+ *    `Europe/Istanbul` görür: sipariş saati mağazanın saatidir, okuyanın değil.
+ *    Diline göre kaydırılsaydı aynı siparişin kargo son tarihi iki ekranda iki
+ *    farklı gün görünürdü.
+ *
+ * ⚠️ YEREL AYAR ARTIK PARAMETRE, ama VARSAYILANI Türkçe: onlarca çağrı yeri
+ *    ikinci argüman vermeden çalışmaya devam ediyor. Bu turda dokunulmaması
+ *    gereken (ve şu anda taşınmakta olan) dosyaları değiştirmemenin tek yolu.
  */
 const DILIM = 'Europe/Istanbul';
 
-const GUN = new Intl.DateTimeFormat('tr-TR', {
-  timeZone: DILIM,
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric',
-});
+/**
+ * ⚠️ BİÇİMLENDİRİCİLER ÖNBELLEKLENİR. `Intl.DateTimeFormat` kurucusu bu
+ *    depodaki en pahalı gösterim çağrısı ve sipariş listesi tek çizimde
+ *    onlarca tarih basıyor; çağrı başına kurmak ölçülebilir bir gerileme olur.
+ */
+const GUN_BICIMLEYICI = new Map<Locale, Intl.DateTimeFormat>();
+const GUN_SAAT_BICIMLEYICI = new Map<Locale, Intl.DateTimeFormat>();
 
-const GUN_SAAT = new Intl.DateTimeFormat('tr-TR', {
-  timeZone: DILIM,
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+function bicimleyici(
+  onbellek: Map<Locale, Intl.DateTimeFormat>,
+  locale: Locale,
+  secenekler: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  let hazir = onbellek.get(locale);
+  if (!hazir) {
+    hazir = new Intl.DateTimeFormat(INTL_ETIKET[locale], { timeZone: DILIM, ...secenekler });
+    onbellek.set(locale, hazir);
+  }
+  return hazir;
+}
 
 /**
  * `2026-08-12T09:58:44.074Z` → `2026-08-12`. `<input type="date">` için.
@@ -40,6 +54,12 @@ const GUN_SAAT = new Intl.DateTimeFormat('tr-TR', {
  *
  * ⚠️ Yerel ayar `en-CA`: `YYYY-MM-DD` üreten tek yerleşik ayar. `tr-TR`
  *    `12.08.2026` üretir ve `<input type="date">` onu kabul etmez.
+ *
+ * ⚠️ BU SATIR LOCALE'E BAĞLANMAZ — ve bu, çok dillilikte yapılması en kolay
+ *    hatalardan biri. `en-CA` burada bir DİL seçimi değil, tarayıcının form
+ *    alanından beklediği makine biçimi. Kullanıcının diline bağlansaydı Türkçe
+ *    arayüzde `<input type="date">` "12.08.2026" alır ve alanı SESSİZCE boş
+ *    bırakırdı; rapor aralığı hiç uygulanmazdı.
  */
 const ISO_GUN = new Intl.DateTimeFormat('en-CA', {
   timeZone: DILIM,
@@ -52,14 +72,24 @@ export function isoGun(kaynak: Date | string): string {
   return ISO_GUN.format(typeof kaynak === 'string' ? new Date(kaynak) : kaynak);
 }
 
-/** "12 Ağustos 2026" */
-export function tarih(iso: string): string {
-  return GUN.format(new Date(iso));
+/** "12 Ağustos 2026" (tr) · "12 August 2026" (en) */
+export function tarih(iso: string, locale: Locale = VARSAYILAN_LOCALE): string {
+  return bicimleyici(GUN_BICIMLEYICI, locale, {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso));
 }
 
-/** "12 Ağustos 2026 17:04" */
-export function tarihSaat(iso: string): string {
-  return GUN_SAAT.format(new Date(iso));
+/** "12 Ağustos 2026 17:04" (tr) · "12 August 2026 at 17:04" (en) */
+export function tarihSaat(iso: string, locale: Locale = VARSAYILAN_LOCALE): string {
+  return bicimleyici(GUN_SAAT_BICIMLEYICI, locale, {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
 }
 
 /**

@@ -1,4 +1,4 @@
-import { ApiFailure, type ApiErrorBody, type ResponseMeta } from '@vt/contracts';
+import { ApiFailure, errorMessage, type ApiErrorBody, type ResponseMeta } from '@vt/contracts';
 
 /**
  * ZARF AÇMA — ortamdan bağımsız çekirdek.
@@ -59,15 +59,32 @@ function requestIdOf(response: Response): string {
   return response.headers.get('X-Request-Id') ?? 'yok';
 }
 
-/** Ağ/vekil katmanının ürettiği, zarf biçiminde OLMAYAN hatalar için. */
+/**
+ * Ağ/vekil katmanının ürettiği, zarf biçiminde OLMAYAN hatalar için.
+ *
+ * ⚠️ METİN ARTIK PARAMETRE DEĞİL, KODDAN TÜRETİLİYOR. Burada üç çağrı yeri
+ *    kendi Türkçe cümlesini yazıyordu ("Sunucuya şu anda ulaşılamıyor.",
+ *    "Beklenmeyen bir hata oluştu.") — yani ekranda katalog dışında ikinci bir
+ *    metin kaynağı vardı ve çok dilde o cümleler İngilizce arayüzde Türkçe
+ *    kalırdı. Artık `ERROR_CATALOG` tek kaynak; `ApiFailure.mesaj(locale)`
+ *    gösterim anında doğru dili seçiyor.
+ *
+ * ⚠️ Buradaki metin yine de TÜRKÇE dolduruluyor ve bu doğru: `userMessage`
+ *    telde giden sürüm sapması yedeğinin karşılığı, gösterilecek metin değil.
+ */
 function synthesize(
   code: ApiErrorBody['code'],
-  message: string,
   httpStatus: number,
   retryable: boolean,
   requestId: string,
 ): ApiFailure {
-  return new ApiFailure({ code, message, httpStatus, retryable, requestId });
+  return new ApiFailure({
+    code,
+    message: errorMessage(code, { params: { requestId } }),
+    httpStatus,
+    retryable,
+    requestId,
+  });
 }
 
 export function buildQuery(query: RequestOptions<string>['query']): string {
@@ -106,7 +123,6 @@ export async function unwrap<T>(response: Response): Promise<ApiResult<T>> {
     console.error('[api] JSON olmayan yanıt', { status: response.status, requestId, preview });
     throw synthesize(
       response.ok ? 'INTERNAL_ERROR' : 'UPSTREAM_UNAVAILABLE',
-      'Sunucuya şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.',
       response.status,
       !response.ok,
       requestId,
@@ -119,13 +135,7 @@ export async function unwrap<T>(response: Response): Promise<ApiResult<T>> {
     if (typeof body === 'object' && body !== null && 'error' in body) {
       throw new ApiFailure((body as { error: ApiErrorBody }).error);
     }
-    throw synthesize(
-      'INTERNAL_ERROR',
-      'Beklenmeyen bir hata oluştu.',
-      response.status,
-      response.status >= 500,
-      requestId,
-    );
+    throw synthesize('INTERNAL_ERROR', response.status, response.status >= 500, requestId);
   }
 
   const success = body as { data: T; meta?: ResponseMeta };

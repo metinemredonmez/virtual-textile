@@ -8,7 +8,7 @@ import { UrunGorseli } from '@/components/urun/urun-gorseli';
 /**
  * ÜRÜN KARTI — vitrin, liste, kategori ve koleksiyon ekranlarının TEK birimi.
  *
- * ⚠️ Bu kartın bir zamanlar İKİ kopyası vardı (`urunler/_liste/` ve
+ * ⚠️ Bu kartın bir zamanlar İKİ kopyası vardı (`products/_liste/` ve
  *    `koleksiyon/`) ve ikisi zaten ayrışmıştı: birinde `flex-wrap` düzeltmesi
  *    ve `priority` kapısı vardı, diğerinde yoktu. Kart görselinde yapılan bir
  *    değişikliğin (oran, rozet kapısı, fiyat dizilimi) yalnızca yarısının
@@ -47,12 +47,17 @@ export function UrunKarti({
 
   return (
     <li>
-      <Link href={`/urun/${urun.slug}`} className="group block">
-        {/* 4:5, kenarlıksız, gölgesiz — görsel hâkim olmalı. */}
-        <div className="relative aspect-urun w-full overflow-hidden rounded-md bg-yuzey">
-          {/* ⚠️ Ham `next/image` DEĞİL: nesne kovada yoksa `/_next/image` 500
-              döner ve kullanıcı KIRIK RESİM İKONU görür. Gerekçenin tamamı
-              `urun-gorseli.tsx` başlığında. */}
+      <Link href={`/product/${urun.slug}`} className="group block">
+        {/* 4:5, kenarlıksız, gölgesiz — görsel hâkim olmalı.
+            ⚠️ `bg-yuzey` DEĞİL `bg-urun-zemin`. `bg-yuzey` temayla koyulaşır;
+            koyu temada kutu görsel inene kadar koyu durur, sonra bir anda beyaz
+            fonlu fotoğrafa döner. `--urun-zemin` tema başına DEĞİŞMEZ (gerekçe
+            `globals.css` → `@theme inline`), yani çerçeve fotoğrafla aynı tonda
+            kalır ve ince kesim çizgileri kaybolmaz. */}
+        <div className="relative aspect-urun w-full overflow-hidden rounded-md bg-urun-zemin">
+          {/* ⚠️ Ham `next/image` DEĞİL: nesne kovada yoksa kullanıcı KIRIK
+              RESİM İKONU görür. Gerekçenin tamamı `urun-gorseli.tsx`
+              başlığında. */}
           <UrunGorseli src={gorsel} alt={urun.title} sizes={boyutlar} oncelikli={oncelikli} />
         </div>
 

@@ -52,7 +52,7 @@ const BEKLEME_ADIM_SAYISI = 20;
  */
 const inFlight = new Map<string, Promise<WebSession | null>>();
 
-/** Oturum kurtarılamaz — çağıran çerezleri temizleyip /giris'e göndermeli. */
+/** Oturum kurtarılamaz — çağıran çerezleri temizleyip /login'e göndermeli. */
 export class SessionRevoked extends Error {
   constructor(readonly reason: 'guvenlik' | 'suresi-doldu') {
     super(`Oturum düşürüldü: ${reason}`);

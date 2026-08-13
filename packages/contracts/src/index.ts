@@ -1,4 +1,5 @@
 export * from './errors/index.js';
+export * from './i18n/index.js';
 export * from './schemas/index.js';
 export * from './wardrobe/index.js';
 export * from './wire/index.js';

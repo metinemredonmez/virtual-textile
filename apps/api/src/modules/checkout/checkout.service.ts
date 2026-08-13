@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { INVENTORY, ORDER, env } from '@vt/config';
+import { CHECKOUT_RESULT_PATH, INVENTORY, ORDER, env } from '@vt/config';
 import { AppError, isErrorCode, type ErrorCode } from '@vt/contracts';
 import { PRISMA_ERROR, isPrismaKnownError, serializeBigInts, type Prisma } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -1087,7 +1087,15 @@ export class CheckoutService {
       orderNumber,
       status,
       ...(message ? { message } : {}),
-      redirectUrl: `${env().APP_URL}/checkout/sonuc?${query.toString()}`,
+      /**
+       * ⚠️ YOL SABİT YAZILMAZ, `@vt/config`ten OKUNUR. Buraya bir dizgi
+       *    gömüldüğü sürece frontend'in rota adıyla ayrışması ancak GERÇEK bir
+       *    3DS ödemesinde — parası çekilmiş kullanıcıda — görünürdü; ne `tsc`
+       *    ne `next build` ne de testler iki depoyu birden okumuyor.
+       *    Bağ `apps/web/src/rota/rota-tablosu.test.ts` tarafından da
+       *    doğrulanıyor: sabitin işaret ettiği yol gerçek bir rota olmalı.
+       */
+      redirectUrl: `${env().APP_URL}${CHECKOUT_RESULT_PATH}?${query.toString()}`,
     };
   }
 }

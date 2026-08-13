@@ -89,7 +89,7 @@ export function kimlikBasliklari(kimlik: Kimlik): Record<string, string> | null 
  * Kimlikli GET/POST. Başarısızlıkta `ApiFailure` FIRLATIR; çağıran sayfa
  * yakalayıp `<SunucuHatasi>` ile gösterir.
  *
- * `donusYolu` yalnızca oturum düştüğünde `/giris?next=` için kullanılır.
+ * `donusYolu` yalnızca oturum düştüğünde `/login?next=` için kullanılır.
  * ⚠️ Sunucu Bileşeninde geçerli yolu okumanın güvenilir bir yolu YOK
  *    (`headers()` istek yolunu taşımıyor), bu yüzden çağıran taraf yazar.
  */
@@ -128,7 +128,7 @@ function girise(donusYolu: string, sebep: 'guvenlik' | 'suresi-doldu' | null): n
   //    yeniden giriş ister; her 15 dakikada bir "oturumunuz düştü" demek, tek
   //    uçuşlu yenilemenin gizlediği şeyi geri getirirdi.
   if (sebep === 'guvenlik') arama.set('sebep', 'guvenlik');
-  redirect(`/giris?${arama.toString()}`);
+  redirect(`/login?${arama.toString()}`);
 }
 
 /**
@@ -139,7 +139,7 @@ function girise(donusYolu: string, sebep: 'guvenlik' | 'suresi-doldu' | null): n
  *    olmasaydı ziyaretçi boş sohbet kutusuna yazar ve ancak GÖNDERDİKTEN
  *    sonra girişe atılırdı — yazdığı da kaybolurdu.
  *
- * ⚠️ Çağıran taraf `redirect('/giris?next=…')` yazmasın diye burada: `?next=`
+ * ⚠️ Çağıran taraf `redirect('/login?next=…')` yazmasın diye burada: `?next=`
  *    kaçırma ve `sebep=guvenlik` ayrımı TEK yerde kalmalı, ikisi de sessizce
  *    yanlış yazılabilecek şeyler (açık yönlendirme kapısı `lib/donus-yolu.ts`
  *    tarafında kapalı ve o kapı yalnız bu biçimi bekliyor).

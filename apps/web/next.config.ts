@@ -1,3 +1,4 @@
+import createNextIntlPlugin from 'next-intl/plugin';
 import type { NextConfig } from 'next';
 
 /**
@@ -42,13 +43,25 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['ioredis'],
 
   /**
-   * `/checkout/sonuc` → `/odeme/sonuc`
+   * `/checkout/sonuc` → `/checkout/result`
    *
-   * ⚠️ SİTENİN TEK İNGİLİZCE YOLU ve onu biz seçmedik: adres backend'de SABİT
-   *    YAZILI (`checkout.service.ts` → `callbackResult()` →
-   *    `${APP_URL}/checkout/sonuc?siparis=…&durum=…`) ve `POST
-   *    /v1/payments/3ds/callback` yanıtında ölçüldü. Köprü olmadan ödemesini
-   *    bitiren kullanıcı 404 görür.
+   * ⚠️ ROTA GÖÇÜNDE AYAKTA BIRAKILAN TEK KÖPRÜ. Göç bir 301/308 haritası
+   *    KURMADI — bayat bağlantı yüksek sesle 404 vermeli, yoksa ölü bağlantı
+   *    testinin bakacağı yüzey maskelenir. Bu kayıt istisnadır çünkü adresi
+   *    biz seçmedik: backend'de SABİT YAZILI (`checkout.service.ts` →
+   *    `callbackResult()` → `${APP_URL}/checkout/sonuc?siparis=…&durum=…`) ve
+   *    `POST /v1/payments/3ds/callback` yanıtında ölçüldü. Köprü olmadan,
+   *    3DS'ten dönen — yani PARASI ÇEKİLMİŞ — kullanıcı 404 görür. Diğer her
+   *    ölü bağlantının bedeli bir 404; bunun bedeli bir SİPARİŞ.
+   *
+   * ⚠️ `source !== destination` OLMAK ZORUNDA. Göç sırasında bir find/replace
+   *    ikisini eşitlerse Next kendine yönlenen bir kayıt üretir
+   *    (ERR_TOO_MANY_REDIRECTS) ve arıza YALNIZCA gerçek bir ödeme
+   *    tamamlandığında görünür. İddia `src/rota/rota-tablosu.test.ts`te.
+   *
+   * ⚠️ KALICI DEĞİL: backend bu yolu paylaşılan bir sabitten okumaya başladığı
+   *    gün kayıt, uçuştaki 3DS ödemeleri için bir ödeme zaman aşımı penceresi
+   *    kadar daha durur, sonra kaldırılır.
    *
    * ⚠️ NEDEN SAYFA DEĞİL, YÖNLENDİRME: burada `permanentRedirect()` çağıran bir
    *    sayfa vardı ve ÖLÇÜLDÜ — Next o sayfa için 308 değil, `200 OK` +
@@ -60,7 +73,7 @@ const nextConfig: NextConfig = {
    *    izni verir, 308 vermez. Sorgu dizesi kendiliğinden taşınır.
    */
   async redirects() {
-    return [{ source: '/checkout/sonuc', destination: '/odeme/sonuc', permanent: true }];
+    return [{ source: '/checkout/sonuc', destination: '/checkout/result', permanent: true }];
   },
 
   /**
@@ -68,15 +81,32 @@ const nextConfig: NextConfig = {
    *
    * ⚠️ REWRITE, REDIRECT DEĞİL — adres çubuğu `/kullanim-kosullari` kalmalı.
    *    Bu iki adres kayıt formunda ve yarın e-postalarda sabit yazılı olacak;
-   *    `/hukuki/...`e yönlendirmek onları bir gün kırılacak ikinci bir adrese
+   *    `/legal/...`e yönlendirmek onları bir gün kırılacak ikinci bir adrese
    *    bağlamak olurdu.
    */
   async rewrites() {
     return [
-      { source: '/kullanim-kosullari', destination: '/hukuki/kullanim-kosullari' },
-      { source: '/aydinlatma-metni', destination: '/hukuki/aydinlatma-metni' },
+      { source: '/kullanim-kosullari', destination: '/legal/kullanim-kosullari' },
+      { source: '/aydinlatma-metni', destination: '/legal/aydinlatma-metni' },
     ];
   },
 };
 
-export default nextConfig;
+/**
+ * next-intl EKLENTİSİ — SUNUCU TARAFI OKUMASININ TEK BAĞLAYICISI.
+ *
+ * ⚠️ BU SATIR OLMADAN `getTranslations()` / `getLocale()` ÇALIŞMAZ ve arıza
+ *    "modül bulunamadı" gibi okunur değildir: eklenti, `src/i18n/request.ts`i
+ *    derleme zamanında sunucu çalışma zamanına bağlar. Yolu AÇIKÇA yazıyoruz —
+ *    varsayılan arama sırası (`./i18n/request.ts`, `./src/i18n/request.ts`) bir
+ *    sonraki ana sürümde değişirse sessizce yapılandırmasız kalırdık ve her
+ *    metin varsayılan dile düşerdi. Sessiz düşüş bu depodaki en pahalı hata
+ *    sınıfı.
+ *
+ * ⚠️ SARMALAMA EN DIŞTA ve `redirects`/`rewrites` DOKUNULMADAN kalıyor:
+ *    eklenti yalnız derleyici tarafına ekleme yapıyor, yönlendirme tablosuna
+ *    karışmıyor. `/checkout/sonuc` köprüsü olduğu gibi duruyor.
+ */
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+
+export default withNextIntl(nextConfig);

@@ -24,7 +24,7 @@ import { hataYuku } from '@/components/hata/hata-koprusu';
  *    sınırından geçemiyor (`hata-koprusu.ts`), o yüzden düz gövdeye çevriliyor.
  *
  * ⚠️ `redirect()` YUTULMAZ. `hesapFetch` oturum yokken `NEXT_REDIRECT` fırlatır;
- *    o hata `try` bloğunun içinde yakalanırsa kullanıcı `/giris` yerine bir hata
+ *    o hata `try` bloğunun içinde yakalanırsa kullanıcı `/login` yerine bir hata
  *    kutusu görür. `hataYuku` onu yeniden fırlatıyor (bkz. o dosya).
  */
 export type Okuma<T> = { tamam: true; veri: T } | { tamam: false; hata: ApiErrorBody };

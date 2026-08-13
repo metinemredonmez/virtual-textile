@@ -6,7 +6,7 @@ import { mediaUrl } from '@/lib/media';
 import { UrunGorseli } from '@/components/urun/urun-gorseli';
 import { Button } from '@/components/ui/button';
 import { Fiyat } from '@/components/fiyat/fiyat';
-import { AramaKutusu } from './urunler/_liste/arama-kutusu';
+import { AramaKutusu } from './products/_liste/arama-kutusu';
 import { UrunIzgarasi } from '@/components/urun/urun-izgarasi';
 import { kategoriAgaci, vitrinKategorileri } from '@/lib/kategori';
 
@@ -51,7 +51,7 @@ export default async function VitrinPage(): Promise<React.ReactElement> {
         <section>
           <div className="mb-6 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold tracking-tight">Öne çıkanlar</h2>
-            <Link href="/urunler" className="text-sm text-metin-soluk hover:text-metin">
+            <Link href="/products" className="text-sm text-metin-soluk hover:text-metin">
               Tümünü gör
             </Link>
           </div>
@@ -82,7 +82,7 @@ function Vitrin({ urun }: { urun: ProductListItemWire | undefined }): React.Reac
 
   return (
     <section className="flex flex-col gap-8">
-      <div className="relative aspect-urun w-full overflow-hidden rounded-lg bg-yuzey md:aspect-[16/7]">
+      <div className="relative aspect-urun w-full overflow-hidden rounded-lg bg-urun-zemin md:aspect-[16/7]">
         {/* ⚠️ Ham `next/image` DEĞİL — gerekçe `components/urun/urun-gorseli.tsx`te.
             `oncelikli`: ilk ekranın en büyük öğesi; tembel yüklenirse LCP odur. */}
         <UrunGorseli src={urun ? gorsel : null} alt={urun?.title ?? ''} sizes="100vw" oncelikli />
@@ -103,11 +103,11 @@ function Vitrin({ urun }: { urun: ProductListItemWire | undefined }): React.Reac
 
         <div className="flex flex-wrap items-center gap-6">
           <Button asChild size="lg">
-            <Link href="/urunler">Ürünleri keşfet</Link>
+            <Link href="/products">Ürünleri keşfet</Link>
           </Button>
 
           {urun ? (
-            <Link href={`/urun/${urun.slug}`} className="group flex flex-col gap-0.5 text-sm">
+            <Link href={`/product/${urun.slug}`} className="group flex flex-col gap-0.5 text-sm">
               <span className="text-xs uppercase tracking-wide text-metin-soluk">Vitrinde</span>
               {/* Ürün adı birincil, mağaza ikincil gri, fiyat birincil. */}
               <span className="font-semibold group-hover:underline">{urun.title}</span>
@@ -133,7 +133,7 @@ function Kategoriler({
     <section>
       <div className="mb-6 flex items-baseline justify-between">
         <h2 className="text-sm font-semibold tracking-tight">Kategoriler</h2>
-        <Link href="/kategori" className="text-sm text-metin-soluk hover:text-metin">
+        <Link href="/category" className="text-sm text-metin-soluk hover:text-metin">
           Tüm kategoriler
         </Link>
       </div>
@@ -143,7 +143,7 @@ function Kategoriler({
         {gosterilecek.map((kategori) => (
           <li key={kategori.id}>
             <Link
-              href={`/kategori/${kategori.slug}`}
+              href={`/category/${kategori.slug}`}
               className="inline-block rounded-md border border-kenar px-4 py-2 text-sm hover:bg-yuzey-vurgulu"
             >
               {kategori.name}

@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Money } from '@vt/contracts';
+import { useLocale } from 'next-intl';
+import { Money, type Locale } from '@vt/contracts';
 import { cn } from '@/lib/utils';
 
 /**
@@ -32,5 +33,11 @@ export function Tutar({
   minor: bigint;
   className?: string;
 }): React.ReactElement {
-  return <span className={cn('rakam', className)}>{Money.formatMoney(Money.money(minor))}</span>;
+  // ⚠️ Dil prop olarak alınmaz — gerekçe `<Fiyat>` içinde yazılı: çağrı yerine
+  //    bırakılan her biçim kararı, unutulduğunda derlemeyi kırmadan yanlış
+  //    ayraçlı bir tutar üretir.
+  const locale = useLocale() as Locale;
+  return (
+    <span className={cn('rakam', className)}>{Money.formatMoney(Money.money(minor), locale)}</span>
+  );
 }

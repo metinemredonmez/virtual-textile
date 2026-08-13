@@ -1,5 +1,6 @@
 import * as React from 'react';
-import type { MinorString } from '@vt/contracts';
+import { useLocale } from 'next-intl';
+import type { Locale, MinorString } from '@vt/contracts';
 import { discountPercent, formatMinor } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,18 @@ export interface FiyatProps {
 }
 
 export function Fiyat({ value, listValue, className }: FiyatProps): React.ReactElement {
+  /**
+   * ⚠️ DİL PROP OLARAK ALINMAZ. `<Fiyat>` bu depoda onlarca yerde çağrılıyor;
+   *    her çağrıya `locale` eklemek, bir çağrının unutulmasını ve o kartta
+   *    Türkçe ayraçlı bir fiyatın kalmasını kaçınılmaz kılardı — üstelik
+   *    derleme geçerdi (varsayılan değer var). `useLocale()` next-intl'in hem
+   *    Sunucu hem İstemci Bileşeninde çalışan okumasıdır; çağıran unutamaz.
+   *
+   * ⚠️ İNDİRİM YÜZDESİ locale'e BAĞLI DEĞİL: `discountPercent` 0–99 arası tam
+   *    sayı üretiyor, binlik ayracı olamaz. `Intl`e sokmak kazanç değil,
+   *    fazladan bir kurucu çağrısı olurdu.
+   */
+  const locale = useLocale() as Locale;
   const indirim = listValue ? discountPercent(value, listValue) : null;
 
   return (
@@ -38,10 +51,10 @@ export function Fiyat({ value, listValue, className }: FiyatProps): React.ReactE
      *    sığdığı yerde satır zaten tek satır.
      */
     <span className={cn('rakam inline-flex flex-wrap items-baseline gap-2', className)}>
-      <span className="font-semibold">{formatMinor(value)}</span>
+      <span className="font-semibold">{formatMinor(value, locale)}</span>
       {listValue && indirim !== null ? (
         <>
-          <s className="text-metin-soluk">{formatMinor(listValue)}</s>
+          <s className="text-metin-soluk">{formatMinor(listValue, locale)}</s>
           {/*
             ⚠️ İNDİRİM YÜZDESİ RENKSİZ. Burada `text-tehlike` yazıyordu ve bu
                bir kural ihlaliydi: `design-system.md`in "renk taşır" tablosunda

@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { isApiFailure } from '@vt/contracts';
+import { useLocale } from 'next-intl';
+import { isApiFailure, type Locale } from '@vt/contracts';
 import { Button } from '@/components/ui/button';
 import { HataGosterimi } from '@/components/hata/hata-gosterimi';
 import { fieldMessage } from '@/components/hata/alan-hatalari';
@@ -54,6 +55,7 @@ const GEREKCE_AZAMI = 500;
 
 export function KararKutusu({ kararlar }: { kararlar: readonly Karar[] }): React.ReactElement {
   const router = useRouter();
+  const locale = useLocale() as Locale;
   const [acik, setAcik] = React.useState<string | null>(null);
   const [gerekce, setGerekce] = React.useState('');
   const [calisiyor, setCalisiyor] = React.useState(false);
@@ -158,7 +160,7 @@ export function KararKutusu({ kararlar }: { kararlar: readonly Karar[] }): React
                WCAG 2.4.7 (Seviye A).
                `outline-none` ancak halkayı TAŞIYAN bir kabukla birlikte
                yazılabilir (`has-[:focus-visible]:outline-2` — örnek:
-               `(magaza)/urunler/_liste/arama-kutusu.tsx`). Burada kabuk yok,
+               `(magaza)/products/_liste/arama-kutusu.tsx`). Burada kabuk yok,
                kontrolün kendisi görünen kutu; halka doğrudan ona çizilir.
           */}
           <textarea
@@ -213,7 +215,7 @@ export function KararKutusu({ kararlar }: { kararlar: readonly Karar[] }): React
       {alanHatalari.length > 0 ? (
         <ul className="flex flex-col gap-1 text-sm text-metin">
           {alanHatalari.map((alan) => (
-            <li key={alan.path}>{fieldMessage(alan)}</li>
+            <li key={alan.path}>{fieldMessage(alan, locale)}</li>
           ))}
         </ul>
       ) : null}

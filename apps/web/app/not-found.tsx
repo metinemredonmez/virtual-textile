@@ -7,7 +7,7 @@ import MagazaLayout from './(magaza)/layout';
  * ⚠️ İKİ 404 DOSYASI VAR VE İKİSİ DE GEREKLİ. `(magaza)/not-found.tsx` yalnızca
  *    o rota grubunun İÇİNDEN `notFound()` çağrıldığında devreye girer; hiçbir
  *    rotaya uymayan bir adres (ya da `dynamicParams:false` olan bir rotanın
- *    yönlendirici düzeyindeki 404'ü — `/koleksiyon/canta` ölçüldü) grubun
+ *    yönlendirici düzeyindeki 404'ü — `/collection/canta` ölçüldü) grubun
  *    dışında kalır ve buraya düşer. Bu dosya olmasaydı aynı hata iki farklı
  *    ekran gösterirdi: biri vitrin kabuğunda Türkçe, diğeri Next'in İngilizce
  *    varsayılanı.

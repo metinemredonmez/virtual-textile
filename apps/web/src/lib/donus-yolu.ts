@@ -2,7 +2,7 @@
  * `?next=` PARAMETRESİNİN TEMİZLENMESİ.
  *
  * ⚠️ AÇIK YÖNLENDİRME (open redirect) KAPISI. `next` değerini olduğu gibi
- *    `router.replace()`e vermek, `/giris?next=https://kotu-site.example` ile
+ *    `router.replace()`e vermek, `/login?next=https://kotu-site.example` ile
  *    gelen bir bağlantının kullanıcıyı GİRİŞTEN HEMEN SONRA — yani en çok
  *    güvendiği anda — saldırganın kopyaladığı bir ekrana atması demektir.
  *    Kimlik avı kampanyalarının klasik taşıyıcısıdır.
@@ -20,7 +20,7 @@
  */
 
 /** Yönlendirme hedefi verilmediğinde/güvenilmediğinde gidilecek yer. */
-export const VARSAYILAN_HEDEF = '/hesabim';
+export const VARSAYILAN_HEDEF = '/account';
 
 export function guvenliDonusYolu(next: string | null | undefined): string {
   if (!next) return VARSAYILAN_HEDEF;

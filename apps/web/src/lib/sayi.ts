@@ -11,7 +11,7 @@
  *    diye taşımak, ilerideki her çarpımı kayan noktaya sokardı.
  *
  * ⚠️ BURASI ORTAK KATMAN, bir ekranın `_lib`i DEĞİL — ve bu bir yer değiştirme
- *    değil, bir arıza önleme. Dosya bir dönem `(magaza)/hesaplayici/` altındaydı
+ *    değil, bir arıza önleme. Dosya bir dönem `(magaza)/calculator/` altındaydı
  *    ve YEDİ tüketicisi ona rota grubunun DIŞINDAN, göreli yolla ulaşıyordu
  *    (satıcı payout formu, varyant matrisi, yeni ürün, kuponlar; yönetim
  *    komisyon ×2, manuel iade). İkinci bir ayrıştırıcı yazılsaydı bedeli

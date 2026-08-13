@@ -17,6 +17,7 @@
     "push": "dotenv -e ../../.env -- prisma db push",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "seed:varlik": "tsx prisma/seed-assets/uret.ts",
     "rol:ata": "dotenv -e ../../.env -- tsx scripts/rol-ata.ts",
     "validate": "dotenv -e ../../.env -- prisma validate",
     "format": "prisma format",
@@ -29,7 +30,11 @@
     "@prisma/client": "^6.2.1"
   },
   "devDependencies": {
+    "@vt/adapters": "workspace:*",
+    "@vt/config": "workspace:*",
+    "argon2": "^0.41.1",
     "prisma": "^6.2.1",
+    "sharp": "^0.35.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

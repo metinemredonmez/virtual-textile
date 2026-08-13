@@ -12,10 +12,28 @@
  *    sipariş durumu, stok uyarısı, onay durumu gibi BİLGİ taşıyan yerlerde
  *    kullanılır. Süs amaçlı renk bu sinyali harcar.
  *
- * ⚠️ KOYU TEMA YALNIZCA (yonetim) BÖLGESİNDE. `prefers-color-scheme` bilinçli
- *    olarak DİNLENMİYOR: vitrin ve satıcı paneli her zaman açık temadır, çünkü
- *    ürün fotoğrafları beyaz fon üzerine çekiliyor ve koyu zeminde kesim
- *    çizgileri kayboluyor. Koyu tema `.tema-koyu` sınıfıyla AÇIKÇA açılır.
+ * ⚠️ KOYU TEMA ARTIK KULLANICININ SEÇİMİ VE SİTE GENELİNDE GEÇERLİ.
+ *    `.tema-koyu` sınıfı `<html>` üzerinde durur ve onu ilk boyamadan önce
+ *    `lib/tema.ts`teki satır içi betik yazar. Üç seçenek: açık / koyu / sistem
+ *    (varsayılan `sistem`, yani `prefers-color-scheme`).
+ *
+ *    ESKİ KURAL "koyu tema yalnızca (yonetim) bölgesinde"ydi ve sınıf
+ *    `(yonetim)/layout.tsx` üzerinde duruyordu. Neden düştüğü önemli:
+ *    `Dialog`/`Sheet` içeriğini `document.body`ye PORTAL ediyor, yani temalı
+ *    kabuğun DIŞINA — koyu panelde açılan ilk modal AÇIK temada çizilecekti.
+ *    Sınıf `<html>`e taşınınca `document.body` zaten kapsayıcının İÇİNDE
+ *    kalıyor ve o tuzak YAPISAL olarak kapanıyor; her yeni modalda
+ *    hatırlanması gereken bir kural kalmıyor.
+ *
+ * ⚠️ ESKİ İTİRAZ HÂLÂ GEÇERLİ AMA ARAYÜZE DEĞİL FOTOĞRAFA AİT: ürün
+ *    fotoğrafları beyaz fon üzerine çekiliyor, koyu zeminde kesim çizgileri
+ *    kaybolur. Bu yüzden fotoğraf ÇERÇEVESİ tema başına DEĞİŞMEYEN ayrı bir
+ *    token taşır (`--urun-zemin`). Kabuk koyarır, fotoğrafın altındaki zemin
+ *    beyaza yakın kalır.
+ *
+ * ⚠️ İKİ TEMA DA AKROMATİK. Koyu tema bir renk şenliği değildir; aşağıdaki
+ *    iki blokta `.tema-koyu`nun `:root`a göre EK bir renk ailesi yoktur, aynı
+ *    16 token'ın karşılığı vardır.
  */
 
 @theme inline {
@@ -50,6 +68,27 @@
    *    kullanılmaz — hepsi anlamsal token.
    */
   --color-tehlike-metin: var(--tehlike-metin);
+
+  /*
+   * ⚠️ MODAL PERDESİ TOKEN OLMAK ZORUNDAYDI. `dialog.tsx:40` ve `sheet.tsx:47`
+   *    `bg-black/40` yazıyordu — depodaki TEK iki sabit renk ihlali (220 dosya
+   *    tarandı, başka yok). Açık temada doğru çalışıyordu; koyu temada koyu bir
+   *    sayfanın üstündeki %40 siyah perde ayırt edilemiyor, yani modalın
+   *    arkasının "devre dışı" olduğu görsel olarak kayboluyor.
+   */
+  --color-perde: var(--perde);
+
+  /*
+   * ÜRÜN FOTOĞRAFI ÇERÇEVESİ — İKİ TEMADA DA AYNI, bilerek.
+   *
+   * ⚠️ `.tema-koyu` bu ikisini ÖZELLİKLE EZMEZ. Ezseydi koyu temada ürün
+   *    fotoğrafının beyaz fonu koyu bir kutunun içinde yüzer ve ince kesim
+   *    çizgileri kaybolurdu — koyu temaya geçmenin tek gerçek işlevsel bedeli
+   *    buydu ve kapatılan yer burasıdır. Eksik görsel yedeği de bu zemini
+   *    kullanır ki yedek, yerini aldığı fotoğrafla aynı çerçevede dursun.
+   */
+  --color-urun-zemin: var(--urun-zemin);
+  --color-urun-zemin-metin: var(--urun-zemin-metin);
 
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -92,6 +131,13 @@
   --tehlike: #b91c1c;
   --tehlike-zemin: #fdecec;
   --tehlike-metin: #ffffff;
+
+  --perde: rgb(0 0 0 / 0.4);
+
+  /* ⚠️ TEMA BAŞINA DEĞİŞMEZ — `.tema-koyu` bunları bilerek ezmiyor, gerekçe
+     `@theme inline` içinde. #52525b / #f4f4f5 = 7,03:1. */
+  --urun-zemin: #f4f4f5;
+  --urun-zemin-metin: #52525b;
 }
 
 /* Linear iskeleti: düşük kontrastlı çizgiler, parlak vurgu yok. */
@@ -115,9 +161,24 @@
   /* ⚠️ BEYAZ DEĞİL. Dolgu koyu temada parlak (#ef6b6b); beyaz metin 3,01:1
      ederdi. Zemin rengiyle 6,42:1. Gerekçenin tamamı `@theme inline` içinde. */
   --tehlike-metin: #0d0e11;
+
+  /* ⚠️ %40 DEĞİL. Sayfa zemini zaten #0d0e11; %40 siyah perde onu #080809
+     yapar ve modalın arkasıyla modalın kendisi ayırt edilemez. %70'te arka
+     plan #040405'e iner, `--kenar` çerçeveli modal ondan AÇIK kalır. */
+  --perde: rgb(0 0 0 / 0.7);
 }
 
 @layer base {
+  /*
+   * ⚠️ İKİSİ AYNI ELEMENTTE ÇAKIŞMAZ: `.tema-koyu` (0,1,0) > `html` (0,0,1).
+   *    Sınıf artık `<html>` üzerinde durduğu için bu ölçülebilir bir kural,
+   *    kaynak sırasına bağlı bir tesadüf değil.
+   *
+   * ⚠️ Satır içi betik `style.colorScheme`i AYRICA yazıyor ve bu tekrar
+   *    gereklidir: CSS henüz inmemişken kaydırma çubuğu ve form denetimleri
+   *    tarayıcı varsayılanıyla (beyaz) çizilir. Buradaki kural CSS indikten
+   *    sonrası için, oradaki satır içi stil CSS'ten önceki pencere için.
+   */
   html {
     color-scheme: light;
   }
@@ -155,4 +216,85 @@
 @utility rakam {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
+}
+
+/*
+ * EKSİK GÖRSEL YEDEĞİ — CSS KATMANINDA, ÇÜNKÜ SORUN GÖRÜNÜŞ DEĞİL ZAMAN.
+ *
+ * ⚠️ ÖLÇÜLDÜ (2026-08-12, üretim derlemesi, /urunler, 3 kırık görsel):
+ *    `<img>` hatası 226 ms, JS yedeği 542 ms → KIRIK İKON PENCERESİ 316 ms;
+ *    x4 kısılmış CPU'da 501 ms; JS KAPALIYKEN yedek HİÇ gelmiyor, kırık ikon
+ *    KALICI. Sebep `onError`ın bir React sentetik olayı olması ve hidrasyon
+ *    tamamlanana kadar bağlanmaması — React kaçırdığı `error` olayını geri
+ *    OYNATMAZ. Yani yedek "sonunda doğru"ydu, "ilk karede" değil; bu deponun
+ *    altı arızasının ortak deseni tam olarak budur.
+ *
+ * ⚠️ HİDRASYONDAN ÖNCE ÇALIŞAN TEK ŞEY CSS'TİR. O yüzden örtü buraya iniyor.
+ *    Mekanizma: üretilmiş içerik (`::before`/`::after`) DEĞİŞTİRİLMİŞ
+ *    (replaced) elemanlarda YALNIZCA görsel çizilemediğinde boyanır. Başarılı
+ *    yüklemede örtü HİÇ görünmez; başarısızda kırık damganın üzerini İLK
+ *    BOYAMADA örter.
+ *
+ * ⚠️ REDDEDİLEN ALTERNATİF — `<img>`i `opacity:0` yapıp `onLoad`da açmak.
+ *    Bu bir GERİLEMEDİR: `onLoad` da `onError` gibi hidrasyondan önce ateşlenir
+ *    (önbellekten gelen görselde neredeyse her zaman), yani BAŞARILI yüklenen
+ *    her görsel de aynı 316 ms boyunca görünmez kalırdı — arıza 3 kırık karttan
+ *    24 sağlam karta yayılırdı.
+ *
+ * ⚠️ DÜRÜST SINIR: `::after` davranışı tarayıcıya bağlıdır (Chrome/Firefox'ta
+ *    güvenilir, Safari tarihsel olarak tutarsız). Bu yüzden `urun-gorseli.tsx`
+ *    içindeki `onError` yolu GARANTİ katman olarak DURUYOR; CSS katmanı
+ *    yalnızca hidrasyon öncesi pencereyi kapatır. Safari boyamıyorsa Safari
+ *    kullanıcısı eski davranışı görür — gerileme değil, iyileşmenin ulaşmadığı
+ *    yer.
+ *
+ * ⚠️ TEK SINIF, İKİ TÜKETİCİ. Aynı iki kural hem `<img>`in örtüsünü hem
+ *    `onError` sonrası çizilen `<span>` yedeğini çiziyor. İki ayrı kural
+ *    yazılsaydı biri düzeltilip diğeri eski kalırdı ve fark yalnızca 316 ms'lik
+ *    bir pencerede görünürdü — bu depoda ayrışan iki kopya teorik değil,
+ *    ölçülmüş bir olay.
+ */
+@layer components {
+  /*
+   * ⚠️ İKON `background-image`, `mask` DEĞİL — ve çizgi rengi SABİT YAZILI.
+   *    CSS `url()` içine `var()` giremez; ikonu tokenla boyamanın tek yolu
+   *    `mask` olurdu ama o zaman ARKA PLAN maskelenir, yani ikon ve zemin için
+   *    iki ayrı katman gerekir ve elimizde yalnız iki sözde-eleman var (üçüncüsü
+   *    ürün adı). #52525b burada `--urun-zemin-metin` ile AYNI değer olmak
+   *    zorunda; ikisi TEMA BAŞINA DEĞİŞMEDİĞİ için sapma riski yok — token
+   *    değiştirilirse bu dizgi de değiştirilir.
+   *
+   *    İkon Lucide `ImageOff`, 1.5px çizgi — JS yedeğiyle GÖRSEL OLARAK AYNI.
+   *    Her karta ayrıca bir `<svg>` düğümü girmiyor (24'lük ızgarada 24 düğüm).
+   */
+  .gorsel-yedek::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2352525b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cline x1='2' x2='22' y1='2' y2='22'/%3e%3cpath d='M10.41 10.41a2 2 0 1 1-2.83-2.83'/%3e%3cline x1='13.5' x2='6' y1='13.5' y2='21'/%3e%3cline x1='18' x2='21' y1='12' y2='15'/%3e%3cpath d='M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59'/%3e%3cpath d='M21 15V5a2 2 0 0 0-2-2H9'/%3e%3c/svg%3e")
+        no-repeat center 42% / 20px 20px,
+      var(--urun-zemin);
+  }
+
+  /*
+   * ⚠️ ÜRÜN ADI — "boş gri kutu" ile "eksik görsel" arasındaki fark bu satır.
+   *    Tek satır + `ellipsis`: 48px'lik bir küçük görselde ad kırpılır ama
+   *    kutuyu taşırmaz; sarmalasaydı küçük kutularda okunamayan 4 satır metin
+   *    çizerdi. `attr()` kullanılıyor çünkü örtü hidrasyondan ÖNCE çizilmeli,
+   *    yani değeri yazan tek yer HTML'in kendisi olabilir.
+   */
+  .gorsel-yedek::after {
+    content: attr(data-yedek-ad);
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 0 0.5rem 0.5rem;
+    color: var(--urun-zemin-metin);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

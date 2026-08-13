@@ -21,18 +21,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 export function proxy(request: NextRequest): NextResponse {
   if (request.cookies.has('vt_sid')) return NextResponse.next();
 
-  const giris = new URL('/giris', request.url);
+  const giris = new URL('/login', request.url);
   giris.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
   return NextResponse.redirect(giris);
 }
 
 /**
- * ⚠️ `/hesabim/:path*` LİSTEDE, ama korumanın kendisi BURADA DEĞİL: gerçek kapı
- *    `hesabim/layout.tsx` ve `hesapFetch()`in `/giris`e yönlendirmesi. Bu
+ * ⚠️ `/account/:path*` LİSTEDE, ama korumanın kendisi BURADA DEĞİL: gerçek kapı
+ *    `account/layout.tsx` ve `hesapFetch()`in `/login`e yönlendirmesi. Bu
  *    satırın tek işi İSKELET SIÇRAMASINI önlemek — çerezsiz ziyaretçi önce
  *    hesap kabuğunu çizdiriyor, sonra yönlendiriliyordu. Satır kaldırılırsa
  *    kaybolan şey güvenlik değil, yalnızca o sıçramanın yokluğu.
  */
 export const config = {
-  matcher: ['/hesabim/:path*', '/satici/:path*', '/yonetim/:path*'],
+  matcher: ['/account/:path*', '/seller/:path*', '/admin/:path*'],
 };

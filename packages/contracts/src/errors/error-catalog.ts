@@ -2,13 +2,33 @@
  * HATA KODU KATALOĞU — tek doğruluk kaynağı.
  *
  * Buradaki her kayıt hem HTTP davranışını hem kullanıcıya gösterilecek
- * Türkçe mesajı hem de "bu hata Sentry'ye gitmeli mi" kararını belirler.
+ * mesajı hem de "bu hata Sentry'ye gitmeli mi" kararını belirler.
  *
  * Kural: yeni bir hata durumu eklerken ÖNCE buraya kod eklenir, sonra fırlatılır.
  * `throw new Error('...')` kullanılmaz.
  *
  * `message` içinde `{param}` yer tutucuları kullanılabilir; `appError()` çağrısında
  * `params` ile doldurulur.
+ *
+ * ═══ ÇOK DİLLİLİK — "MESAJI FRONTEND YENİDEN YAZMAZ" KURALI NASIL KORUNUYOR ═══
+ *
+ * Kural "metin telde gelir" DEĞİL, "metin KATALOĞA yazılır"dır. `hata-gosterimi.tsx`
+ * bunu kendi yorumunda zaten böyle söylüyor: *"Metin değişikliği ERROR_CATALOG'ta
+ * yapılır."* Çok dilde de öyle kalıyor — değişen tek şey kataloğun artık iki
+ * dosyası olması:
+ *
+ *   - `error-catalog.ts`     → KAYNAK metin (Türkçe), bu dosya.
+ *   - `error-catalog.en.ts`  → aynı anahtar kümesi, İngilizce.
+ *
+ * Sunucu telde KOD + PARAMETRE gönderir; metni gösterileceği dilde kuran taraf
+ * `error-message.ts`tir ve o da SADECE bu iki dosyadan okur. Frontend hiçbir
+ * yerde kendi cümlesini yazmaz.
+ *
+ * ⚠️ `message` TELDE GİTMEYE DEVAM EDİYOR ve bu bir çelişki değil, SÜRÜM SAPMASI
+ *    YEDEĞİ: yeni bir kod açıldığında eski frontend derlemesi o kodu tanımaz;
+ *    telden gelen hazır metin sayesinde kullanıcı boş kutu değil doğru cümleyi
+ *    görür (yalnız sunucunun dilinde). `api-failure.ts` bu yedeği bilerek
+ *    koruyor.
  */
 
 /**
@@ -24,14 +44,43 @@
  */
 export type ErrorFamily = 'validation' | 'domain' | 'integration' | 'system';
 
+/**
+ * Yer tutucu değerinin TÜRÜ — biçimlendirme kararını bu belirler.
+ *
+ * ⚠️ `para` OLMADAN OLMAZ, VE BU ÖLÇÜLMÜŞ BİR ARIZANIN KAPISIDIR: bugün
+ *    `COUPON_MIN_AMOUNT` ile `PAYOUT_BELOW_MINIMUM` parametreyi sunucuda
+ *    `Money.formatMoney(...)`ten geçirip TELE HAZIR TÜRKÇE DİZGİ olarak
+ *    ("1.000,00 ₺") koyuyordu. Metin İngilizceye çevrilince cümle İngilizce,
+ *    içindeki tutar Türkçe ayraçlı kalırdı ("at least 1.000,00 ₺") — derleme
+ *    geçer, test geçer, yalnız kullanıcı görür. Artık telde KURUŞ DİZGİSİ
+ *    gider ("100000") ve biçim gösterildiği yerde, gösterildiği dile göre kurulur.
+ *
+ * ⚠️ `para` değerleri `Number()`a UĞRAMAZ; `BigInt` → `Money.formatMoney`
+ *    yolundan geçer (`error-message.ts`). `sayi` ise gerçekten sayıdır (adet,
+ *    gün, dakika) ve ÇOĞUL SEÇİMİ için sayısal kalmak zorundadır.
+ */
+export type ErrorParamKind = 'metin' | 'sayi' | 'para';
+
 export interface ErrorDefinition {
   /** HTTP durum kodu */
   readonly status: number;
   readonly family: ErrorFamily;
   /** İstemci aynı isteği tekrar deneyebilir mi? */
   readonly retryable: boolean;
-  /** Kullanıcıya gösterilebilir Türkçe mesaj. İç detay/teknik terim içermez. */
+  /**
+   * KAYNAK metin (Türkçe). Çevirisi `error-catalog.en.ts`te; ikisi
+   * `error-catalog.test.ts` ile anahtar anahtar EŞİT tutulur.
+   */
   readonly message: string;
+  /**
+   * Mesajdaki `{yerTutucu}` adlarının türü.
+   *
+   * ⚠️ Yer tutucusu olan HER kodda dolu olmak ZORUNDA ve testle kapalı: yeni
+   *    bir yer tutucu ekleyip türünü bildirmeyi unutmak, o değerin biçimsiz
+   *    basılması demek. Türsüz bırakılsaydı `sayi` ile `para` arasındaki fark
+   *    kaybolur ve kuruş tutarı ekrana "100000" diye çıkardı.
+   */
+  readonly params?: Readonly<Record<string, ErrorParamKind>>;
 }
 
 const define = <T extends Record<string, ErrorDefinition>>(catalog: T): T => catalog;
@@ -86,6 +135,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: true,
     message: 'Çok fazla hatalı deneme yapıldı. {minutes} dakika sonra tekrar deneyin.',
+    params: { minutes: 'sayi' },
   },
   AUTH_ACCOUNT_SUSPENDED: {
     status: 403,
@@ -180,12 +230,14 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Yeterli stok kalmadı. Bu üründen en fazla {available} adet alabilirsiniz.',
+    params: { available: 'sayi' },
   },
   MAX_QUANTITY_EXCEEDED: {
     status: 422,
     family: 'domain',
     retryable: false,
     message: 'Bu üründen tek siparişte en fazla {max} adet alabilirsiniz.',
+    params: { max: 'sayi' },
   },
   /**
    * Adet tavanından (MAX_QUANTITY_EXCEEDED) AYRI: burada sınır tek varyantın
@@ -199,6 +251,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Sepetinize en fazla {max} farklı ürün ekleyebilirsiniz. Bir ürünü çıkarıp tekrar deneyin.',
+    params: { max: 'sayi' },
   },
   COUPON_INVALID: {
     status: 400,
@@ -217,6 +270,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Bu kupon için en az {minAmount} tutarında alışveriş yapmalısınız.',
+    params: { minAmount: 'para' },
   },
   COUPON_ALREADY_USED: {
     status: 409,
@@ -358,6 +412,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'İade süresi ({days} gün) dolmuş.',
+    params: { days: 'sayi' },
   },
 
   // ── SİPARİŞ & İADE ────────────────────────────────────────────────────
@@ -427,6 +482,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Sipariş kaydında tutarsızlık var, işlem güvenlik nedeniyle durduruldu. Destek ekibine şu kodu iletin: {requestId}',
+    params: { requestId: 'metin' },
   },
 
   // ── AI / SANAL DENEME ─────────────────────────────────────────────────
@@ -454,6 +510,7 @@ export const ERROR_CATALOG = define({
     family: 'validation',
     retryable: false,
     message: 'Fotoğraf boyutu {maxMb} MB’ı aşamaz.',
+    params: { maxMb: 'sayi' },
   },
   PHOTO_INVALID_FORMAT: {
     status: 422,
@@ -466,6 +523,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Fotoğraf kalitesi yetersiz: {reason}',
+    params: { reason: 'metin' },
   },
   PHOTO_NO_PERSON: {
     status: 422,
@@ -527,6 +585,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     /** Sınırlar parametre: sabit yazılsaydı @vt/adapters'taki değer değişince mesaj yalan söylerdi. */
     message: 'Kombin denemesi için en az {min}, en fazla {max} parça seçebilirsiniz.',
+    params: { min: 'sayi', max: 'sayi' },
   },
   OUTFIT_DUPLICATE_PIECE: {
     status: 422,
@@ -540,6 +599,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: true,
     message: 'Günlük sanal deneme hakkınız doldu ({used}/{limit}). Yarın tekrar deneyebilirsiniz.',
+    params: { used: 'sayi', limit: 'sayi' },
   },
   TRYON_JOB_NOT_FOUND: {
     status: 404,
@@ -637,6 +697,7 @@ export const ERROR_CATALOG = define({
     family: 'system',
     retryable: false,
     message: 'Ürün araması güncellenemedi. Destek ekibine şu kodu iletin: {requestId}',
+    params: { requestId: 'metin' },
   },
   /** Gömme sağlayıcısı yanıt vermedi — genel UPSTREAM_UNAVAILABLE yerine. */
   EMBEDDING_PROVIDER_ERROR: {
@@ -699,6 +760,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Bu varyanttan {reserved} adet müşteri sepetlerinde rezerve. Stoğu bu adedin altına indiremezsiniz.',
+    params: { reserved: 'sayi' },
   },
   /**
    * Şifreli alan çözülemedi (anahtar rotasyonu veya bozuk kayıt).
@@ -713,6 +775,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Kayıtlı bilgileriniz okunamadı, işlem tamamlanamadı. Destek ekibine şu kodu iletin: {requestId}',
+    params: { requestId: 'metin' },
   },
   /**
    * PAYOUT_PENDING_EXISTS'ten AYRI: orada satıcıya "zaten talebin var" denir,
@@ -724,6 +787,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Bu ödeme talebi zaten karara bağlanmış ({status}). Listeyi yenileyip tekrar bakın.',
+    params: { status: 'metin' },
   },
   /** Komisyon oranı politika tavanını aştı — genel VALIDATION_FAILED yerine. */
   COMMISSION_RATE_ABOVE_CAP: {
@@ -731,6 +795,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Komisyon oranı en fazla %{maxPercent} olabilir. Daha düşük bir oran girin.',
+    params: { maxPercent: 'sayi' },
   },
   /**
    * Komisyon versiyon çizelgesi çakışıyor (aynı anda iki açık versiyon vb.).
@@ -746,12 +811,14 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Komisyon çizelgesinde çakışma var, işlem durduruldu. Destek ekibine şu kodu iletin: {requestId}',
+    params: { requestId: 'metin' },
   },
   BULK_UPLOAD_INVALID: {
     status: 422,
     family: 'validation',
     retryable: false,
     message: 'Yüklediğiniz dosyada {count} satırda hata var. Detayları inceleyip tekrar deneyin.',
+    params: { count: 'sayi' },
   },
   PAYOUT_INSUFFICIENT_BALANCE: {
     status: 422,
@@ -770,6 +837,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: false,
     message: 'Ödeme talebi en az {minAmount} tutarında olmalıdır.',
+    params: { minAmount: 'para' },
   },
   COMMISSION_RULE_NOT_FOUND: {
     status: 404,
@@ -808,6 +876,7 @@ export const ERROR_CATALOG = define({
     family: 'domain',
     retryable: true,
     message: 'Çok fazla istek gönderdiniz. {retryAfter} saniye sonra tekrar deneyin.',
+    params: { retryAfter: 'sayi' },
   },
   IDEMPOTENCY_CONFLICT: {
     status: 409,
@@ -857,6 +926,7 @@ export const ERROR_CATALOG = define({
     retryable: false,
     message:
       'Beklenmeyen bir hata oluştu. Sorun devam ederse destek ekibine şu kodu iletin: {requestId}',
+    params: { requestId: 'metin' },
   },
 });
 

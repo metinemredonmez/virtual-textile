@@ -39,11 +39,14 @@ describe('RETRY_POLICY kapsamı', () => {
     expect(retryBehaviourFor('BOYLE_BIR_KOD_YOK')).toEqual({ kind: 'yok' });
   });
 
-  it("'yonlendir' dalının hedefi VE etiketi var — etiketsiz bağlantı basılamaz", () => {
+  it("'yonlendir' dalının hedefi VE etiket anahtarı var — etiketsiz bağlantı basılamaz", () => {
     for (const [kod, davranis] of Object.entries(RETRY_POLICY)) {
       if (davranis.kind !== 'yonlendir') continue;
       expect(davranis.href, kod).toMatch(/^\//);
-      expect(davranis.etiket.length, kod).toBeGreaterThan(0);
+      // ⚠️ Artık HAZIR METİN değil SÖZLÜK ANAHTARI tutuluyor: buraya Türkçe bir
+      //    cümle yazmak katalog/sözlük dışında üçüncü bir metin kaynağı açardı
+      //    ve İngilizce arayüzde Türkçe bir düğme kalırdı.
+      expect(davranis.etiketAnahtari, kod).toMatch(/^[a-z]+\.[a-zA-Z]+$/);
     }
   });
 
@@ -53,8 +56,8 @@ describe('RETRY_POLICY kapsamı', () => {
     //    davranışı ödemeyi baştan denemek — yani ikinci tahsilat riski.
     expect(RETRY_POLICY.PAYMENT_TIMEOUT).toEqual({
       kind: 'yonlendir',
-      href: '/hesabim/siparisler',
-      etiket: 'Siparişlerime git',
+      href: '/account/orders',
+      etiketAnahtari: 'hata.siparislerimeGit',
     });
   });
 });

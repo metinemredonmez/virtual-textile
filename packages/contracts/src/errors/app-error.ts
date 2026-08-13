@@ -1,14 +1,22 @@
 import {
   ERROR_CATALOG,
   getErrorDefinition,
-  interpolate,
   type ErrorCode,
   type ErrorFamily,
 } from './error-catalog.js';
+import { errorMessage, type ErrorParams } from './error-message.js';
 
 export interface AppErrorOptions {
-  /** Kullanıcı mesajındaki `{param}` yer tutucularını doldurur. */
-  params?: Record<string, string | number>;
+  /**
+   * Kullanıcı mesajındaki `{param}` yer tutucularını doldurur.
+   *
+   * ⚠️ DEĞERLER HAM VERİLİR: tutar KURUŞ dizgisi ("100000"), sayı sayı olarak.
+   *    Burada `Money.formatMoney(...)` çağırıp hazır bir Türkçe dizgi vermek
+   *    tam olarak kaldırılan hataydı — o dizgi telde olduğu gibi gider ve
+   *    İngilizce cümlenin ortasında Türkçe ayraçlı bir tutar bırakır. Tutarın
+   *    biçimi kataloğun `params` tablosundan (`'para'`) belli.
+   */
+  params?: ErrorParams;
   /** İstemciye gönderilecek yapılandırılmış ek bilgi (alan hataları, stok adedi vb.). */
   details?: unknown;
   /** Asıl hata — loglanır, ASLA istemciye gönderilmez. */
@@ -30,14 +38,28 @@ export class AppError extends Error {
   readonly httpStatus: number;
   readonly family: ErrorFamily;
   readonly retryable: boolean;
-  /** Kullanıcıya gösterilebilir Türkçe mesaj. */
+  /**
+   * Kullanıcıya gösterilebilir TÜRKÇE mesaj.
+   *
+   * ⚠️ Dile göre DEĞİŞMEZ ve değişmemeli. `AppError` bir sunucu nesnesi; onu
+   *    üreten kod yolunda (servis, worker işi, kuyruk) HTTP isteği ve
+   *    dolayısıyla kullanıcının dili her zaman bilinmiyor. Kullanıcının dilinde
+   *    metin, gösterildiği yerde `errorMessage(code, { locale, params })` ile
+   *    kurulur. Burası log/telemetri metni ve telde giden SÜRÜM SAPMASI
+   *    YEDEĞİDİR.
+   */
   readonly userMessage: string;
+  /** Telde `ApiErrorBody.params` olarak gider — istemci metni bununla kurar. */
+  readonly params?: ErrorParams;
   readonly details?: unknown;
   readonly retryAfterSeconds?: number;
 
   constructor(code: ErrorCode, options: AppErrorOptions = {}) {
     const def = getErrorDefinition(code);
-    const userMessage = interpolate(def.message, options.params);
+    // ⚠️ `interpolate` DEĞİL: `errorMessage` yer tutucuyu TÜRÜNE göre biçimler
+    //    (kuruş → "1.000,00 ₺"). Düz interpolasyon sunucu metnine ham "100000"
+    //    yazardı ve o metin sürüm sapması yedeği olarak kullanıcıya çıkabilir.
+    const userMessage = errorMessage(code, { params: options.params });
 
     // Error.message = LOG mesajı (teknik). userMessage = KULLANICI mesajı.
     super(options.internalMessage ?? `${code}: ${userMessage}`, { cause: options.cause });
@@ -48,6 +70,7 @@ export class AppError extends Error {
     this.family = def.family;
     this.retryable = def.retryable;
     this.userMessage = userMessage;
+    this.params = options.params;
     this.details = options.details;
     this.retryAfterSeconds = options.retryAfterSeconds;
 

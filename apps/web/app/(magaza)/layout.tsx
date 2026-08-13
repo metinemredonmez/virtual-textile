@@ -1,9 +1,16 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Layers, ShoppingBag, Shirt, Sparkles, User } from 'lucide-react';
+import { TemaSecici } from '@/components/tema/tema-secici';
 
 /**
- * MÜŞTERİ VİTRİNİ — açık tema, SSR, SEO açık.
+ * MÜŞTERİ VİTRİNİ — SSR, SEO açık.
+ *
+ * ⚠️ "AÇIK TEMA" ARTIK BURADA YAZMIYOR: tema kullanıcının seçimi ve site
+ *    genelinde geçerli (`lib/tema.ts`). Vitrinin açık kalma gerekçesi
+ *    ürün fotoğrafının beyaz fonuydu; o itiraz arayüze değil FOTOĞRAFA aitti
+ *    ve `--urun-zemin` tokenıyla karşılandı — fotoğraf çerçevesi iki temada da
+ *    beyaza yakın kalıyor, kesim çizgileri kaybolmuyor.
  *
  * ⚠️ Gezinme ikonları RENKSİZ ve metinden BİR TON SOLUK (`text-ikon`). Göz önce
  *    yazıyı okur; ikonu metinden parlak yapmak — çoğu panelin yaptığı —
@@ -18,7 +25,7 @@ import { Layers, ShoppingBag, Shirt, Sparkles, User } from 'lucide-react';
  *    yüzden gizlenen şey ETİKET, hedef değil — ikon `aria-label` ile erişilebilir
  *    kalıyor.
  *
- * ⚠️ `/stil-danismani` BAĞLANTISI ARTIK VAR. Bir dönem BİLEREK yoktu: ekran
+ * ⚠️ `/stylist` BAĞLANTISI ARTIK VAR. Bir dönem BİLEREK yoktu: ekran
  *    yazılmamıştı (akış vekili hazırdı, çağıranı yoktu) ve olmayan sayfaya
  *    götüren bir menü girdisi basınca hata veren bir düğmedir. Ekran yazıldı;
  *    kuralın ikinci yarısı şimdi geçerli — **yazılan sayfa menüde görünür.**
@@ -41,19 +48,26 @@ export default function MagazaLayout({ children }: { children: ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-4 text-sm sm:gap-6">
-            <GezinmeBaglantisi href="/urunler" etiket="Ürünler" Ikon={Shirt} />
-            <GezinmeBaglantisi href="/koleksiyon" etiket="Koleksiyonlar" Ikon={Layers} />
-            <GezinmeBaglantisi href="/stil-danismani" etiket="Danışman" Ikon={Sparkles} />
-            <GezinmeBaglantisi href="/sepet" etiket="Sepet" Ikon={ShoppingBag} />
-            <GezinmeBaglantisi href="/hesabim" etiket="Hesabım" Ikon={User} />
+            <GezinmeBaglantisi href="/products" etiket="Ürünler" Ikon={Shirt} />
+            <GezinmeBaglantisi href="/collection" etiket="Koleksiyonlar" Ikon={Layers} />
+            <GezinmeBaglantisi href="/stylist" etiket="Danışman" Ikon={Sparkles} />
+            <GezinmeBaglantisi href="/cart" etiket="Sepet" Ikon={ShoppingBag} />
+            <GezinmeBaglantisi href="/account" etiket="Hesabım" Ikon={User} />
           </div>
         </nav>
       </header>
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
 
-      <footer className="border-t border-kenar py-6 text-center text-xs text-metin-soluk">
-        Virtual Textile
+      {/*
+        ⚠️ TEMA ANAHTARI ALT BİLGİDE, GEZİNME ÇUBUĞUNDA DEĞİL. Çubuk 375px'te
+           zaten ölçülmüş bir taşma sorunu yaşadı (etiketler `hidden sm:inline`
+           tam bu yüzden); altıncı bir hedef aynı arızayı geri getirirdi. Tema
+           bir gezinme hedefi de değil — tek seferlik bir tercihtir.
+      */}
+      <footer className="flex items-center justify-center gap-4 border-t border-kenar py-6 text-center text-xs text-metin-soluk">
+        <span>Virtual Textile</span>
+        <TemaSecici />
       </footer>
     </div>
   );

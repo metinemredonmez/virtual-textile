@@ -1,5 +1,6 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
+import { errorMessage } from '@vt/contracts';
 import { appUrl } from '../env';
 
 /**
@@ -38,7 +39,13 @@ export function forbiddenEnvelope(): Response {
     {
       error: {
         code: 'AUTH_FORBIDDEN',
-        message: 'Bu işlem için yetkiniz yok.',
+        /**
+         * ⚠️ ELLE YAZILMIŞ KOPYA KALDIRILDI. Bu satır `AUTH_FORBIDDEN`ın
+         *    katalog metninin birebir ikinci nüshasıydı: katalogdaki cümle
+         *    düzeltilse burası eski hâlinde kalırdı ve aynı hata iki farklı
+         *    cümleyle görünürdü. Artık tek kaynak.
+         */
+        message: errorMessage('AUTH_FORBIDDEN'),
         httpStatus: 403,
         retryable: false,
         requestId: 'vekil',

@@ -38,6 +38,34 @@ export const ORDER = {
   maxPaymentAttempts: 3,
 } as const;
 
+/**
+ * 3DS DÖNÜŞ ADRESİ — İKİ DEPONUN PAYLAŞTIĞI TEK YOL.
+ *
+ * ⚠️ BİR URL'İN İŞ SABİTLERİ ARASINDA İŞİ NE: bu adresi backend YAZIYOR
+ *    (`checkout.service.ts` → `callbackResult().redirectUrl`), frontend
+ *    SERVİS EDİYOR (`app/(magaza)/checkout/result/page.tsx`). İki ayrı pakette
+ *    ayrı ayrı yazıldığı sürece ayrışması ancak GERÇEK bir 3DS ödemesinde,
+ *    yani parası çekilmiş kullanıcıda görünür. Diğer her ölü bağlantının
+ *    bedeli bir 404; bunun bedeli bir SİPARİŞTİR. Bu yüzden teknik detay
+ *    değil, ürün kararı sayılıp buraya kondu.
+ *
+ * ⚠️ ROTA GÖÇÜNDE BU YOL TÜRKÇEYDİ (`/checkout/sonuc`). Göç bir 301 haritası
+ *    KURMADI — bayat adres yüksek sesle 404 vermeli. Bu adres tek istisna:
+ *    aşağıdaki eski hâli, uçuştaki 3DS ödemeleri için `next.config.ts`te bir
+ *    308 köprüsü olarak duruyor.
+ */
+export const CHECKOUT_RESULT_PATH = '/checkout/result';
+
+/**
+ * ⚠️ ESKİ (TÜRKÇE) DÖNÜŞ ADRESİ — SİLİNMEZ, EMEKLİYE AYRILIR. Göç anında
+ *    3DS'e gitmiş bir ödemenin sağlayıcıda tutulan `redirectUrl`ı hâlâ bu
+ *    adresi taşıyor; köprü kaldırılırsa o kullanıcı 404 görür. Kaldırma şartı
+ *    ZAMANDIR: son bu adresi yazan sürümün dağıtımından sonra bir ödeme zaman
+ *    aşımı penceresi (`INVENTORY.reservationTtlMinutes` + sağlayıcı payı)
+ *    geçmesi. `next.config.ts` köprüsüyle birlikte kaldırılır.
+ */
+export const CHECKOUT_RESULT_LEGACY_PATH = '/checkout/sonuc';
+
 // ── Finans ────────────────────────────────────────────────────────────────
 export const FINANCE = {
   /**

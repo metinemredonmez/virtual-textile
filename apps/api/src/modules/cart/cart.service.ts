@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { appError, Money, toAppError } from '@vt/contracts';
+import { appError, toAppError } from '@vt/contracts';
 import { CART } from '@vt/config';
 import { Prisma, serializeBigInts } from '@vt/db';
 import { PrismaService } from '../../infra/prisma.service.js';
@@ -397,8 +397,13 @@ export class CartService {
 
     if (totals.couponRejection === 'NOT_APPLICABLE') throw appError('COUPON_NOT_APPLICABLE');
     if (totals.couponRejection === 'MIN_AMOUNT') {
+      // ⚠️ `Money.formatMoney(...)` BURADA ÇAĞRILMAZ. Tutar KURUŞ dizgisi olarak
+      //    gider ve biçimi gösterildiği dilde kurulur (katalogda
+      //    `minAmount: 'para'`). Hazır Türkçe dizgi gönderilseydi İngilizce
+      //    cümlenin ortasında Türkçe ayraçlı bir tutar kalırdı; tip kontrolü de
+      //    testler de bunu göremez.
       throw appError('COUPON_MIN_AMOUNT', {
-        params: { minAmount: Money.formatMoney(Money.money(coupon.minCartMinor)) },
+        params: { minAmount: coupon.minCartMinor.toString() },
       });
     }
 
