@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Layers, ShoppingBag, Shirt, Sparkles, User } from 'lucide-react';
 import { TemaSecici } from '@/components/tema/tema-secici';
+import { GezinmeBaglantisi } from '@/components/gezinme/gezinme-baglantisi';
 
 /**
  * MÜŞTERİ VİTRİNİ — SSR, SEO açık.
@@ -48,11 +49,31 @@ export default function MagazaLayout({ children }: { children: ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-4 text-sm sm:gap-6">
-            <GezinmeBaglantisi href="/products" etiket="Ürünler" Ikon={Shirt} />
-            <GezinmeBaglantisi href="/collection" etiket="Koleksiyonlar" Ikon={Layers} />
-            <GezinmeBaglantisi href="/stylist" etiket="Danışman" Ikon={Sparkles} />
-            <GezinmeBaglantisi href="/cart" etiket="Sepet" Ikon={ShoppingBag} />
-            <GezinmeBaglantisi href="/account" etiket="Hesabım" Ikon={User} />
+            <GezinmeBaglantisi
+              href="/products"
+              etiket="Ürünler"
+              ikon={<Shirt className="size-4 shrink-0 text-ikon" />}
+            />
+            <GezinmeBaglantisi
+              href="/collection"
+              etiket="Koleksiyonlar"
+              ikon={<Layers className="size-4 shrink-0 text-ikon" />}
+            />
+            <GezinmeBaglantisi
+              href="/stylist"
+              etiket="Danışman"
+              ikon={<Sparkles className="size-4 shrink-0 text-ikon" />}
+            />
+            <GezinmeBaglantisi
+              href="/cart"
+              etiket="Sepet"
+              ikon={<ShoppingBag className="size-4 shrink-0 text-ikon" />}
+            />
+            <GezinmeBaglantisi
+              href="/account"
+              etiket="Hesabım"
+              ikon={<User className="size-4 shrink-0 text-ikon" />}
+            />
           </div>
         </nav>
       </header>
@@ -70,28 +91,5 @@ export default function MagazaLayout({ children }: { children: ReactNode }) {
         <TemaSecici />
       </footer>
     </div>
-  );
-}
-
-function GezinmeBaglantisi({
-  href,
-  etiket,
-  Ikon,
-}: {
-  href: string;
-  etiket: string;
-  Ikon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Link
-      href={href}
-      // ⚠️ `aria-label` ETİKET GİZLİYKEN de gerekli: mobilde ekran okuyucu
-      //    yalnızca ikonu görür ve Lucide SVG'leri `aria-hidden` gelir.
-      aria-label={etiket}
-      className="flex items-center gap-2 text-metin-soluk hover:text-metin"
-    >
-      <Ikon className="size-4 shrink-0 text-ikon" />
-      <span className="hidden sm:inline">{etiket}</span>
-    </Link>
   );
 }
