@@ -65,10 +65,20 @@ pnpm-lock.yaml.bak
 #    Next resmî şablonunda da yok sayılıyor; "bu dosyayı düzenlemeyin" diyor.
 apps/web/next-env.d.ts
 
-# ⚠️ ÜRETİLEN DEMO ÜRÜN GÖRSELLERİ — depoya girmez.
-#    `pnpm --filter @vt/db seed:varlik` ile yeniden üretilir (FAL_KEY gerekir).
-#    Gerekçe: 298 gerçek fotoğraf ~35 MB; sentetik silüetler 0,3 MB idi ve
-#    bu yüzden commit edilebiliyordu. Eksik dosya sessiz kalmaz —
-#    `seed/gorsel.ts` okurken atar.
-packages/db/prisma/seed-assets/urunler/
-packages/db/prisma/seed-assets/vitrin/
+# ⚠️ DEMO GÖRSELLERİ DEPOYA GİRER — ve bu karar BİR KEZ TERSİ DENENİP GERİ ALINDI.
+#
+#    Bir tur boyunca burada `seed-assets/urunler/` ve `seed-assets/vitrin/`
+#    yazıyordu. Gerekçe "35 MB depoyu şişirir"di. İKİ NOKTADA YANLIŞTI:
+#
+#    1. RAKAM YANLIŞTI. Ölçüldü: 278 ürün karesi 14 MB, 9 site görseli 0,5 MB.
+#       Tahmin edilen 35 MB'ın yarısından az. `.git` 13 MB → ~28 MB olur.
+#
+#    2. ASIL BEDELİ DEPO DEĞİL, DAĞITIM ÖDEDİ. Dosyalar depoda olmayınca
+#       sunucuda `git pull` onları getirmedi; seed yükleyecek dosya bulamadı;
+#       ana sayfa afişi ürün fotoğrafı yedeğine düştü ve kullanıcı yine
+#       "resim yok" gördü. Yani 14 MB kazanmak için ÇALIŞAN BİR DAĞITIM
+#       feda edilmişti.
+#
+#    Alternatif (sunucuda `seed:varlik` çalıştırmak) FAL_KEY, para ve zaman
+#    ister; her dağıtımda tekrar üretmek ise determinist olsa bile gereksiz.
+#    Depoda durmaları en ucuz seçenek.

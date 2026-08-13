@@ -31,11 +31,11 @@
  *      seed tarafından yükleniyor, tam da bugünkü yol
  *    · determinist: tohum slug'dan türetiliyor, aynı ürün aynı görseli alır
  *
- *  ⚠️ DEPO ŞİŞMESİ ÇÖZÜLDÜ, GÖRMEZDEN GELİNMEDİ: çıktı `.gitignore`da.
- *     Bunun bedeli var ve biliniyor — eski yorumun haklı olduğu nokta şuydu:
- *     "dosya depoda durunca eksikliği `git status` gösterir". O emniyet
- *     kaybolmasın diye `seed/gorsel.ts` eksik dosyada ZATEN atıyor ve
- *     `dogrula()` seed öncesi tüm listeyi tek seferde denetliyor.
+ *  ⚠️ ÇIKTI DEPOYA GİRER. Bir tur `.gitignore`daydı ve o karar GERİ ALINDI —
+ *     gerekçesi `.gitignore` içinde yazılı. Özeti: tahmin edilen 35 MB gerçekte
+ *     14,5 MB çıktı, ve dosyalar depoda olmayınca sunucuda `git pull` onları
+ *     getirmedi; seed yükleyecek dosya bulamadı; kullanıcı yine "resim yok"
+ *     gördü. 14 MB kazanmak için çalışan bir dağıtım feda edilmişti.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 import { createHash } from 'node:crypto';
