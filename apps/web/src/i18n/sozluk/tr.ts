@@ -54,7 +54,7 @@ export const tr = {
     kategoriler: 'Kategoriler',
     koleksiyonlar: 'Koleksiyonlar',
     stilDanismani: 'Stil danışmanı',
-    hesaplayici: 'Beden hesaplayıcı',
+    hesaplayici: 'Satıcılar için hesaplayıcı',
     sepet: 'Sepet',
     hesabim: 'Hesabım',
     giris: 'Giriş yap',

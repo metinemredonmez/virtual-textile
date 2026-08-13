@@ -48,7 +48,7 @@ export const en = {
     kategoriler: 'Categories',
     koleksiyonlar: 'Collections',
     stilDanismani: 'Style adviser',
-    hesaplayici: 'Size calculator',
+    hesaplayici: 'Calculator for sellers',
     sepet: 'Cart',
     hesabim: 'My account',
     giris: 'Sign in',
