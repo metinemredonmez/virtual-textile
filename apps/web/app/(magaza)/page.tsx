@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { Layers, Ruler, Search, Shirt, ShoppingBag, Sparkles } from 'lucide-react';
 import type { ProductListItemWire, ProductListPayloadWire, SiteImageWire } from '@vt/contracts';
 import { list } from '@/lib/api/core';
 import { serverFetch } from '@/lib/api/server';
@@ -10,6 +11,7 @@ import { Fiyat } from '@/components/fiyat/fiyat';
 import { AramaKutusu } from './products/_liste/arama-kutusu';
 import { UrunKarti } from '@/components/urun/urun-karti';
 import { Ray, RayKarti } from '@/components/vitrin/ray';
+import { BolumBasligi } from '@/components/vitrin/bolum-basligi';
 import { AfisKarti } from '@/components/vitrin/afis-karti';
 import { afisGetir, kapaklariGetir } from '@/components/vitrin/site-gorseli';
 import { kategoriAgaci, vitrinKategorileri } from '@/lib/kategori';
@@ -224,20 +226,54 @@ async function Ozellikler(): Promise<React.ReactElement> {
   // ⚠️ Anahtarlar ÇİFTLER hâlinde: başlık + metin. Biri sözlükte yoksa
   //    derleme kırılır (en.ts `satisfies typeof tr`), yani yarım çeviri
   //    ekrana ham anahtar olarak DÜŞEMEZ.
-  const anahtarlar = ['Deneme', 'Kombin', 'Beden', 'Danisman', 'Gardirop', 'Arama'] as const;
+  /**
+   * ⚠️ HER MADDE BİR EKRANA GİDER. Özellik listesi bir dönem yalnızca METİNDİ:
+   *    kullanıcı "Dijital gardırop" okuyup nereye gideceğini bilmiyordu.
+   *    Şimdi her kart bir bağlantı — ve HEDEFLER ÖLÇÜLDÜ, hepsi var olan
+   *    rotalar. Olmayan bir sayfaya kart açmak, bu listeyi bir vaat listesine
+   *    çevirirdi ve dosya başlığındaki kural tam da bunu yasaklıyor.
+   *
+   * ⚠️ İKONLAR AKROMATİK (`text-ikon`). `design-system.md`: renk yalnız DURUM
+   *    taşır. Altı renkli ikon, sayfadaki tek renkli sinyal olan "indirim"
+   *    rozetini harcardı. Aynı gerekçe üst çubukta da yazılı.
+   */
+  const maddeler = [
+    { anahtar: 'Deneme', ikon: Shirt, adres: '/products' },
+    { anahtar: 'Kombin', ikon: Layers, adres: '/collection' },
+    { anahtar: 'Beden', ikon: Ruler, adres: '/calculator' },
+    { anahtar: 'Danisman', ikon: Sparkles, adres: '/stylist' },
+    { anahtar: 'Gardirop', ikon: ShoppingBag, adres: '/account/wardrobe' },
+    { anahtar: 'Arama', ikon: Search, adres: '/products' },
+  ] as const;
 
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold tracking-tight">{t('ozellikler')}</h2>
-      <p className="mb-6 max-w-xl text-sm text-metin-soluk">{t('ozelliklerNot')}</p>
+      <BolumBasligi baslik={t('ozellikler')} aciklama={t('ozelliklerNot')} />
 
-      <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
-        {anahtarlar.map((anahtar) => (
-          <li key={anahtar} className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-semibold tracking-tight">{t(`ozellik${anahtar}`)}</h3>
-            <p className="text-sm leading-relaxed text-metin-soluk">
-              {t(`ozellik${anahtar}Metin`)}
-            </p>
+      {/*
+        ⚠️ KARTLAR ARTIK GERÇEKTEN KART. Önce altı paragraf yan yanaydı; kenarlık
+           yok, zemin yok, ikon yok. Ekranda "özellik listesi" değil "duvar
+           metni" gibi duruyordu — kullanıcının ilk yorumu buydu.
+
+        ⚠️ KENARLIK VAR AMA GÖLGE YOK. `design-system.md` gölgeyi eler; kenarlık
+           ise bir sınırı BİLDİRİR, süslemez. Kartın tıklanabilir olduğunu
+           `hover:bg-yuzey-vurgulu` söylüyor, gölge değil.
+      */}
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {maddeler.map(({ anahtar, ikon: Ikon, adres }) => (
+          <li key={anahtar}>
+            <Link
+              href={adres}
+              className="flex h-full flex-col gap-2 rounded-lg border border-kenar p-5 transition-colors hover:bg-yuzey-vurgulu"
+            >
+              <Ikon className="size-5 shrink-0 text-ikon" aria-hidden />
+              <h3 className="text-[0.9375rem] font-semibold tracking-tight">
+                {t(`ozellik${anahtar}`)}
+              </h3>
+              <p className="text-sm leading-relaxed text-metin-soluk">
+                {t(`ozellik${anahtar}Metin`)}
+              </p>
+            </Link>
           </li>
         ))}
       </ul>
@@ -263,12 +299,31 @@ async function NasilCalisir(): Promise<React.ReactElement> {
 
   return (
     <section>
-      <h2 className="mb-6 text-sm font-semibold tracking-tight">{t('nasilCalisir')}</h2>
-      <ol className="grid gap-8 sm:grid-cols-3">
+      <BolumBasligi baslik={t('nasilCalisir')} aciklama={t('nasilCalisirNot')} />
+
+      {/*
+        ⚠️ ÜÇ ADIM ARTIK KENDİ YÜZEYİNDE. Önce çıplak metindi: üç sütun, hepsi
+           `text-sm`, arada 32px boşluk. Ekranda "yazı bloğu" gibi duruyordu,
+           bir AKIŞ gibi değil. Yüzey (`bg-yuzey-vurgulu`) üçünü tek bir şey
+           olarak bağlıyor — kutu değil zemin, yani çerçeve gürültüsü yok.
+
+        ⚠️ NUMARALAR BÜYÜDÜ (`text-3xl`) VE SOLDU. Adım numarası bir DURUM
+           değil SIRA olduğu için renk taşımaz (`design-system.md`); ama görsel
+           çıpa olması gerekiyordu — 12px bir "01" hiçbir şeye çıpa olamaz.
+           Büyük ve soluk: göze sırayı verir, okumayı çalmaz.
+
+        ⚠️ `sm:` altında TEK SÜTUN ve numara solda kalır: 375px'te üç sütun
+           satır başına ~110px düşürüyordu ve başlıklar iki-üç satıra kırılıyordu.
+      */}
+      <ol className="grid gap-px overflow-hidden rounded-lg bg-kenar sm:grid-cols-3">
         {adimlar.map((sira) => (
-          <li key={sira} className="flex flex-col gap-2">
-            <span className="text-xs tabular-nums text-metin-soluk">0{sira}</span>
-            <h3 className="text-sm font-semibold tracking-tight">{t(`adim${sira}Baslik`)}</h3>
+          <li key={sira} className="flex flex-col gap-2 bg-yuzey-vurgulu p-6">
+            <span className="text-3xl font-semibold tabular-nums leading-none text-ikon">
+              0{sira}
+            </span>
+            <h3 className="mt-1 text-[0.9375rem] font-semibold tracking-tight">
+              {t(`adim${sira}Baslik`)}
+            </h3>
             <p className="text-sm leading-relaxed text-metin-soluk">{t(`adim${sira}Metin`)}</p>
           </li>
         ))}

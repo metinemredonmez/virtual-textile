@@ -120,6 +120,8 @@ export const tr = {
     afistekiParcalar: 'Afişteki parçalar',
 
     nasilCalisir: 'Nasıl çalışır',
+    nasilCalisirNot:
+      'Sanal deneme üç adımda; fotoğrafınız işlem bitince sizin seçiminize göre saklanır ya da silinir.',
     adim1Baslik: 'Fotoğrafınızı yükleyin',
     adim1Metin:
       'Tek bir boy fotoğrafı yeterli. Yalnızca bu deneme için kullanılmasını ya da profilinizde saklanmasını siz seçersiniz.',

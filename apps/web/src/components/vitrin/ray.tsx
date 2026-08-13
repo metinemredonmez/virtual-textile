@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import { BolumBasligi } from './bolum-basligi';
 
 /**
  * YATAY RAY — sağa doğru kaydırılan içerik şeridi.
@@ -39,16 +39,15 @@ export function Ray({
 }) {
   return (
     <section>
-      <div className="mb-2 flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-semibold tracking-tight">{baslik}</h2>
-        {tumuAdres ? (
-          <Link href={tumuAdres} className="shrink-0 text-sm text-metin-soluk hover:text-metin">
-            {tumuEtiket}
-          </Link>
-        ) : null}
-      </div>
-
-      {aciklama ? <p className="mb-6 max-w-xl text-sm text-metin-soluk">{aciklama}</p> : null}
+      {/* ⚠️ Başlık ARTIK PAYLAŞILAN BİLEŞEN. Her bölüm kendi `<h2>`sini
+          yazdığı sürece ölçek ayrışıyordu — ölçüldü: `Ray` `mb-2`,
+          `Ozellikler` `mb-2`, `NasilCalisir` `mb-6` kullanıyordu ve üçü de
+          gövde metniyle aynı `text-sm` idi. */}
+      <BolumBasligi
+        baslik={baslik}
+        {...(aciklama ? { aciklama } : {})}
+        {...(tumuAdres ? { tumuAdres, tumuEtiket } : {})}
+      />
 
       {/* ⚠️ `-mx-4 px-4`: ray kabın kenarına DEĞER, yani kaydırınca kartlar
           ekranın kenarından girip çıkar. Kenar boşluğu içeride bırakılsaydı

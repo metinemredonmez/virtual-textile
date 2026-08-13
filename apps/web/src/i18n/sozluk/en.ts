@@ -87,6 +87,8 @@ export const en = {
     afistekiParcalar: 'Items in this banner',
 
     nasilCalisir: 'How it works',
+    nasilCalisirNot:
+      'Virtual try-on in three steps; your photo is kept or deleted afterwards, whichever you choose.',
     adim1Baslik: 'Upload your photo',
     adim1Metin:
       'A single full-length photo is enough. You choose whether it is used only for this try-on or saved to your profile.',
