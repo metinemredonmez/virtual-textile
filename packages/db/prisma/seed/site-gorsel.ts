@@ -63,6 +63,33 @@ export async function siteGorselleriYaz(
   const depolamaAnahtarlari: string[] = [];
   let yazilan = 0;
 
+  /**
+   * ⚠️ DEPOLAMA YOKSA HİÇBİR SATIR YAZILMAZ — ve bu, ürün görselinden FARKLI
+   *    davranmak demek. Fark kasıtlı, sebebi sunucuda ÖLÇÜLDÜ:
+   *
+   *    Seed R2 değişkenleri olmadan koşturuldu. Ürün tarafında sonuç zararsız:
+   *    satır yazılır, görsel gelmez, kart nötr yer tutucuya düşer. Ama site
+   *    görselinde sonuç DAHA KÖTÜ oldu:
+   *
+   *      · satır yazılıyor → `afisGetir()` artık `null` DÖNMÜYOR
+   *      · yani ana sayfa ürün fotoğrafı yedeğine DÜŞEMİYOR
+   *      · nesne kovada olmadığı için afiş 404 → ekranın en büyük öğesi
+   *        KIRIK GÖRSEL
+   *
+   *    Yani yarım seed, hiç seed'den kötü bir ekran üretti. Kural: afiş satırı
+   *    ancak NESNESİ GERÇEKTEN YÜKLENDİYSE yazılır.
+   *
+   * ⚠️ Var olan satırlara DOKUNULMAZ (silinmez): önceki doğru bir koşunun
+   *    yazdığı afişi, depolamasız bir koşunun silmesi gerileme olurdu.
+   */
+  if (!storage) {
+    return {
+      yazilan: 0,
+      atlanan: VARLIKLAR.map((v) => `${v.ad} (depolama yapılandırılmamış)`),
+      depolamaAnahtarlari: [],
+    };
+  }
+
   for (const [sira, varlik] of VARLIKLAR.entries()) {
     const govde = await dosyaOku(varlik.ad);
     if (!govde) {
@@ -99,37 +126,32 @@ export async function siteGorselleriYaz(
     const id = varOlan?.id ?? randomUUID();
 
     const anahtar = storageKeys.siteImageOriginal(id);
-    if (storage) {
+    await storage.put({
+      key: anahtar,
+      visibility: 'public',
+      body: govde,
+      contentType: 'image/webp',
+      cacheControl: 'public, max-age=31536000, immutable',
+    });
+    depolamaAnahtarlari.push(anahtar);
+
+    /**
+     * ⚠️ KAYNAKTAN BÜYÜK TÜREV ÜRETİLMEZ. Afiş kaynağı 2048 px, kapak 1024;
+     *    `SITE_BANNER_WIDTHS` dördünü de listeliyor. 1024 px bir kapağı
+     *    2048'e çıkarmak bilgi eklemez, yalnız dosyayı ve süreyi büyütür —
+     *    aynı gerekçe `gorsel.ts`te ürün görseli için de yazılı.
+     */
+    for (const genislik of SITE_BANNER_WIDTHS.filter((w) => w <= varlik.genislik)) {
+      const turev = await sharp(govde).resize({ width: genislik }).webp({ quality: 82 }).toBuffer();
+      const turevAnahtar = storageKeys.siteImage(id, genislik);
       await storage.put({
-        key: anahtar,
+        key: turevAnahtar,
         visibility: 'public',
-        body: govde,
+        body: turev,
         contentType: 'image/webp',
         cacheControl: 'public, max-age=31536000, immutable',
       });
-      depolamaAnahtarlari.push(anahtar);
-
-      /**
-       * ⚠️ KAYNAKTAN BÜYÜK TÜREV ÜRETİLMEZ. Afiş kaynağı 2048 px, kapak 1024;
-       *    `SITE_BANNER_WIDTHS` dördünü de listeliyor. 1024 px bir kapağı
-       *    2048'e çıkarmak bilgi eklemez, yalnız dosyayı ve süreyi büyütür —
-       *    aynı gerekçe `gorsel.ts`te ürün görseli için de yazılı.
-       */
-      for (const genislik of SITE_BANNER_WIDTHS.filter((w) => w <= varlik.genislik)) {
-        const turev = await sharp(govde)
-          .resize({ width: genislik })
-          .webp({ quality: 82 })
-          .toBuffer();
-        const turevAnahtar = storageKeys.siteImage(id, genislik);
-        await storage.put({
-          key: turevAnahtar,
-          visibility: 'public',
-          body: turev,
-          contentType: 'image/webp',
-          cacheControl: 'public, max-age=31536000, immutable',
-        });
-        depolamaAnahtarlari.push(turevAnahtar);
-      }
+      depolamaAnahtarlari.push(turevAnahtar);
     }
 
     const alanlar = {

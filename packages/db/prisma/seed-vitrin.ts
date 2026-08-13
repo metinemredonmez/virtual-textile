@@ -103,7 +103,12 @@ async function main(): Promise<void> {
     const storage = depolamaKur();
     if (!storage) {
       console.warn(
-        '⚠️  DEPOLAMA YAPILANDIRILMAMIŞ — görseller yüklenmeyecek, satırlar yine yazılacak.\n',
+        '⚠️  DEPOLAMA YAPILANDIRILMAMIŞ (R2_* değişkenleri yok).\n' +
+          '    · ürün görselleri: satır yazılır, dosya YÜKLENMEZ\n' +
+          '    · site görselleri (afiş/kapak): HİÇ SATIR YAZILMAZ — gerekçe\n' +
+          '      seed/site-gorsel.ts içinde: nesnesi olmayan bir afiş satırı,\n' +
+          '      ana sayfayı yedeğe düşüremez hâle getirip KIRIK GÖRSEL üretir.\n' +
+          '    Sunucuda doğrusu, R2 değişkenlerini TEK KOMUTA vererek koşmaktır.\n',
       );
     }
 
