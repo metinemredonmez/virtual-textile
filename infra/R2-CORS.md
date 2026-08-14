@@ -81,3 +81,39 @@ yapmıyor.
 
 Ekran görüntüsü veya `curl` çıktısı kanıttır; başarılı bir `build` kanıt
 değildir.
+
+
+## Durum: UYGULANDI (2026-08-14)
+
+Kural Cloudflare panelinden `vt-private-user-photos` kovasına işlendi ve
+sunucudan doğrulandı:
+
+```
+$ curl -sS -D - -o /dev/null -X OPTIONS \
+    "https://vt-private-user-photos.<hesap>.r2.cloudflarestorage.com/deneme" \
+    -H "Origin: http://91.99.183.64" \
+    -H "Access-Control-Request-Method: PUT" \
+    -H "Access-Control-Request-Headers: content-type"
+
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: http://91.99.183.64
+Access-Control-Allow-Headers: content-type
+Access-Control-Allow-Methods: PUT
+Access-Control-Max-Age: 3600
+```
+
+⚠️ ÖNCESİNDE 403 DÖNÜYORDU ve arıza tam da bu belgenin tarif ettiği gibiydi:
+   `POST /v1/me/photos` **201** (bilet alınıyor), ardından tarayıcının ön
+   uçuşu **403**, gerçek `PUT` hiç gitmiyor. Uygulama loglarında tek satır iz
+   yok — çünkü istek sunucumuza hiç ulaşmıyor.
+
+⚠️ BU KAYIT BİR İNSAN ADIMINI BELGELİYOR VE SORUN DA BU. Kural kod tarafından
+   yazılamıyor (uygulamanın jetonu `GetBucketCors` → `AccessDenied`), yani her
+   yeni ortamda birinin panele girmesi gerekiyor. Adım atlandığında arıza
+   sessiz. Bu yüzden kullanıcı fotoğrafı yüklemesi SUNUCU TARAFINA taşınıyor
+   (ayrı iş): tarayıcı R2'ye hiç gitmezse bu belgeye de gerek kalmaz.
+
+   Taşıma bittiğinde bu kayıt SİLİNMEZ — ürün görseli ve site görseli (afiş,
+   kapak) yüklemeleri hâlâ imzalı akışı kullanıyorsa CORS onlar için gerekli
+   olmaya devam eder. Hangi akışın hangi yolu kullandığı taşıma turunda
+   ölçülüp buraya yazılacak.
