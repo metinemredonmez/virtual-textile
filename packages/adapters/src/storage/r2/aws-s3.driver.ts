@@ -110,6 +110,40 @@ export function createAwsS3Driver(
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
     },
+
+    /**
+     * ⚠️ ESNEK SAĞLAMA TOPLAMI KAPATILDI — İMZALI YÜKLEMEYİ KIRIYORDU.
+     *
+     *  AWS SDK v3 (bu depoda ^3.1107) `PutObject` için varsayılan olarak
+     *  `requestChecksumCalculation: 'WHEN_SUPPORTED'` kullanıyor: isteğe bir
+     *  CRC32 sağlama toplamı ekliyor. NORMAL bir `send()` çağrısında bu
+     *  doğrudur ve iyidir — gövde elde olduğu için toplam gerçek gövdeden
+     *  hesaplanır.
+     *
+     *  ⚠️ AMA İMZALAMADA (`getSignedUrl`) GÖVDE YOKTUR. SDK toplamı BOŞ
+     *     gövdeden hesaplayıp adrese gömüyor:
+     *
+     *         x-amz-checksum-crc32=AAAAAA%3D%3D      ← boş gövdenin CRC32'si
+     *         x-amz-sdk-checksum-algorithm=CRC32
+     *
+     *     Tarayıcı o adrese GERÇEK dosyayı PUT ettiğinde R2 sağlamayı
+     *     doğruluyor, tutmuyor ve isteği reddediyor. Canlıda ölçüldü: CORS ön
+     *     uçuşu 204 geçiyor, ardından gerçek PUT düşüyor ve ekranda yalnızca
+     *     "Beklenmeyen bir hata oluştu" görünüyor.
+     *
+     *  ⚠️ BU ARIZA `curl` İLE DE GÖRÜNMEZ: elle atılan bir PUT o sorgu
+     *     parametrelerini taşımaz. Bu depoda "curl geçti, tarayıcı düştü"
+     *     sınıfının DÖRDÜNCÜ örneği (öncekiler: r2.dev, `Secure` çerez, CORS).
+     *
+     *  `WHEN_REQUIRED`: sağlama yalnızca S3 API'sinin ZORUNLU tuttuğu
+     *  işlemlerde eklenir (ör. `DeleteObjects`). Sıradan `PutObject` imzasına
+     *  girmez, imzalı adres temiz kalır.
+     *
+     * ⚠️ VERİ BÜTÜNLÜĞÜ KAYBI DEĞİL: TLS zaten aktarımı bütünlük denetimiyle
+     *    koruyor ve R2 nesneyi yazdıktan sonra ETag döndürüyor. Kaybedilen şey
+     *    uçtan uca ek bir doğrulama katmanı; kazanılan şey ÇALIŞAN bir yükleme.
+     */
+    requestChecksumCalculation: 'WHEN_REQUIRED',
   });
 
   const breaker = options.circuitBreaker ?? circuitFor('r2');

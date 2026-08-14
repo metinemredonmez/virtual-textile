@@ -333,3 +333,68 @@ describe('R2StorageProvider — yapılandırma güvenliği', () => {
     ).rejects.toBeInstanceOf(AppError);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  İMZALI ADRES SAĞLAMA TOPLAMI TAŞIMAMALI.
+ *
+ *  ⚠️ BU TEST BİR CANLI ARIZADAN DOĞDU (2026-08-14). AWS SDK v3 `PutObject`
+ *     için varsayılan olarak CRC32 sağlama toplamı ekliyor. Normal bir
+ *     `send()` çağrısında doğru; ama İMZALAMADA gövde olmadığı için toplam
+ *     BOŞ gövdeden hesaplanıp adrese gömülüyor:
+ *
+ *         x-amz-checksum-crc32=AAAAAA%3D%3D
+ *
+ *     Tarayıcı gerçek dosyayı PUT edince R2 sağlamayı doğruluyor, tutmuyor,
+ *     reddediyor. Ekranda yalnızca "Beklenmeyen bir hata oluştu" görünüyor.
+ *
+ *  ⚠️ NEDEN `curl` YAKALAYAMAZ: elle atılan PUT o sorgu parametrelerini
+ *     taşımaz. Bu depoda "curl geçti, tarayıcı düştü" sınıfının dördüncü
+ *     örneğiydi (r2.dev · `Secure` çerez · CORS · bu).
+ *
+ *  ⚠️ TEST S3Client YAPILANDIRMASINI ÖLÇÜYOR, ADRESİ DEĞİL. Gerçek adresi
+ *     üretmek ağa çıkmayı gerektirir; ölçülebilir ve yeterli olan şey,
+ *     sürücünün SDK'ya doğru ayarı VERİP VERMEDİĞİdir. Ayar geri alınırsa
+ *     bu test kırılır.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('imzalı adres — sağlama toplamı', () => {
+  it('S3Client `WHEN_REQUIRED` ile kurulur (imzalı adrese CRC32 gömülmez)', async () => {
+    const { createAwsS3Driver } = await import('./aws-s3.driver.js');
+
+    let verilenAyar: Record<string, unknown> | null = null;
+
+    const sahteSdk = {
+      S3Client: class {
+        constructor(ayar: Record<string, unknown>) {
+          verilenAyar = ayar;
+        }
+        async send(): Promise<unknown> {
+          return {};
+        }
+      },
+      PutObjectCommand: class {
+        constructor(public input: Record<string, unknown>) {}
+      },
+      GetObjectCommand: class {
+        constructor(public input: Record<string, unknown>) {}
+      },
+      DeleteObjectCommand: class {
+        constructor(public input: Record<string, unknown>) {}
+      },
+      DeleteObjectsCommand: class {
+        constructor(public input: Record<string, unknown>) {}
+      },
+      HeadObjectCommand: class {
+        constructor(public input: Record<string, unknown>) {}
+      },
+      getSignedUrl: async () => 'https://ornek/imzali',
+    };
+
+    createAwsS3Driver(sahteSdk as never, config);
+
+    expect(verilenAyar).not.toBeNull();
+    // ⚠️ Mutasyon: satır silinince ya da 'WHEN_SUPPORTED' yapılınca kırılır.
+    expect(verilenAyar!['requestChecksumCalculation']).toBe('WHEN_REQUIRED');
+  });
+});
