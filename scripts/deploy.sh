@@ -533,6 +533,70 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  TOPOLOJİ UZLAŞTIRMA — `instances` değişikliği YÜRÜRLÜĞE GİRSİN
+#
+#  ⚠️ VARLIK SEBEBİ ÖLÇÜLMÜŞ BİR ARIZA. `ecosystem.config.cjs` içinde
+#     `vt-api` 4'ten 2'ye, `vt-worker-media` 2'den 1'e indirildi, dağıtım
+#     KOŞTU, "✓ Dağıtım tamam" yazdı — ve `pm2 list` hâlâ 4 + 2 gösterdi.
+#
+#     Sebep: `pm2 reload` var olan süreçleri YERİNDE yeniden başlatır;
+#     `instances` alanını YENİDEN OKUMAZ. Yani ecosystem dosyasındaki her
+#     örnek sayısı değişikliği SESSİZCE yok sayılıyordu. Bu deponun altı kez
+#     yaşadığı sınıfın bir örneği daha: yazıldı, commit edildi, dağıtıldı —
+#     ve hiçbir etkisi olmadı.
+#
+#  ⚠️ YALNIZCA vt-* DOKUNULUR. Bu makinede üç proje daha barınıyor
+#     (celine-*, od-*). Aşağıdaki döngü adları ecosystem dosyamızdan okuyor,
+#     `pm2 jlist`ten değil — yani bizim tanımlamadığımız bir sürece hiçbir
+#     koşulda dokunamaz.
+adim "8b/9  Süreç sayıları uzlaştırılıyor"
+
+# İstenen sayılar ecosystem dosyasından; çalışanlar pm2'den.
+ISTENEN=$(node -e "
+  const c = require('$KOK/ecosystem.config.cjs');
+  for (const a of c.apps) console.log(a.name, a.instances, a.exec_mode || 'fork');
+" 2>/dev/null || true)
+
+if [ -z "$ISTENEN" ]; then
+  uyari "ecosystem.config.cjs okunamadı — süreç sayıları uzlaştırılmadı."
+else
+  while read -r AD ADET MOD; do
+    [ -n "$AD" ] || continue
+    # ⚠️ `'max'` gibi sayı olmayan değerler uzlaştırılmaz: kaç olması
+    #    gerektiğini burada hesaplamak, PM2'nin işini ikinci bir yerde
+    #    tekrar etmek olurdu ve ikisi ayrışırdı.
+    case "$ADET" in ''|*[!0-9]*) continue ;; esac
+
+    MEVCUT=$(pm2 jlist 2>/dev/null | node -e "
+      let g='';process.stdin.on('data',d=>g+=d).on('end',()=>{
+        try { console.log(JSON.parse(g).filter(p=>p.name==='$AD').length) }
+        catch { console.log(0) }
+      })" || echo 0)
+
+    [ "$MEVCUT" = "$ADET" ] && { bilgi "$AD: $ADET ✓"; continue; }
+
+    uyari "$AD: çalışan $MEVCUT, istenen $ADET — düzeltiliyor"
+
+    if [ "$MOD" = "cluster" ]; then
+      # ⚠️ `pm2 scale` YALNIZCA cluster modunda çalışır; fork modunda
+      #    "app not in cluster mode" der ve hiçbir şey yapmaz.
+      pm2 scale "$AD" "$ADET"
+    else
+      # ⚠️ FORK MODUNDA SİL-YENİDEN AÇ TEK YOL. Kısa bir kesinti doğar ve
+      #    kabul edilebilir: bu roller kuyruk tüketicisi, işler Redis'te
+      #    bekler, kaybolmaz. `vt-web` fork ama instances=1 olduğu için bu
+      #    dala hiç girmez.
+      pm2 delete "$AD" >/dev/null 2>&1 || true
+      pm2 start "$KOK/ecosystem.config.cjs" --env production --only "$AD"
+    fi
+  done <<< "$ISTENEN"
+
+  # ⚠️ `pm2 save` ZORUNLU: kaydedilmezse sunucu yeniden başladığında PM2
+  #    ESKİ listeyi (4 + 2) diriltir ve uzlaştırma boşa gider.
+  pm2 save >/dev/null 2>&1 || uyari "pm2 save başarısız — yeniden başlatmada eski liste dönebilir."
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 adim "9/9  Sağlık kontrolü"
 
 # ⚠️ SAĞLIK UCU KİMLİK İSTEMEMELİ. Bir kez `@Public()` unutuldu ve /health
@@ -715,12 +779,24 @@ for p in surecler:
         continue
     ortam = p.get("pm2_env", {})
     durum = ortam.get("status", "?")
-    yeniden = ortam.get("restart_time", 0)
+    # ⚠️ İKİ AYRI SAYAÇ VAR VE YANLIŞINA BAKIYORDUK.
+    #
+    #    `restart_time`      = TOPLAM yeniden başlatma — `pm2 reload` DE artırır.
+    #    `unstable_restarts` = ÇÖKME sonrası yeniden başlatma.
+    #
+    #    Eski kontrol `restart_time > 20` diyordu ve bugün 24 dağıtım yapılmış
+    #    sağlıklı bir süreçte HER SEFERİNDE uyarı bastı. Her dağıtımda çıkan
+    #    bir uyarı, okunmayan bir uyarıdır: gerçek bir çökme döngüsü aynı
+    #    satırın arasında kaybolurdu. Doğru sinyal `unstable_restarts`.
+    toplam = ortam.get("restart_time", 0)
+    kararsiz = ortam.get("unstable_restarts", 0)
     if durum != "online":
         print(f"  \033[1;33m⚠️  {ad} durumu: {durum}\033[0m")
-    elif yeniden > 20:
-        # Çok sayıda yeniden başlatma "ayakta" görünse de çöküp duruyor demektir.
-        print(f"  \033[1;33m⚠️  {ad} online ama {yeniden} kez yeniden başlamış\033[0m")
+    elif kararsiz > 0:
+        print(
+            f"  \033[1;33m⚠️  {ad} ÇÖKÜP yeniden başlamış: {kararsiz} kez"
+            f" (toplam yeniden başlatma {toplam})\033[0m"
+        )
 ' || true
 
 trap - EXIT
