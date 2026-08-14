@@ -31,6 +31,19 @@ import { CONCURRENCY, QUEUE, type TryOnJobData } from '../queues.js';
  *    istisna işi sonsuza dek RUNNING'de bırakırsa kullanıcı hakkını kaybeder.
  */
 
+/**
+ * BULLMQ KİLİT SÜRESİ.
+ *
+ * ⚠️ SAĞLAYICI SÜRE SINIRINDAN TÜRETİLİR, ELLE YAZILMAZ. İkisi iki ayrı yerde
+ *    iki sabit sayı olsaydı, sınır büyütüldüğü gün kilit geride kalırdı ve
+ *    arıza SESSİZ olurdu: iş "takıldı" sayılır, YENİDEN çalıştırılır, aynı
+ *    üretim ikinci kez ödenir. Fatura görür, log görmez.
+ *
+ * ⚠️ +60 sn emniyet payı: sağlayıcı çağrısı bittikten sonra filigran gömme ve
+ *    depoya yükleme var; kilit yalnızca çağrıyı değil işin TAMAMINI kapsamalı.
+ */
+export const TRYON_LOCK_DURATION_MS = TRYON.timeoutMs.QUALITY + 60_000;
+
 export const TRYON_PROVIDERS = 'TRYON_PROVIDERS';
 export const TRYON_WATERMARKER = 'TRYON_WATERMARKER';
 export const TRYON_URL_ISSUER = 'TRYON_URL_ISSUER';
@@ -194,6 +207,23 @@ export class TryOnProcessor implements OnModuleInit, OnModuleDestroy {
         connection: this.connection,
         // Dış API hız limitine takılmamak için düşük tutulur.
         concurrency: CONCURRENCY[QUEUE.TRYON],
+        /**
+         * ⚠️ KİLİT SÜRESİ AÇIKÇA VERİLİYOR — VARSAYILAN 30 SANİYE VE YETMEZ.
+         *
+         *    `TRYON.timeoutMs.QUALITY` 120 saniye; sağlayıcı çağrısı bunun
+         *    tamamını kullanabilir, üstüne filigran ve yükleme biner. BullMQ
+         *    kilidi bundan kısa olursa iş "takıldı" sayılır ve YENİDEN
+         *    çalıştırılır — yani aynı üretim ikinci kez ödenir ve kullanıcı
+         *    kotasından ikinci kez düşer.
+         *
+         *    BullMQ kilidi işlem sürerken kendiliğinden yeniler; bu ayar o
+         *    yenilemenin kaçırıldığı durumlar için emniyet payıdır (filigran
+         *    CPU'ya yüklenirse ya da makine anlık takılırsa).
+         *
+         * ⚠️ SÜRE SINIRINDAN BÜYÜK OLMAK ZORUNDA. İkisi ayrıştığı gün arıza
+         *    sessizdir: çift üretim faturada görünür, log'da görünmez.
+         */
+        lockDuration: TRYON_LOCK_DURATION_MS,
       },
     );
 

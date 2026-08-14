@@ -200,7 +200,36 @@ export const TRYON = {
    *    backend'in "iyileştirme gerekli" dediği üründe uyarı GÖRMEZ.
    */
   minProductReadinessScore: 60,
-  timeoutMs: { FAST: 25_000, QUALITY: 60_000 },
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   *  SAĞLAYICI ÇAĞRISI İÇİN SÜRE SINIRI.
+   *
+   *  ⚠️ FAST 25 sn İDİ VE ÇOK KISAYDI — canlıda ölçüldü (2026-08-14):
+   *
+   *      zincir: [{ saglayici: "fal", sebep: "TIMEOUT", ms: 25001 },
+   *               { saglayici: "gemini", sebep: "QUOTA_EXCEEDED", ms: 1334 }]
+   *
+   *     `fal-ai/idm-vton` tipik olarak 15–45 saniye sürüyor. 25 saniyelik
+   *     sınır, üretimin ORTASINDA bağlantıyı kesiyordu: model işi yapıyor,
+   *     biz beklemeyi bırakıyoruz. Aynı gün 12:57'de başaran tek deneme,
+   *     tesadüfen 25 saniyenin altında bitendi.
+   *
+   *  ⚠️ BU HATA UZUN SÜRE GÖRÜNMEDİ çünkü zincir fal'dan sonra gemini'yi
+   *     deniyor ve kullanıcıya giden kod SON halkadan geliyordu. Ekranda hep
+   *     "yapay zekâ bütçesi doldu" yazıyordu — oysa gerçek sebep bizim
+   *     koyduğumuz süre sınırıydı.
+   *
+   *  ⚠️ SÜREYİ UZATMAK KULLANICIYI BEKLETMEZ: üretim BullMQ kuyruğunda,
+   *     tarayıcı yoklama yapıyor. Uzun sınırın tek bedeli, gerçekten kopmuş
+   *     bir çağrının daha geç fark edilmesi — buna karşılık kesilen her
+   *     çağrı ÖDENMİŞ ama alınmamış bir üretimdir.
+   *
+   *  ⚠️ `apps/worker` tarafındaki BullMQ `lockDuration` bu değerden BÜYÜK
+   *     olmalı, yoksa iş "takıldı" sayılıp yeniden çalıştırılır ve aynı
+   *     üretim iki kez ödenir. (bkz. tryon.processor.ts → new Worker)
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  timeoutMs: { FAST: 60_000, QUALITY: 120_000 },
   /** Kuyruk önceliği — küçük sayı önce işlenir. */
   priority: { QUALITY: 1, FAST: 5, GUEST: 10 },
   maxAttempts: 3,
