@@ -67,6 +67,23 @@ const FAL_CATEGORY: Readonly<Record<TryOnGarmentCategory, string>> = {
   OUTERWEAR: 'upper_body',
 };
 
+/**
+ * GİYSİ AÇIKLAMASI — `idm-vton` şemasında ZORUNLU alan.
+ *
+ * ⚠️ Model bu metni giysiyi anlamak için okuyor; boş geçmek şemayı geçse bile
+ *    sonucu kötüleştirir. Kısa ve nesnel tutuluyor: marka/renk gibi ayrıntılar
+ *    zaten GÖRSELDE var ve metinle tekrarlamak modeli yanıltabilir.
+ *
+ * ⚠️ İngilizce — model istemi İngilizce okuyor. Bu bir arayüz metni DEĞİL,
+ *    sağlayıcıya giden teknik bir parametre; sözlüğe girmez.
+ */
+const FAL_DESCRIPTION: Record<TryOnGarmentCategory, string> = {
+  UPPER_BODY: 'a garment worn on the upper body',
+  LOWER_BODY: 'a garment worn on the lower body',
+  DRESS: 'a full-length dress',
+  OUTERWEAR: 'an outer layer garment worn over other clothing',
+};
+
 export class FalTryOnProvider implements TryOnProvider {
   readonly name = 'fal';
 
@@ -137,6 +154,31 @@ export class FalTryOnProvider implements TryOnProvider {
         human_image_url: request.personImageUrl,
         garment_image_url: request.garmentImageUrl,
         category: FAL_CATEGORY[request.category],
+        /**
+         * ⚠️ ZORUNLU ALAN — YOKLUĞU ÜRETİMDE HER DENEMEYİ DÜŞÜRÜYORDU.
+         *
+         *  Canlıda ölçüldü (2026-08-14): iş worker'a ulaşıyor, fal'a gidiyor
+         *  ve 4,6 saniyede `TRYON_PROVIDER_ERROR` ile düşüyordu. Sağlayıcıya
+         *  worker'ın gönderdiği gövdenin AYNISI elle atıldı:
+         *
+         *      POST https://fal.run/fal-ai/idm-vton   →  HTTP 422
+         *      {"detail":[{"loc":["body","description"],
+         *                  "msg":"Field required","type":"missing"}]}
+         *
+         *  Yani `description` şemada ZORUNLU ve biz hiç göndermiyorduk.
+         *
+         * ⚠️ HİÇBİR TESTİN GÖREMEYECEĞİ BİR ARIZAYDI: birim testlerde `fetch`
+         *    sahtelenir, sahte uç gövdeyi doğrulamaz. Sağlayıcı şemasını
+         *    yalnızca GERÇEK uç doğrular ve ona hiç istek atılmamıştı.
+         *
+         * ⚠️ METİN KATEGORİDEN TÜRETİLİYOR, ürün başlığından DEĞİL. İki sebep:
+         *    (1) `TryOnRequest` ürün metnini taşımıyor ve onu eklemek sözleşmeyi
+         *        sağlayıcıya özel bir alanla kirletirdi;
+         *    (2) ürün başlıkları Türkçe ("Keten Oversize Gömlek") ve model
+         *        istemi İngilizce okuyor — çeviri borcu doğururdu. Kategori
+         *        eşlemesi zaten var ve deterministtir.
+         */
+        description: FAL_DESCRIPTION[request.category],
         // QUALITY modda daha çok adım: kalite/latency kaldıracı burada.
         num_inference_steps: request.mode === 'QUALITY' ? 40 : 20,
       },

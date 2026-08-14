@@ -512,3 +512,77 @@ describe("fallback zinciri gerçek adapter'larla", () => {
     expect(chain.totalCostMicroUsd).toBe(39_060n);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  SAĞLAYICI GÖVDESİ — ZORUNLU ALANLAR GERÇEKTEN GÖNDERİLİYOR MU?
+ *
+ *  ⚠️ BU TESTLER CANLI BİR ARIZADAN DOĞDU (2026-08-14). Sanal deneme
+ *     üretimde HER SEFERİNDE `TRYON_PROVIDER_ERROR` ile düşüyordu. Gövde
+ *     gerçek uca elle atıldı:
+ *
+ *         POST https://fal.run/fal-ai/idm-vton   →  HTTP 422
+ *         {"detail":[{"loc":["body","description"],
+ *                     "msg":"Field required","type":"missing"}]}
+ *
+ *     `description` şemada ZORUNLU ve hiç gönderilmiyordu.
+ *
+ *  ⚠️ VAR OLAN TESTLER BUNU GÖREMEZDİ VE GÖREMEZ: `fetch` sahtelenir, sahte
+ *     uç gövdeyi DOĞRULAMAZ. Sağlayıcı şemasını yalnızca gerçek uç bilir.
+ *     Bu testler o boşluğu kapatmıyor — kapatamaz — ama BİLDİĞİMİZ zorunlu
+ *     alanların düşmesini yakalıyor. Gerçek şema doğrulaması ancak canlı uca
+ *     atılan bir istekle yapılır ve o bu turda elle yapıldı (HTTP 200 döndü).
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('fal gövdesi — zorunlu alanlar', () => {
+  async function govdeyiYakala(category: 'UPPER_BODY' | 'LOWER_BODY' | 'DRESS' | 'OUTERWEAR') {
+    let govde: Record<string, unknown> | null = null;
+
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      govde = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({ image: { url: 'https://ornek/sonuc.png', content_type: 'image/png' } }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof fetch;
+
+    await falProvider(fetchImpl)
+      .generate({
+        personImageUrl: 'https://ornek/insan.jpg',
+        garmentImageUrl: 'https://ornek/giysi.jpg',
+        category,
+        mode: 'FAST',
+        idempotencyKey: 'anahtar-1',
+      })
+      .catch(() => undefined);
+
+    return govde;
+  }
+
+  it('⚠️ `description` GÖNDERİLİR — yokluğu üretimde 422 üretiyordu', async () => {
+    const govde = await govdeyiYakala('UPPER_BODY');
+    // Mutasyon: `description` satırı silinince bu kırılır.
+    expect(govde?.['description']).toBe('a garment worn on the upper body');
+  });
+
+  it('her kategori kendi açıklamasını gönderir — hiçbiri boş değil', async () => {
+    for (const kategori of ['UPPER_BODY', 'LOWER_BODY', 'DRESS', 'OUTERWEAR'] as const) {
+      const govde = await govdeyiYakala(kategori);
+      expect(typeof govde?.['description']).toBe('string');
+      expect(String(govde?.['description']).length).toBeGreaterThan(10);
+    }
+  });
+
+  it('gerçek uca giden gövde şeması: dört zorunlu alan', async () => {
+    const govde = await govdeyiYakala('DRESS');
+    // ⚠️ Bu dört ad `fal.run/fal-ai/idm-vton` şemasından; adları değiştirmek
+    //    sessizce 422 üretir ve ekranda yalnızca genel bir hata görünür.
+    expect(Object.keys(govde ?? {}).sort()).toEqual([
+      'category',
+      'description',
+      'garment_image_url',
+      'human_image_url',
+      'num_inference_steps',
+    ]);
+  });
+});
