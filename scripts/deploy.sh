@@ -529,7 +529,26 @@ elif [ -n "$ESKI_WORKER" ] && [ "$TOPOLOJI_GOCU" -eq 1 ]; then
   pm2 save
 
 else
-  pm2 reload ecosystem.config.cjs --env production --update-env
+  # ⚠️ `vt-web` BU KOMUTTAN HARİÇ TUTULUYOR VE SEBEBİ CANLIDA ÖLÇÜLDÜ.
+  #
+  #    `pm2 reload … --update-env` O ANKİ KABUK ORTAMINI sürece basar. Kabukta
+  #    kirli bir `APP_URL` varsa (`api.env` içindeki `:3000`'li değer bir kez
+  #    export edilmişti) `vt-web` onu miras alır ve CSRF denetimi her POST'u
+  #    reddeder:
+  #
+  #        POST /api/auth/login → 403  "Bu işlem için yetkiniz yok"
+  #        (istek no: vekil — `lib/api/csrf.ts` → `origin !== appUrl()`)
+  #
+  #    Sayfalar 200 döndüğü için site dışarıdan SAĞLIKLI görünür; kimse giriş
+  #    yapamaz, kayıt olamaz, sepete ekleyemez.
+  #
+  #    ⚠️ ASIL KUSUR ŞUYDU: `web_baslat_veya_yukle` bu korumayı zaten yazıyordu
+  #       (kirli değişkenleri `env -u` ile siler, sonra `/proc/<pid>/environ`
+  #       okuyup DOĞRULAR) ama YALNIZCA eski-worker dallarından çağrılıyordu.
+  #       Normal dağıtımda — yani HER GÜN koşan dalda — hiç çalışmıyordu.
+  #       Yazılmış, test edilmiş, mutlu yolda ölü bir koruma.
+  pm2 reload ecosystem.config.cjs --env production --update-env --only vt-api,vt-worker-core,vt-worker-media
+  web_baslat_veya_yukle
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -671,6 +690,59 @@ else
   uyari "  Host: $NGINX_HOST ile soruldu. Sunucu bloğu bu adı tanıyor mu?"
   uyari "  nginx -t && systemctl reload nginx"
 fi
+
+# ── CSRF: GİRİŞ GERÇEKTEN ÇALIŞIYOR MU ─────────────────────────────────────
+#
+# ⚠️ BU KONTROL BİR KULLANICI ŞİKÂYETİNDEN DOĞDU, "olur da"dan değil.
+#    Site açılıyordu, sayfalar 200 dönüyordu, /health yeşildi — ama giriş
+#    formuna doğru şifre yazan kullanıcı şunu gördü:
+#
+#        "Bu işlem için yetkiniz yok."   (istek no: vekil)
+#
+#    Sebep: `vt-web` süreci kirli bir `APP_URL` miras almıştı ve
+#    `lib/api/csrf.ts` → `origin !== appUrl()` HER POST'u reddediyordu.
+#    Kayıt, giriş, sepete ekleme, ödeme — hiçbiri çalışmıyordu.
+#
+# ⚠️ SEBEBİ DEĞİL BELİRTİYİ ÖLÇÜYOR. Yukarıdaki `web_baslat_veya_yukle`
+#    `APP_URL`i karşılaştırıyor (sebep); bu kontrol asıl soruyu soruyor:
+#    "bir POST isteği CSRF'e takılıyor mu?" İkisi farklı şeyler — env doğru
+#    görünüp `csrf.ts` mantığı bozulsaydı yalnızca bu kontrol yakalardı.
+#
+# ⚠️ KASTEN YANLIŞ ŞİFRE gönderiliyor. Beklenen cevap 401 (kimlik hatalı).
+#    403 gelirse istek CSRF'e takılmış demektir — yani DOĞRU şifreyle de
+#    takılırdı. Gerçek bir hesabın şifresini betiğe yazmak gerekmiyor.
+adim "9c/9  Giriş yolu (CSRF)"
+
+# ⚠️ KÖK `vt-web`İN KENDİ DOSYASINDAN OKUNUYOR, api.env'den DEĞİL. CSRF
+#    karşılaştırması `appUrl()` üzerinden yapılıyor ve o değer web'in
+#    `.env.production`ından geliyor. api.env'deki APP_URL BAŞKA bir değer
+#    (`:3000` ekli) ve bu depoda tam olarak o karışıklık siteyi kırmıştı.
+SUNUCU_KOK=$(grep '^APP_URL=' "$KOK/apps/web/.env.production" | cut -d= -f2- | tr -d '"' | sed 's#/*$##')
+
+CSRF_KOD=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+  -X POST "http://127.0.0.1:$WEB_PORT/api/auth/login" \
+  -H "content-type: application/json" \
+  -H "origin: $SUNUCU_KOK" \
+  -H "sec-fetch-site: same-origin" \
+  -d '{"identifier":"dagitim-kontrolu@example.invalid","password":"kasten-yanlis-parola"}' || true)
+
+case "$CSRF_KOD" in
+  401|400|429)
+    bilgi "POST /api/auth/login → $CSRF_KOD (CSRF geçildi ✓)"
+    ;;
+  403)
+    hata "POST /api/auth/login → 403: CSRF HER POST'U REDDEDİYOR."
+    hata "    Kimse giriş yapamaz, kayıt olamaz, sepete ekleyemez."
+    hata "    `vt-web` sürecinin gördüğü APP_URL, tarayıcının gönderdiği"
+    hata "    Origin ile uyuşmuyor. Karşılaştır:"
+    hata "        grep '^APP_URL=' $KOK/apps/web/.env.production"
+    hata "        tr '\\0' '\\n' < /proc/\$(pm2 pid vt-web)/environ | grep APP_URL"
+    exit 1
+    ;;
+  *)
+    uyari "POST /api/auth/login → ${CSRF_KOD:-yanıt yok} (beklenmeyen; elle bakın)"
+    ;;
+esac
 
 # ── Medya önbelleği: ÖLÇ ve ISIT ───────────────────────────────────────────
 #
