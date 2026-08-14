@@ -77,6 +77,22 @@ db -c "SELECT \"createdAt\", type, CASE WHEN \"publishedAt\" IS NULL THEN 'YAYIN
        ORDER BY \"createdAt\" DESC LIMIT 5;" \
   | awk -F'|' '{printf "  %-26s %-18s %-14s %s deneme\n",$1,$2,$3,$4}'
 
+# ⚠️ HATA METNİ AYRI BASILIR VE BU BİR DERS.
+#
+#    `fail()` istisnanın metnini `errorMessage` kolonuna 500 karakter olarak
+#    YAZIYOR — ama bu betiğin ilk sürümü yalnızca `errorCode`u basıyordu.
+#    `errorCode` her istisna için aynı: TRYON_PROVIDER_ERROR. Yani ekranda
+#    hep "sağlayıcı hatası" yazıyordu ve gerçek sebep — kova karışması,
+#    eksik dosya, rıza iptali — kolonda DURUYOR ama görünmüyordu.
+#
+#    Sekiz tur boyunca hangi halkanın koptuğu tahminle arandı; cevap her
+#    seferinde veritabanında hazır bekliyordu. Bir daha olmayacak.
+baslik "2b/6  Hata metinleri (gerçek sebep)"
+db -c "SELECT \"queuedAt\", left(COALESCE(\"errorMessage\", 'hata metni yok'), 300)
+       FROM ai_tryon_jobs WHERE status LIKE 'FAILED%'
+       ORDER BY \"queuedAt\" DESC LIMIT 3;" 2>/dev/null \
+  | awk -F'|' 'NF{printf "  %s\n    %s\n", $1, $2}'
+
 BEKLEYEN=$(db -c "SELECT count(*) FROM infra_outbox_events WHERE \"publishedAt\" IS NULL;" | tr -d ' ')
 if [ "${BEKLEYEN:-0}" -gt 0 ]; then
   kotu "$BEKLEYEN outbox olayı YAYINLANMAMIŞ — vt-worker-core dağıtıcısı çalışmıyor"
