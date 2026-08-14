@@ -86,8 +86,25 @@ const FAL_BASE_URL = 'https://fal.run';
  */
 const FAL_QUEUE_BASE_URL = 'https://queue.fal.run';
 
-/** Durum yoklama aralığı. Kısa tutulur: üretim bitince beklemek istemiyoruz. */
-const KUYRUK_YOKLAMA_ARALIGI_MS = 1500;
+/**
+ * ⚠️ 1500 ms İDİ VE GEREKSİZ GECİKME EKLİYORDU.
+ *
+ *    Ölçüldü: fashn sıcakken üretim 2-3 saniye. 1,5 saniyelik aralıkla
+ *    yoklamak, biten bir işi ortalama 0,75 sn geç fark etmek demek — ve
+ *    döngü İLK kontrolden önce de bekliyordu, yani 2 saniyelik bir üretim
+ *    en iyi ihtimalle 3,5 saniyede görünüyordu.
+ *
+ *    400 ms: fal'ın hız limitini zorlamayacak kadar seyrek, biten işi
+ *    neredeyse anında yakalayacak kadar sık. 2 saniyelik üretimde ~5 yoklama.
+ */
+const KUYRUK_YOKLAMA_ARALIGI_MS = 400;
+
+/**
+ * ⚠️ İLK KONTROL BEKLEMEDEN YAPILIR. Gönderim yanıtı bazen zaten
+ *    `COMPLETED` geliyor (fal önbelleği). Koşulsuz beklemek, hazır sonucu
+ *    elimizde tutarken boşuna oturmaktı.
+ */
+const ILK_YOKLAMA_GECIKMESI_MS = 0;
 
 /**
  * ⚠️ YOKLAMA DÖNGÜSÜ KENDİ SÜRE SINIRINI TAŞIR VE BU ZORUNLU.
@@ -375,6 +392,7 @@ export class FalTryOnProvider implements TryOnProvider {
     if (!durumAdresi || !sonucAdresi) return gonderim;
 
     // ── 2) Yokla ─────────────────────────────────────────────────────────
+    let yoklamaSayisi = 0;
     for (;;) {
       if (this.now() >= bitis) {
         // ⚠️ KENDİ ZAMAN AŞIMIMIZ. Dış sarmalayıcı iptal sinyalini bize
@@ -382,7 +400,8 @@ export class FalTryOnProvider implements TryOnProvider {
         throw new AiHttpError(408, this.name, `kuyruk beklemesi aşıldı: ${this.config.model}`);
       }
 
-      await bekle(KUYRUK_YOKLAMA_ARALIGI_MS);
+      await bekle(yoklamaSayisi === 0 ? ILK_YOKLAMA_GECIKMESI_MS : KUYRUK_YOKLAMA_ARALIGI_MS);
+      yoklamaSayisi += 1;
 
       const { json: durum } = await requestJson({
         url: durumAdresi,
