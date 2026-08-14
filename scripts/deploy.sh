@@ -256,6 +256,31 @@ BOS_MB=$(df -Pm "$KOK" | awk 'NR==2 {print $4}')
 KULLANILABILIR_MB=$(free -m | awk '/^Mem:/ {print $7}')
 bilgi "Disk: ${BOS_MB} MB boş · Bellek: ${KULLANILABILIR_MB} MB kullanılabilir"
 
+# ── Yazı tipi ─────────────────────────────────────────────────────────────
+#  ⚠️ CANLI ARIZADAN DOĞDU (2026-08-14). Sunucuda SIFIR yazı tipi vardı
+#     (`fc-list | wc -l` → 0) ve filigran katmanı boş rasterleşiyordu. Kod
+#     bunu DOĞRU yakalıyor — filigran yasal zorunluluk, rasterleşmediyse
+#     görsel KAYDEDİLMİYOR (`tryon.watermarker.ts` → assertInkRendered).
+#     Ama kullanıcı tarafındaki karşılığı "deneme bazen çalışıyor bazen
+#     çalışmıyor"du; fal işini 7,97 saniyede bitirmiş olsa bile.
+#
+#  ⚠️ BU BİR KOD SORUNU DEĞİL, SİSTEM PAKETİ EKSİKLİĞİ — ve tam bu yüzden
+#     hiçbir test yakalayamaz. Sunucu yeniden kurulduğunda sessizce geri
+#     gelir. Kontrol buraya konuyor ki dağıtım ANINDA bağırsın.
+if command -v fc-list >/dev/null 2>&1; then
+  YAZI_TIPI=$(fc-list 2>/dev/null | wc -l | tr -d " ")
+  if [ "${YAZI_TIPI:-0}" -eq 0 ]; then
+    kotu "sistemde YAZI TİPİ YOK — filigran rasterleşmez, her sanal deneme düşer"
+    bilgi "  düzeltme: apt-get install -y fonts-dejavu-core fontconfig && fc-cache -f"
+    exit 1
+  fi
+  bilgi "yazı tipi: ${YAZI_TIPI} adet"
+else
+  kotu "fontconfig kurulu değil — filigran rasterleşemez, her sanal deneme düşer"
+  bilgi "  düzeltme: apt-get install -y fonts-dejavu-core fontconfig && fc-cache -f"
+  exit 1
+fi
+
 PORT=$(grep '^PORT=' "$ENV_DOSYASI" | cut -d= -f2- | tr -d '"')
 PORT="${PORT:-3010}"
 
