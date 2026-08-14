@@ -150,6 +150,32 @@ type StepRow = {
   errorCode: string | null;
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  KOMBİN ÜRETİM BORU HATTI BAĞLI MI.
+ *
+ *  ⚠️ `false` VE BU BİR ÖLÇÜMÜN SONUCU, TEDBİR DEĞİL. Canlıda (2026-08-14):
+ *
+ *    · `create()` `tryon.outfit_requested` outbox olayı yazıyor (~satır 601)
+ *    · O olayı OKUYAN HİÇBİR İŞLEYİCİ YOK — depoda tek eşleşme yazan taraf ve
+ *      kendi testi. `tryon.dispatch.ts:128` yalnızca `tryon.requested` alıyor.
+ *    · `composeOutfit()` (packages/adapters/src/ai/multi-tryon.ts:457) yazılmış
+ *      ve on bir kez test edilmiş ama `apps/worker` altında SIFIR çağıranı var.
+ *
+ *  Kullanıcının gördüğü: uç `202 QUEUED` döndü, tarayıcı 100+ saniye yokladı,
+ *  ekranda "1. katman üretiliyor / 2. katman üretiliyor" sonsuza kadar kaldı —
+ *  ve `costMicroUsd: 60000` ile günlük kota ve ~0,06 USD YANDI.
+ *
+ *  "Kabul et ve asla bitirme", bir istemciye verilebilecek en kötü sözleşme:
+ *  hata gösterilemez, yeniden deneme anlamsızdır, kullanıcı yalnızca bekler.
+ *
+ *  ⚠️ BAYRAK SABİT, ORTAM DEĞİŞKENİ DEĞİL. Env'den okunsaydı biri onu üretimde
+ *     açar ve aynı sonsuz bekleme geri gelirdi. Bu kapı ancak worker tarafı
+ *     GERÇEKTEN yazıldığında, kodla birlikte kalkar.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const KOMBIN_URETIMI_BAGLI = false;
+
 @Injectable()
 export class MultiTryOnService {
   constructor(
@@ -171,7 +197,54 @@ export class MultiTryOnService {
    * hangi katmanların yeniden üretileceğine kendisi karar verir, istemcinin
    * "neyi değiştirdim" bilgisini taşımasına gerek yoktur.
    */
+  /**
+   * ⚠️ GİRİŞ NOKTASI YALNIZCA KAPIDIR; İŞİ `planlaVeKuyrukla` YAPAR.
+   *
+   *    İkiye ayrılmasının sebebi test edilebilirlik DEĞİL, DÜRÜSTLÜK:
+   *    planlama mantığı (katman sırası, önbellek önekleri, ret kodları, parça
+   *    bazlı yeniden üretim) DOĞRU ve kapı kalktığında olduğu gibi gerekecek.
+   *    O mantığı silmek ya da testsiz bırakmak, bugün çalışmıyor diye doğru
+   *    olan kodu çöpe atmak olurdu.
+   *
+   * ⚠️ KAPI ALT METOTTA DEĞİL BURADA: `planlaVeKuyrukla` testlerden doğrudan
+   *    çağrılıyor. Kapıyı oraya koysaydım testler onu atlatmak zorunda kalır ve
+   *    kapının kendisi ölçülemezdi. Böyle: DIŞARIYA açılan tek yol kapılı,
+   *    testler kapının altındaki mantığı ölçüyor, kapıyı da ayrı test ölçüyor.
+   */
   async create(input: OutfitTryOnCreateInput, actor: TryOnActor): Promise<OutfitTryOnResult> {
+    /**
+     * ⚠️ 0) ÖZELLİK KAPISI — RIZADAN DA KOTADAN DA ÖNCE, EN BAŞTA.
+     *
+     *    Aşağıdaki sıra rıza → fotoğraf → varyant → kota. Kapıyı bir alt
+     *    basamağa koymak, çalışmayacağını BİLDİĞİMİZ bir iş için kullanıcının
+     *    günlük hakkını harcamak olurdu. Reddedeceksek bedavaya reddederiz.
+     *
+     * ⚠️ SESSİZCE TEK PARÇAYA DÜŞÜLMÜYOR. Kullanıcı iki parça istedi; birini
+     *    giydirip "oldu" demek, istemediği şeyi istediği sanarak vermektir.
+     *    Yapamadığımızı SÖYLERİZ; istemci kullanıcıyı tek parça denemeye
+     *    yönlendirir.
+     */
+    if (!KOMBIN_URETIMI_BAGLI) {
+      throw appError('TRYON_OUTFIT_UNAVAILABLE', {
+        internalMessage:
+          'Kombin boru hattının worker tarafı bağlı değil: tryon.outfit_requested olayını tüketen işleyici ve composeOutfit çağrısı yok',
+      });
+    }
+
+    return this.planlaVeKuyrukla(input, actor);
+  }
+
+  /**
+   * KOMBİN PLANLAMA VE KUYRUKLAMA — kapının altındaki gerçek iş.
+   *
+   * ⚠️ ÜRETİMDE TEK ÇAĞIRANI `create()`TİR ve o kapılıdır. Doğrudan çağıran
+   *    yeni bir kod yazılırsa kapı ATLANMIŞ olur — bu metoda dışarıdan
+   *    erişilmesi yalnızca testler içindir.
+   */
+  async planlaVeKuyrukla(
+    input: OutfitTryOnCreateInput,
+    actor: TryOnActor,
+  ): Promise<OutfitTryOnResult> {
     const startedAt = Date.now();
 
     // 1) ⚠️ RIZA — sağlayıcıya çağrı yapılmadan ÖNCE, istisnasız.

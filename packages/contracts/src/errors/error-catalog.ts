@@ -619,6 +619,31 @@ export const ERROR_CATALOG = define({
     retryable: true,
     message: 'Sanal deneme çok uzun sürdü. Tekrar deneyebilirsiniz.',
   },
+  /**
+   * KOMBİN DENEMESİ HENÜZ ÜRETİMDE DEĞİL.
+   *
+   * ⚠️ BU KOD BİR ÖZELLİK KAPISI, BİR ARIZA DEĞİL — ve varlık sebebi canlıda
+   *    ölçülen şu davranış: uç `202 QUEUED` dönüyordu, kullanıcı sonsuza kadar
+   *    yokluyordu, iş HİÇ üretilmiyordu (olayı okuyan işleyici yok) ve üstüne
+   *    günlük kota ile ~0,06 USD bedel YANIYORDU.
+   *
+   *    "Kabul et ve asla bitirme", bir istemciye verilebilecek EN KÖTÜ
+   *    sözleşmedir: hata gösterilemez, yeniden deneme anlamsızdır, kullanıcı
+   *    yalnızca bekler. Açıkça reddetmek her açıdan daha dürüst.
+   *
+   * ⚠️ `retryable: false` — tekrar denemek DURUMU DEĞİŞTİRMEZ. `true` yazmak
+   *    istemciyi ve kullanıcıyı sonuçsuz bir döngüye sokardı.
+   *
+   *    Kapı, worker tarafındaki kombin boru hattı (olay tüketicisi +
+   *    composeOutfit + ara görsel yayıncısı) bağlandığında kaldırılacak.
+   */
+  TRYON_OUTFIT_UNAVAILABLE: {
+    status: 501,
+    family: 'domain',
+    retryable: false,
+    message:
+      'Kombin denemesi henüz kullanıma açık değil. Parçaları tek tek deneyebilirsiniz.',
+  },
   TRYON_CONTENT_BLOCKED: {
     status: 422,
     family: 'domain',

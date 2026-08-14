@@ -52,6 +52,14 @@ export function DenemeEkrani({ taban, adaylar, magazaAdi }: DenemeEkraniProps): 
     [taban, secilenAday],
   );
 
+  /**
+   * ⚠️ İKİ PARÇA SEÇİLİ = KOMBİN AKIŞI = BUGÜN ÇALIŞMIYOR.
+   *    `parcalar.length > 1` yerine `secilenAday` üzerinden okunuyor: ikisi
+   *    bugün aynı şeyi söylüyor ama niyet farklı — kapalı olan şey "birden çok
+   *    parça" değil, KULLANICININ BİR ADAY SEÇMİŞ OLMASI.
+   */
+  const kombinSecili = secilenAday !== null;
+
   const deneme = useDeneme(parcalar);
   const beden = useBedenOnerisi(taban.variantId, true);
 
@@ -120,13 +128,51 @@ export function DenemeEkrani({ taban, adaylar, magazaAdi }: DenemeEkraniProps): 
           size="lg"
           className="w-full"
           onClick={deneme.dene}
-          disabled={deneme.asama.tur === 'gonderiliyor' || deneme.asama.tur === 'uretiliyor'}
+          disabled={
+            deneme.asama.tur === 'gonderiliyor' ||
+            deneme.asama.tur === 'uretiliyor' ||
+            kombinSecili
+          }
         >
           Üzerimde Dene
         </Button>
 
         <SepeteEkle variantIdler={parcalar.map((parca) => parca.variantId)} />
       </div>
+
+      {/*
+        ⚠️ KOMBİN DENEMESİ KAPALI VE SEBEBİ YAZIYOR.
+
+           Ölçüldü (canlı): iki parça seçiliyken düğmeye basmak `POST
+           /tryon/outfit` → `202 QUEUED` üretiyordu, ekran "1. katman
+           üretiliyor / 2. katman üretiliyor"da SONSUZA KADAR kalıyordu ve
+           günlük kota + ~0,06 USD yanıyordu. Sebebi: o işi üretecek worker
+           tarafı hiç yazılmamış (olay tüketicisi ve `composeOutfit` çağrısı
+           yok — bkz. multi-tryon.service.ts `KOMBIN_URETIMI_BAGLI`).
+
+        ⚠️ SUNUCU DA REDDEDİYOR; BU YALNIZCA İKİNCİ SAVUNMA. Sunucu kapısı
+           gerçek kapıdır — istemci eskiyebilir, biri doğrudan uca istek
+           atabilir. Buradaki amaç kullanıcıyı boşa tıklatmamak ve NEDENİNİ
+           söylemek; sessizce pasif bir düğme, bozuk bir düğmeden farksızdır.
+
+        ⚠️ SEPETE EKLE KAPATILMADI: iki parçayı satın almak ÇALIŞIYOR, yalnızca
+           ikisini birlikte GİYDİRMEK çalışmıyor. Çalışan bir şeyi, yanındaki
+           bozuk şey yüzünden kapatmak kullanıcıdan değer çalar.
+      */}
+      {kombinSecili ? (
+        <p className="text-sm text-metin-soluk">
+          Kombin denemesi henüz kullanıma açık değil. Parçaları tek tek
+          deneyebilirsiniz — karuselden seçimi kaldırmak için{' '}
+          <button
+            type="button"
+            onClick={() => setSeciliAdayId(null)}
+            className="underline underline-offset-2"
+          >
+            yalnız bu ürünü dene
+          </button>
+          .
+        </p>
+      ) : null}
 
       {/*
         ⚠️ TOPLAM BURADA HESAPLANMAZ — parça fiyatları AYRI AYRI listelenir.

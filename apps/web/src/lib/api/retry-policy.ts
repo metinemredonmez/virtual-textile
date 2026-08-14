@@ -142,6 +142,13 @@ export const RETRY_POLICY = {
   TRYON_PROVIDER_ERROR: DUGME,
   TRYON_TIMEOUT: DUGME,
   TRYON_CONTENT_BLOCKED: YOK,
+  /**
+   * ⚠️ `YOK` — tekrar denemek DURUMU DEĞİŞTİRMEZ. Kombin üretiminin worker
+   *    tarafı henüz bağlı değil; bu geçici bir arıza değil, kapalı bir özellik.
+   *    `DUGME` yazmak kullanıcıya sonuçsuz bir "tekrar dene" sunardı ve her
+   *    tıklama yeni bir 501 üretirdi.
+   */
+  TRYON_OUTFIT_UNAVAILABLE: YOK,
   AI_BUDGET_EXCEEDED: DUGME,
   STYLIST_UNAVAILABLE: DUGME,
   STYLIST_RATE_LIMITED: GERI_SAYIM,

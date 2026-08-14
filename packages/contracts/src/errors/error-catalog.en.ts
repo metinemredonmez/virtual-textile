@@ -129,6 +129,8 @@ export const ERROR_CATALOG_EN = {
   TRYON_JOB_NOT_FOUND: 'Try-on record not found.',
   TRYON_PROVIDER_ERROR: 'The virtual try-on could not be created. Please try again shortly.',
   TRYON_TIMEOUT: 'The virtual try-on took too long. You can try again.',
+  TRYON_OUTFIT_UNAVAILABLE:
+    'Outfit try-on is not available yet. You can try the pieces one at a time.',
   TRYON_CONTENT_BLOCKED: 'Your photo could not be processed. Please try a different photo.',
 
   // ── YAPAY ZEKÂ ────────────────────────────────────────────────────────

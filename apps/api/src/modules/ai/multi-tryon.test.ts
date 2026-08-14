@@ -185,7 +185,7 @@ describe('POST /tryon/outfit — rıza kapısı', () => {
   it('rıza yoksa reddeder ve HİÇBİR ÜRETİM İZİ bırakmaz', async () => {
     const { service, prisma, tx } = build([]);
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toBeInstanceOf(AppError);
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toBeInstanceOf(AppError);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -195,7 +195,7 @@ describe('POST /tryon/outfit — rıza kapısı', () => {
   it('yurt dışı aktarım rızası tek başına eksikse reddeder', async () => {
     const { service } = build([granted('PHOTO_PROCESSING')]);
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toMatchObject({
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toMatchObject({
       code: 'CONSENT_CROSS_BORDER_REQUIRED',
     });
   });
@@ -203,7 +203,7 @@ describe('POST /tryon/outfit — rıza kapısı', () => {
   it('rıza kontrolü fotoğraf ve katalog okumasından ÖNCE yapılır', async () => {
     const { service, prisma, catalog } = build([]);
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toBeInstanceOf(AppError);
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toBeInstanceOf(AppError);
 
     expect(prisma.userPhoto.findFirst).not.toHaveBeenCalled();
     expect(catalog.findVariant).not.toHaveBeenCalled();
@@ -214,7 +214,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
   it('⚠️ SIRA SUNUCUDA BELİRLENİR: istemci ceketi ilk gönderse de en üstte kalır', async () => {
     const { service, tx } = build();
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.steps.map((step) => step.variantId)).toEqual(ORDERED);
     expect(result.steps.map((step) => step.layerIndex)).toEqual([0, 1, 2]);
@@ -226,14 +226,14 @@ describe('POST /tryon/outfit — katman sırası', () => {
 
   it('farklı istemci sıraları AYNI önbellek anahtarlarını üretir', async () => {
     const first = build();
-    await first.service.create(INPUT, ACTOR);
+    await first.service.planlaVeKuyrukla(INPUT, ACTOR);
     const firstKeys = (
       outboxPayload(first.tx).payload as { steps: { cacheKey: string }[] }
     ).steps.map((step) => step.cacheKey);
 
     vi.clearAllMocks();
     const second = build();
-    await second.service.create(
+    await second.service.planlaVeKuyrukla(
       { ...INPUT, variantIds: ['v-gomlek', 'v-ceket', 'v-pantolon'] },
       ACTOR,
     );
@@ -247,7 +247,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
   it('anahtarlar ÖNEK yapısındadır — kanonik sıradan üretilir', async () => {
     const { service, tx } = build();
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     const payload = outboxPayload(tx).payload as { steps: { cacheKey: string }[] };
     expect(payload.steps.map((step) => step.cacheKey)).toEqual(keysFor(ORDERED));
@@ -257,7 +257,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
     const { service, tx } = build();
 
     await expect(
-      service.create({ ...INPUT, variantIds: ['v-elbise', 'v-pantolon'] }, ACTOR),
+      service.planlaVeKuyrukla({ ...INPUT, variantIds: ['v-elbise', 'v-pantolon'] }, ACTOR),
     ).rejects.toMatchObject({ code: 'OUTFIT_LAYER_CONFLICT' });
 
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
       }),
     );
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toMatchObject({
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toMatchObject({
       code: 'PRODUCT_NOT_TRYONABLE',
     });
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -304,7 +304,7 @@ describe('POST /tryon/outfit — katman sırası', () => {
       }),
     );
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toMatchObject({
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toMatchObject({
       code: 'VARIANT_UNAVAILABLE',
     });
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -322,7 +322,7 @@ describe('POST /tryon/outfit — kombin ret kodları', () => {
   async function rejectionOf(variantIds: readonly string[]): Promise<AppError> {
     const { service, tx } = build();
     const error = await service
-      .create({ ...INPUT, variantIds: [...variantIds] }, ACTOR)
+      .planlaVeKuyrukla({ ...INPUT, variantIds: [...variantIds] }, ACTOR)
       .then(() => null)
       .catch((caught: unknown) => caught as AppError);
 
@@ -442,7 +442,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
   it('hiçbir önek hazır değilse her katman için ayrı iş açılır', async () => {
     const { service, tx } = build();
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('QUEUED');
     expect(tx.tryOnJob.create).toHaveBeenCalledTimes(3);
@@ -458,7 +458,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
 
     const { service, tx } = build(BOTH_GRANTED, rows);
 
-    const result = await service.create(
+    const result = await service.planlaVeKuyrukla(
       { ...INPUT, variantIds: ['v-ceket', 'v-pantolon', 'v-gomlek'] },
       ACTOR,
     );
@@ -485,7 +485,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
       succeeded('job-2', previous[1]!),
     ]);
 
-    await service.create({ ...INPUT, variantIds: ['v-ceket', 'v-pantolon', 'v-gomlek'] }, ACTOR);
+    await service.planlaVeKuyrukla({ ...INPUT, variantIds: ['v-ceket', 'v-pantolon', 'v-gomlek'] }, ACTOR);
 
     const payload = outboxPayload(tx).payload as { steps: { variantId: string }[] };
     expect(payload.steps).toHaveLength(1);
@@ -496,7 +496,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
     // Yalnızca pantolon öneki hazır: gömlek değişti, ceket onun üstündeydi.
     const { service, tx } = build(BOTH_GRANTED, [succeeded('job-1', keysFor(ORDERED)[0]!)]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(tx.tryOnJob.create).toHaveBeenCalledTimes(2);
     if (result.outcome !== 'QUEUED') throw new Error('kuyruğa alınmalıydı');
@@ -512,7 +512,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
       succeeded('job-3', other[2]!),
     ]);
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(tx.tryOnJob.create).toHaveBeenCalledTimes(3);
   });
@@ -525,7 +525,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
       succeeded('job-3', keys[2]!),
     ]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('CACHED');
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -556,7 +556,7 @@ describe('POST /tryon/outfit — parça bazlı yeniden üretim', () => {
       },
     ]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('QUEUED');
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -572,7 +572,7 @@ describe('POST /tryon/outfit — kota (parça başına)', () => {
       tryOnJob: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(8) },
     });
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toMatchObject({
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toMatchObject({
       code: 'TRYON_QUOTA_EXCEEDED',
     });
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -584,7 +584,7 @@ describe('POST /tryon/outfit — kota (parça başına)', () => {
       tryOnJob: { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(7) },
     });
 
-    await expect(service.create(INPUT, ACTOR)).resolves.toMatchObject({ outcome: 'QUEUED' });
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).resolves.toMatchObject({ outcome: 'QUEUED' });
   });
 
   it('yeniden kullanılan katmanlar kotadan DÜŞMEZ', async () => {
@@ -608,7 +608,7 @@ describe('POST /tryon/outfit — kota (parça başına)', () => {
     );
 
     await expect(
-      service.create({ ...INPUT, variantIds: ['v-ceket', 'v-pantolon', 'v-gomlek'] }, ACTOR),
+      service.planlaVeKuyrukla({ ...INPUT, variantIds: ['v-ceket', 'v-pantolon', 'v-gomlek'] }, ACTOR),
     ).resolves.toMatchObject({ outcome: 'QUEUED' });
   });
 
@@ -627,7 +627,7 @@ describe('POST /tryon/outfit — kota (parça başına)', () => {
       },
     });
 
-    await expect(service.create(INPUT, ACTOR)).resolves.toMatchObject({ outcome: 'CACHED' });
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).resolves.toMatchObject({ outcome: 'CACHED' });
   });
 
   it('platform bütçesi dolduysa üretim başlamaz', async () => {
@@ -641,7 +641,7 @@ describe('POST /tryon/outfit — kota (parça başına)', () => {
       },
     });
 
-    await expect(service.create(INPUT, ACTOR)).rejects.toMatchObject({
+    await expect(service.planlaVeKuyrukla(INPUT, ACTOR)).rejects.toMatchObject({
       code: 'AI_BUDGET_EXCEEDED',
     });
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
@@ -671,7 +671,7 @@ describe('POST /tryon/outfit — kısmi başarı', () => {
       permanentlyFailed(keys[2]!),
     ]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('PARTIAL');
     if (result.outcome !== 'PARTIAL') return;
@@ -690,7 +690,7 @@ describe('POST /tryon/outfit — kısmi başarı', () => {
   it('hiçbir katman giydirilemediyse gösterilecek görsel yoktur — FAILED', async () => {
     const { service } = build(BOTH_GRANTED, [permanentlyFailed(keys[0]!)]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('FAILED');
     if (result.outcome !== 'FAILED') return;
@@ -704,7 +704,7 @@ describe('POST /tryon/outfit — kısmi başarı', () => {
       permanentlyFailed(keys[2]!),
     ]);
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(tx.tryOnJob.create).not.toHaveBeenCalled();
     expect(tx.tryOnJob.update).not.toHaveBeenCalled();
@@ -726,7 +726,7 @@ describe('POST /tryon/outfit — kısmi başarı', () => {
       },
     ]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('QUEUED');
     // Yeni satır açılmaz, var olan satır tazelenir.
@@ -756,7 +756,7 @@ describe('POST /tryon/outfit — kısmi başarı', () => {
       },
     ]);
 
-    const result = await service.create(INPUT, ACTOR);
+    const result = await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(result.outcome).toBe('PARTIAL');
     expect(tx.tryOnJob.update).not.toHaveBeenCalled();
@@ -767,7 +767,7 @@ describe('POST /tryon/outfit — kuyruk sözleşmesi', () => {
   it('işler ve outbox olayı AYNI transaction içinde yazılır', async () => {
     const { service, prisma, tx } = build();
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.tryOnJob.create).toHaveBeenCalledTimes(3);
@@ -777,7 +777,7 @@ describe('POST /tryon/outfit — kuyruk sözleşmesi', () => {
   it('zincir TEK olayla taşınır — katmanlar paralel işlenemez', async () => {
     const { service, tx } = build();
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     const event = outboxPayload(tx);
     expect(event.type).toBe('tryon.outfit_requested');
@@ -790,7 +790,7 @@ describe('POST /tryon/outfit — kuyruk sözleşmesi', () => {
   it('her katman kendi varyantını ve ÖNEK anahtarını taşır', async () => {
     const { service, tx } = build();
 
-    await service.create(INPUT, ACTOR);
+    await service.planlaVeKuyrukla(INPUT, ACTOR);
 
     const payload = outboxPayload(tx).payload as {
       steps: { variantId: string; cacheKey: string; layerIndex: number; category: string }[];
@@ -807,13 +807,13 @@ describe('POST /tryon/outfit — kuyruk sözleşmesi', () => {
 
   it('bekleme tahmini parça sayısıyla çarpılır — katmanlar sırayla üretilir', async () => {
     const single = build();
-    const singleResult = await single.service.create(
+    const singleResult = await single.service.planlaVeKuyrukla(
       { ...INPUT, variantIds: ['v-pantolon', 'v-gomlek'] },
       ACTOR,
     );
 
     const triple = build();
-    const tripleResult = await triple.service.create(INPUT, ACTOR);
+    const tripleResult = await triple.service.planlaVeKuyrukla(INPUT, ACTOR);
 
     if (singleResult.outcome !== 'QUEUED' || tripleResult.outcome !== 'QUEUED') {
       throw new Error('ikisi de kuyruğa alınmalıydı');
@@ -829,7 +829,7 @@ describe('POST /tryon/outfit — kuyruk sözleşmesi', () => {
       succeeded('job-3', keys[2]!),
     ]);
 
-    const result = await service.create({ ...INPUT, mode: 'QUALITY' }, ACTOR);
+    const result = await service.planlaVeKuyrukla({ ...INPUT, mode: 'QUALITY' }, ACTOR);
 
     expect(result.outcome).toBe('QUEUED');
     expect(tx.tryOnJob.create).toHaveBeenCalledTimes(3);

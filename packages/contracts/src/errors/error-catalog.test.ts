@@ -21,14 +21,18 @@ import { errorMessage, wireErrorMessage } from './error-message.js';
  *      düzeyinde görünmez.
  */
 describe('hata kataloğu — diller arası tutarlılık', () => {
-  it('her dil TAM 114 kod taşır ve anahtar kümeleri birebir eşittir', () => {
+  it('her dil TAM 115 kod taşır ve anahtar kümeleri birebir eşittir', () => {
     // ⚠️ Alt sınır iddiası: tarama boşalırsa test var olmamasıyla aynı şeydir.
     //
+    // 114 → 115: TRYON_OUTFIT_UNAVAILABLE — kombin denemesi özellik kapısı.
+    //   Kombin üretiminin worker tarafı yazılmamış; uç 202 QUEUED dönüp
+    //   sonsuza kadar bekletiyor ve kota yakıyordu. Kapı, worker tarafı
+    //   bağlandığında bu kodla birlikte kalkacak ve sayı 114'e dönecek.
     // 111 → 114: site içeriği turunda üç kod eklendi (SITE_IMAGE_NOT_FOUND,
     // SITE_IMAGE_TARGET_INVALID, SITE_IMAGE_TOO_MANY_CARDS). Sayının ELLE
     // güncellenmesi gerekmesi bir zahmet değil, TASARIM: kod eklemek bilinçli
     // bir karar olmalı ve bu satır o kararın kaydı.
-    expect(ERROR_CODES.length).toBe(114);
+    expect(ERROR_CODES.length).toBe(115);
 
     for (const locale of LOCALES) {
       expect(Object.keys(ERROR_MESSAGES[locale]).sort()).toEqual([...ERROR_CODES].sort());
