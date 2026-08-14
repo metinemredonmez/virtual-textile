@@ -8,6 +8,7 @@ import {
   type CostMetering,
 } from './ai-cost.js';
 import {
+  AiHttpError,
   asRecord,
   bodyPreview,
   downloadBinary,
@@ -50,9 +51,56 @@ export interface FalTryOnConfig {
   now?: () => number;
   /** Üretilen görsel için üst sınır. Varsayılan: MEDIA.maxUploadBytes. */
   maxImageBytes?: number;
+  /** Test için değiştirilebilir kuyruk kökü. */
+  queueBaseUrl?: string;
 }
 
 const FAL_BASE_URL = 'https://fal.run';
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  KUYRUK UCU — SENKRON UÇ YERİNE.
+ *
+ *  ⚠️ CANLI ARIZADAN DOĞDU (2026-08-14). Önce `https://fal.run/{model}`
+ *     kullanılıyordu: bu SENKRON uçtur, bağlantıyı açık tutup üretimin
+ *     bitmesini bekler. Ölçüldü:
+ *
+ *         fal: TIMEOUT (25001ms)   → sınır 25 sn iken
+ *         fal: TIMEOUT (~60000ms)  → sınır 60 sn'ye çıkarıldıktan sonra
+ *
+ *     Yani süreyi büyütmek çözmedi; senkron uç bizim beklediğimizden uzun
+ *     sürüyor. Sebebi büyük ihtimalle SOĞUK BAŞLANGIÇ: model uzun süre
+ *     çağrılmamışsa fal onu yüklerken istek kuyrukta bekliyor ve bu süre
+ *     üretim süresine ekleniyor. Düşük trafikte bu KURAL, istisna değil.
+ *
+ *  Kuyruk ucu bunu üç şekilde çözer:
+ *    1. Gönderim ANINDA döner (`request_id`), bağlantı tutulmaz. Uzun ömürlü
+ *       HTTP bağlantılarını kesen ara vekiller/yük dengeleyiciler devre dışı.
+ *    2. Durum yoklanabilir — "kuyrukta bekliyor" ile "asıldı" ayırt edilir.
+ *    3. Bizim süre bütçemiz üretimi DEĞİL, toplam bekleyişi sınırlar.
+ *
+ *  ⚠️ WORKER ZATEN ASENKRON: iş BullMQ kuyruğunda, tarayıcı yoklama yapıyor.
+ *     Yani burada beklemek kimseyi bloklamıyor — senkron uçta ısrar etmek
+ *     hiçbir şey kazandırmıyordu.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const FAL_QUEUE_BASE_URL = 'https://queue.fal.run';
+
+/** Durum yoklama aralığı. Kısa tutulur: üretim bitince beklemek istemiyoruz. */
+const KUYRUK_YOKLAMA_ARALIGI_MS = 1500;
+
+/**
+ * ⚠️ YOKLAMA DÖNGÜSÜ KENDİ SÜRE SINIRINI TAŞIR VE BU ZORUNLU.
+ *
+ *    Dış sarmalayıcı (`resilient` → `withTimeout`) zaman aşımını
+ *    `Promise.race` ile uyguluyor ve iptal sinyalini `fn`e GEÇİRMİYOR.
+ *    Döngü kendi kendini durdurmazsa, dışarıda "zaman aşımı" denmesine
+ *    rağmen arka planda yoklamaya DEVAM EDER — sızıntı ve boşa istek.
+ *
+ *    Pay, dış bütçenin bitiminden hemen önce durmak içindir; böylece hata
+ *    "yoklama bitmedi" olarak bizim tarafımızdan, anlaşılır biçimde doğar.
+ */
+const KUYRUK_GUVENLIK_PAYI_MS = 3000;
 
 /**
  * Kategori eşlemesi. fal'ın IDM-VTON ailesi üç kategori tanır; OUTERWEAR için
@@ -101,12 +149,14 @@ export class FalTryOnProvider implements TryOnProvider {
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
   private readonly baseUrl: string;
+  private readonly queueBaseUrl: string;
   private readonly maxImageBytes: number;
 
   constructor(private readonly config: FalTryOnConfig) {
     this.fetchImpl = config.fetchImpl ?? globalThis.fetch;
     this.now = config.now ?? Date.now;
     this.baseUrl = config.baseUrl ?? FAL_BASE_URL;
+    this.queueBaseUrl = config.queueBaseUrl ?? FAL_QUEUE_BASE_URL;
     this.maxImageBytes = config.maxImageBytes ?? MEDIA.maxUploadBytes;
   }
 
@@ -137,52 +187,8 @@ export class FalTryOnProvider implements TryOnProvider {
   }
 
   private async call(request: TryOnRequest, startedAt: number): Promise<MeteredTryOnResult> {
-    const { json } = await requestJson({
-      url: `${this.baseUrl}/${this.config.model}`,
-      provider: this.name,
-      fetchImpl: this.fetchImpl,
-      headers: {
-        // fal şeması: "Key <anahtar>" — "Bearer" DEĞİL.
-        Authorization: `Key ${this.config.apiKey}`,
-        'Content-Type': 'application/json',
-        // Sağlayıcı tarafında tekilleştirme için gönderilir. fal bunu
-        // belgelemiyor; yok sayarsa zararsızdır, dikkate alırsa retry'da
-        // ikinci üretimi engeller. Bu yüzden retry sayısı yine de düşük tutulur.
-        'X-Idempotency-Key': request.idempotencyKey,
-      },
-      body: {
-        human_image_url: request.personImageUrl,
-        garment_image_url: request.garmentImageUrl,
-        category: FAL_CATEGORY[request.category],
-        /**
-         * ⚠️ ZORUNLU ALAN — YOKLUĞU ÜRETİMDE HER DENEMEYİ DÜŞÜRÜYORDU.
-         *
-         *  Canlıda ölçüldü (2026-08-14): iş worker'a ulaşıyor, fal'a gidiyor
-         *  ve 4,6 saniyede `TRYON_PROVIDER_ERROR` ile düşüyordu. Sağlayıcıya
-         *  worker'ın gönderdiği gövdenin AYNISI elle atıldı:
-         *
-         *      POST https://fal.run/fal-ai/idm-vton   →  HTTP 422
-         *      {"detail":[{"loc":["body","description"],
-         *                  "msg":"Field required","type":"missing"}]}
-         *
-         *  Yani `description` şemada ZORUNLU ve biz hiç göndermiyorduk.
-         *
-         * ⚠️ HİÇBİR TESTİN GÖREMEYECEĞİ BİR ARIZAYDI: birim testlerde `fetch`
-         *    sahtelenir, sahte uç gövdeyi doğrulamaz. Sağlayıcı şemasını
-         *    yalnızca GERÇEK uç doğrular ve ona hiç istek atılmamıştı.
-         *
-         * ⚠️ METİN KATEGORİDEN TÜRETİLİYOR, ürün başlığından DEĞİL. İki sebep:
-         *    (1) `TryOnRequest` ürün metnini taşımıyor ve onu eklemek sözleşmeyi
-         *        sağlayıcıya özel bir alanla kirletirdi;
-         *    (2) ürün başlıkları Türkçe ("Keten Oversize Gömlek") ve model
-         *        istemi İngilizce okuyor — çeviri borcu doğururdu. Kategori
-         *        eşlemesi zaten var ve deterministtir.
-         */
-        description: FAL_DESCRIPTION[request.category],
-        // QUALITY modda daha çok adım: kalite/latency kaldıracı burada.
-        num_inference_steps: request.mode === 'QUALITY' ? 40 : 20,
-      },
-    });
+    const json = await this.kuyrukIleUret(request, startedAt);
+
 
     const reportedCost = readReportedCostMicroUsd(json);
     const estimatedCost = falTryOnEstimate(this.config.model);
@@ -235,6 +241,119 @@ export class FalTryOnProvider implements TryOnProvider {
       model: this.config.model,
       ...meteringFields(metering),
     };
+  }
+
+
+  /**
+   * KUYRUĞA GÖNDER → DURUMU YOKLA → SONUCU AL.
+   *
+   * ⚠️ ÜÇ AYRI HTTP İSTEĞİ ama TEK mantıksal çağrı. Dönen değer, senkron ucun
+   *    döndürdüğü gövdenin AYNISIDIR — bu yüzden `call()`un geri kalanı
+   *    (NSFW bayrağı, görsel çıkarma, maliyet ölçümü) hiç değişmedi.
+   */
+  private async kuyrukIleUret(request: TryOnRequest, startedAt: number): Promise<unknown> {
+    const bitis = startedAt + TRYON.timeoutMs[request.mode] - KUYRUK_GUVENLIK_PAYI_MS;
+
+    // ── 1) Gönder ────────────────────────────────────────────────────────
+    const { json: gonderim } = await requestJson({
+      url: `${this.queueBaseUrl}/${this.config.model}`,
+      provider: this.name,
+      fetchImpl: this.fetchImpl,
+      headers: {
+        // fal şeması: "Key <anahtar>" — "Bearer" DEĞİL.
+        Authorization: `Key ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        // Sağlayıcı tarafında tekilleştirme için gönderilir. fal bunu
+        // belgelemiyor; yok sayarsa zararsızdır, dikkate alırsa retry'da
+        // ikinci üretimi engeller. Bu yüzden retry sayısı yine de düşük tutulur.
+        'X-Idempotency-Key': request.idempotencyKey,
+      },
+      body: {
+        human_image_url: request.personImageUrl,
+        garment_image_url: request.garmentImageUrl,
+        category: FAL_CATEGORY[request.category],
+        /**
+         * ⚠️ ZORUNLU ALAN — YOKLUĞU ÜRETİMDE HER DENEMEYİ DÜŞÜRÜYORDU.
+         *
+         *  Canlıda ölçüldü (2026-08-14): iş worker'a ulaşıyor, fal'a gidiyor
+         *  ve 4,6 saniyede `TRYON_PROVIDER_ERROR` ile düşüyordu. Sağlayıcıya
+         *  worker'ın gönderdiği gövdenin AYNISI elle atıldı:
+         *
+         *      POST https://fal.run/fal-ai/idm-vton   →  HTTP 422
+         *      {"detail":[{"loc":["body","description"],
+         *                  "msg":"Field required","type":"missing"}]}
+         *
+         *  Yani `description` şemada ZORUNLU ve biz hiç göndermiyorduk.
+         *
+         * ⚠️ HİÇBİR TESTİN GÖREMEYECEĞİ BİR ARIZAYDI: birim testlerde `fetch`
+         *    sahtelenir, sahte uç gövdeyi doğrulamaz. Sağlayıcı şemasını
+         *    yalnızca GERÇEK uç doğrular ve ona hiç istek atılmamıştı.
+         *
+         * ⚠️ METİN KATEGORİDEN TÜRETİLİYOR, ürün başlığından DEĞİL. İki sebep:
+         *    (1) `TryOnRequest` ürün metnini taşımıyor ve onu eklemek sözleşmeyi
+         *        sağlayıcıya özel bir alanla kirletirdi;
+         *    (2) ürün başlıkları Türkçe ("Keten Oversize Gömlek") ve model
+         *        istemi İngilizce okuyor — çeviri borcu doğururdu. Kategori
+         *        eşlemesi zaten var ve deterministtir.
+         */
+        description: FAL_DESCRIPTION[request.category],
+        // QUALITY modda daha çok adım: kalite/latency kaldıracı burada.
+        num_inference_steps: request.mode === 'QUALITY' ? 40 : 20,
+      },
+    });
+
+    /**
+     * ⚠️ KUYRUK ADRESLERİ YOKSA GÖVDE ZATEN SONUÇTUR. fal bazı modellerde
+     *    (ve senkron uçta) doğrudan sonucu döndürüyor. Burada körü körüne
+     *    yoklamaya girsek, hazır sonucu elimizde tutarken sonsuza kadar
+     *    "durum" arardık.
+     */
+    const durumAdresi = readString(gonderim, 'status_url');
+    const sonucAdresi = readString(gonderim, 'response_url');
+    if (!durumAdresi || !sonucAdresi) return gonderim;
+
+    // ── 2) Yokla ─────────────────────────────────────────────────────────
+    for (;;) {
+      if (this.now() >= bitis) {
+        // ⚠️ KENDİ ZAMAN AŞIMIMIZ. Dış sarmalayıcı iptal sinyalini bize
+        //    geçirmiyor; durmazsak arka planda yoklamaya devam ederdik.
+        throw new AiHttpError(408, this.name, `kuyruk beklemesi aşıldı: ${this.config.model}`);
+      }
+
+      await bekle(KUYRUK_YOKLAMA_ARALIGI_MS);
+
+      const { json: durum } = await requestJson({
+        url: durumAdresi,
+        method: 'GET',
+        provider: this.name,
+        fetchImpl: this.fetchImpl,
+        headers: { Authorization: `Key ${this.config.apiKey}` },
+      });
+
+      const asama = readString(durum, 'status');
+      if (asama === 'COMPLETED') break;
+
+      /**
+       * ⚠️ IN_QUEUE ve IN_PROGRESS DIŞINDAKİ HER ŞEY HATADIR. Bilinmeyen bir
+       *    aşamada beklemeye devam etmek, bütçeyi boşa yakıp sonunda
+       *    anlaşılmaz bir zaman aşımı üretirdi. Adı geçen aşamayı hataya
+       *    yazıyoruz ki sınıflandırıcı ve log bir şey görsün.
+       */
+      if (asama !== 'IN_QUEUE' && asama !== 'IN_PROGRESS') {
+        throw new AiHttpError(502, this.name, `beklenmeyen kuyruk durumu: ${asama ?? 'yok'}`);
+      }
+    }
+
+    // ── 3) Sonucu al ─────────────────────────────────────────────────────
+    const { json: sonuc } = await requestJson({
+      url: sonucAdresi,
+      method: 'GET',
+      provider: this.name,
+      fetchImpl: this.fetchImpl,
+      headers: { Authorization: `Key ${this.config.apiKey}` },
+    });
+
+    return sonuc;
   }
 
   /**
@@ -329,3 +448,11 @@ export function falTryOnProviderFromEnv(overrides: Partial<FalTryOnConfig> = {})
 // NOT: görsel indirme hatası burada özel olarak yakalanmaz; `downloadBinary`
 // fırlatır, `classifyTryOnError` onu GEÇİCİ hata sayar ve zincir yedek
 // sağlayıcıya geçer. Üretim ücreti bu durumda da kaydedilir.
+
+/**
+ * ⚠️ `setTimeout` DOĞRUDAN KULLANILMIYOR, sarmalanıyor: yoklama döngüsünde
+ *    testlerin sahte saatle ilerleyebilmesi için tek bir yerde durması gerek.
+ */
+function bekle(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -229,7 +229,18 @@ export const TRYON = {
    *     üretim iki kez ödenir. (bkz. tryon.processor.ts → new Worker)
    * ═══════════════════════════════════════════════════════════════════════
    */
-  timeoutMs: { FAST: 60_000, QUALITY: 120_000 },
+  /**
+   * ⚠️ KUYRUK UCUNA GEÇİLDİKTEN SONRA YENİDEN BÜYÜTÜLDÜ (60→120 / 120→240).
+   *
+   *    Bu bütçe artık YALNIZCA üretimi değil, KUYRUKTA BEKLEMEYİ de kapsıyor.
+   *    fal soğuk başlangıçta modeli yüklerken istek kuyrukta bekliyor ve bu
+   *    süre üretime ekleniyor. Düşük trafikte soğuk başlangıç kuraldır.
+   *
+   *    Uzun bütçenin bedeli yok: iş BullMQ kuyruğunda, tarayıcı yokluyor,
+   *    bağlantı tutulmuyor. Kısa bütçenin bedeli ise ölçüldü — ödenmiş ama
+   *    alınmamış üretim.
+   */
+  timeoutMs: { FAST: 120_000, QUALITY: 240_000 },
   /** Kuyruk önceliği — küçük sayı önce işlenir. */
   priority: { QUALITY: 1, FAST: 5, GUEST: 10 },
   maxAttempts: 3,
