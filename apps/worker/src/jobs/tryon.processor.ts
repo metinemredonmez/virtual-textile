@@ -382,8 +382,36 @@ export class TryOnProcessor implements OnModuleInit, OnModuleDestroy {
       errorCode,
     });
 
+    /**
+     * ⚠️ ZİNCİRİN TAMAMI LOGLANIR, YALNIZCA SON DENEME DEĞİL.
+     *
+     *    `chain.attempted` alanının kendi yorumu "gözlemlenebilirlik için"
+     *    diyordu — ama HİÇBİR YERDE OKUNMUYORDU. Log da, veritabanı da,
+     *    kullanım defteri de yalnızca `attempted.at(-1)`i yazıyordu.
+     *
+     *    Canlıda bunun bedeli şuydu: iş `provider=gemini` ve
+     *    `QUOTA_EXCEEDED` ile düşüyordu. Ama zincir önce FAL'ı denemişti ve
+     *    fal'ın NEDEN düştüğü hiçbir yere yazılmadığı için görünmüyordu —
+     *    yirmi dakika önce aynı sağlayıcı başarıyla üretim yapmışken.
+     *    "Son denemeyi logla" tasarımı, tam da fallback zincirinin en çok
+     *    açıklama gerektirdiği anda susuyor.
+     *
+     * ⚠️ `err` AYRI TUTULUYOR: istisna varsa yığın izi lazım, ama zincir
+     *    istisnasız da başarısız olabilir (her sağlayıcı düzgün bir `reason`
+     *    döndürür). O durumda `err` boş, `zincir` dolu olur.
+     */
     this.logger.warn(
-      { tryOnJobId: data.tryOnJobId, reason, permanent, err: error },
+      {
+        tryOnJobId: data.tryOnJobId,
+        reason,
+        permanent,
+        zincir: chain?.attempted.map((deneme) => ({
+          saglayici: deneme.provider,
+          sebep: deneme.reason ?? 'başarılı',
+          ms: deneme.latencyMs,
+        })),
+        err: error,
+      },
       'Sanal deneme başarısız — kullanıcı kotası iade edildi',
     );
 
