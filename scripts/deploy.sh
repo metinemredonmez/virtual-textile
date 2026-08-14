@@ -120,8 +120,16 @@ web_baslat_veya_yukle() {
       hata "vt-web YANLIŞ APP_URL ile çalışıyor — CSRF her POST'u reddeder."
       hata "    dosyada : $beklenen"
       hata "    süreçte : $goruluyor"
-      hata "Kabukta kirli bir APP_URL var. PM2 daemon'ı da miras almış olabilir:"
-      hata "    pm2 delete vt-web && pm2 kill && ./scripts/deploy.sh"
+      hata "Kirlilik KABUKTA DEĞİL, PM2 DAEMON'ında. Çözüm:"
+      hata "    cd $KOK && git pull    # ecosystem.config.cjs değeri AÇIKÇA verir"
+      hata "    pm2 delete vt-web && ./scripts/deploy.sh"
+      hata ""
+      # ⚠️ BU SATIR BİR DÜZELTMEDİR. Burada eskiden `pm2 kill` yazıyordu ve
+      #    O TAVSİYE YANLIŞTI: daemon'ı öldürmek bu makinedeki DİĞER ÜÇ
+      #    PROJEYİ (celine-*, od-*) de düşürür. Bir kez yapıldı ve komşu
+      #    projeler gitti; `pm2 resurrect` ile geri getirildi.
+      hata "⚠️ 'pm2 kill' KULLANMA — bu makinede üç proje daha var, hepsi düşer."
+      hata "   'pm2 delete vt-web' yalnız bizim süreci kaldırır, komşulara dokunmaz."
       exit 1
     fi
     bilgi "vt-web APP_URL doğrulandı: ${goruluyor:-$beklenen}"

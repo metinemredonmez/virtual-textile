@@ -39,6 +39,77 @@
 const API_ENV_DOSYASI = '--env-file=/etc/virtual-textile/api.env';
 
 /**
+ * ⚠️ WEB ORTAMI PM2'YE AÇIKÇA VERİLİR — VE BU CANLIDA ÖLÇÜLEREK EKLENDİ.
+ *
+ *  Yaşanan: kullanıcı doğru şifreyle giriş denedi, "Bu işlem için yetkiniz
+ *  yok" (403) gördü. Dağıtımın doğrulaması sebebi yakaladı:
+ *
+ *      dosyada : http://91.99.183.64
+ *      süreçte : http://91.99.183.64:3000
+ *
+ *  ⚠️ KİRLİLİK KABUKTA DEĞİL, PM2 DAEMON'INDAYDI. `deploy.sh` çağrıyı
+ *     `env -u APP_URL …` ile temizliyor; ama süreci açan şey kabuk değil
+ *     DAEMON ve o, ilk başlatıldığı günden kalma `APP_URL=…:3000` değerini
+ *     taşıyor. Temizlik yanlış yeri temizliyordu.
+ *
+ *  ⚠️ VE NEXT BUNU DÜZELTEMEZ: `.env.production` var olan `process.env`
+ *     ÜZERİNE YAZMAZ (belgelenmiş, bilinçli davranış). Yani daemon bir kez
+ *     kirli değer enjekte ettiğinde dosyadaki doğru değer hiç okunmaz.
+ *
+ *  ÇÖZÜM: değerleri PM2'ye AÇIKÇA veriyoruz. `env_production` bloğu sürece
+ *  doğrudan yazılır ve daemon'dan gelen mirası EZER. Süreç artık daemon'ın
+ *  geçmişinden bağımsız.
+ *
+ *  ⚠️ DEĞER YİNE TEK KAYNAKTAN: `apps/web/.env.production` (o da
+ *     `/etc/virtual-textile/web.env`e simgesel bağ). Buraya elle yazmak
+ *     ikinci bir kaynak açardı ve ikisi ayrıştığında hangisinin kazandığı
+ *     belirsiz olurdu.
+ *
+ *  ⚠️ `pm2 kill` ALTERNATİFİ DEĞERLENDİRİLDİ VE REDDEDİLDİ: daemon'ı
+ *     öldürmek bu makinedeki DİĞER ÜÇ PROJEYİ de düşürür (celine-*, od-*).
+ *     Bir kez yapıldı ve komşu projeler gitti. Süreci kendi kendine yeter
+ *     hâle getirmek, daemon'a dokunmadan aynı sonucu veriyor.
+ */
+const fs = require('node:fs');
+
+/** Kabuktan/daemon'dan MİRAS ALINMAMASI gereken web değişkenleri. */
+const WEB_MIRAS_ALINMAZ = [
+  'APP_URL',
+  'API_URL',
+  'SESSION_REDIS_URL',
+  'SESSION_SECRET',
+  'NEXT_PUBLIC_MEDIA_URL',
+];
+
+function webOrtami() {
+  const yol = '/var/www/virtual/apps/web/.env.production';
+  const ortam = { NODE_ENV: 'production' };
+
+  let ham;
+  try {
+    ham = fs.readFileSync(yol, 'utf8');
+  } catch {
+    /**
+     * ⚠️ SESSİZCE GEÇİLİYOR VE SEBEBİ VAR: bu dosya YEREL geliştirmede yok
+     *    (ecosystem yalnız sunucuda kullanılıyor ama `require` edilebiliyor —
+     *    testler ve `node -e` ile okunuyor). Sunucuda dosya gerçekten yoksa
+     *    `deploy.sh` 7. adımda zaten durduruyor: "apps/web/.env.production
+     *    yok. Bir kez kurun: ln -sfn …".
+     */
+    return ortam;
+  }
+
+  for (const satir of ham.split(/\r?\n/)) {
+    const eslesme = /^([A-Z0-9_]+)=(.*)$/.exec(satir.trim());
+    if (!eslesme) continue;
+    const [, anahtar, ham2] = eslesme;
+    if (!WEB_MIRAS_ALINMAZ.includes(anahtar)) continue;
+    ortam[anahtar] = ham2.trim().replace(/^["']|["']$/g, '');
+  }
+  return ortam;
+}
+
+/**
  * ⚠️ BU SUNUCU ÜRETİM DEĞİL, STAGING. VE BU BİLİNÇLİ BİR İLANDIR.
  *
  *    `@vt/config` → `env.ts`, `NODE_ENV=production` altında şunları ZORUNLU
@@ -271,7 +342,12 @@ module.exports = {
       merge_logs: true,
       time: true, // Next pino kullanmıyor; zaman damgasını PM2 basar
 
-      env_production: { NODE_ENV: 'production' },
+      /**
+       * ⚠️ AÇIKÇA VERİLİYOR, MİRASA BIRAKILMIYOR — gerekçe `webOrtami()`
+       *    başlığında: PM2 daemon'ı kirli bir `APP_URL` taşıyordu ve Next
+       *    `.env.production`u onun üzerine YAZMADIĞI için her POST 403 oldu.
+       */
+      env_production: webOrtami(),
     },
   ],
 };
