@@ -72,7 +72,26 @@ export const envSchema = z
 
     // ── AI sağlayıcıları ──────────────────────────────────────────────
     FAL_KEY: z.string().default(''),
-    FAL_TRYON_MODEL: z.string().default('fal-ai/idm-vton'),
+    /**
+     * ⚠️ VARSAYILAN `fashn/tryon/v1.6` — `idm-vton` DEĞİL. Ölçümle değişti
+     *    (14 Ağustos 2026):
+     *
+     *      · idm-vton SICAKKEN uçtan uca 3 sn — model hızlı
+     *      · ama SOĞUKKEN 25-127 sn, ve üretimde neredeyse hep soğuk
+     *      · sebep: idm-vton 2024 tarihli akademik bir model, trafiği düşük,
+     *        bu yüzden sağlayıcı onu bellekte tutmuyor
+     *
+     *    fashn ticari ve yoğun kullanılıyor; sıcaklığı BAŞKALARININ trafiği
+     *    sağlıyor. Üstelik görsel başı 0,075 $ (idm-vton 0,11 $) ve bağımsız
+     *    değerlendirmede desen/logo sadakati daha iyi — pazaryerinde satan şey
+     *    tam olarak bu.
+     *
+     * ⚠️ MODEL DEĞİŞTİRİLİRSE İSTEK GÖVDESİ DE DEĞİŞİR. Şema modele göre
+     *    kuruluyor (`packages/adapters/src/ai/fal.ts` → `falIstekGovdesi`).
+     *    Tabloda karşılığı olmayan bir model adı yazılırsa idm-vton şeması
+     *    gönderilir ve büyük olasılıkla 422 alınır.
+     */
+    FAL_TRYON_MODEL: z.string().default('fal-ai/fashn/tryon/v1.6'),
     GOOGLE_AI_API_KEY: z.string().default(''),
     GOOGLE_AI_IMAGE_MODEL: z.string().default('gemini-2.5-flash-image'),
     ANTHROPIC_API_KEY: z.string().default(''),

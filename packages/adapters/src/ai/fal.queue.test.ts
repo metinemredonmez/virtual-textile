@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FalTryOnProvider } from './fal.js';
+import { FalTryOnProvider, falIstekGovdesi } from './fal.js';
 import type { TryOnRequest } from './tryon.provider.js';
 
 /**
@@ -198,5 +198,59 @@ describe('FalTryOnProvider — kuyruk akışı', () => {
       garment_image_url: ISTEK.garmentImageUrl,
     });
     expect((gonderilen as Record<string, unknown>)['description']).toBeTruthy();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  MODEL BAZLI İSTEK GÖVDESİ.
+ *
+ *  ⚠️ HER MODELİN ŞEMASI FARKLI. Bu depo bunu bir kez pahalıya öğrendi:
+ *     `idm-vton`'un zorunlu `description` alanı gönderilmiyordu ve HER üretim
+ *     HTTP 422 ile düşüyordu. Birim testlerde `fetch` sahtelendiği için sahte
+ *     uç gövdeyi doğrulamıyordu — arıza yalnızca gerçek uçta görülebilirdi.
+ *
+ *  Bu testler o sınıfı kapatmıyor (gerçek şemayı ancak gerçek uç doğrular)
+ *  ama BİLDİĞİMİZ şemaların bozulmasını engelliyor.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('falIstekGovdesi — model bazlı şema', () => {
+  it('⚠️ fashn ile idm-vton ALAN ADLARI FARKLI — karıştırmak 422 üretir', () => {
+    const fashn = falIstekGovdesi('fal-ai/fashn/tryon/v1.6', ISTEK);
+    const idm = falIstekGovdesi('fal-ai/idm-vton', ISTEK);
+
+    expect(fashn['model_image']).toBe(ISTEK.personImageUrl);
+    expect(fashn['garment_image']).toBe(ISTEK.garmentImageUrl);
+    expect(fashn['human_image_url']).toBeUndefined();
+
+    expect(idm['human_image_url']).toBe(ISTEK.personImageUrl);
+    expect(idm['garment_image_url']).toBe(ISTEK.garmentImageUrl);
+    expect(idm['model_image']).toBeUndefined();
+  });
+
+  it('⚠️ KATEGORİ SÖZLÜĞÜ DE FARKLI — idm-vton adları fashn’de geçersiz', () => {
+    expect(falIstekGovdesi('fal-ai/fashn/tryon/v1.6', ISTEK)['category']).toBe('one-pieces');
+    expect(falIstekGovdesi('fal-ai/idm-vton', ISTEK)['category']).toBe('dresses');
+  });
+
+  it('idm-vton gövdesi `description` taşır — yokluğu her üretimi düşürüyordu', () => {
+    expect(falIstekGovdesi('fal-ai/idm-vton', ISTEK)['description']).toBeTruthy();
+  });
+
+  it('FAST → performance, QUALITY → quality', () => {
+    expect(falIstekGovdesi('fal-ai/fashn/tryon/v1.6', ISTEK)['mode']).toBe('performance');
+    expect(
+      falIstekGovdesi('fal-ai/fashn/tryon/v1.6', { ...ISTEK, mode: 'QUALITY' })['mode'],
+    ).toBe('quality');
+  });
+
+  it('⚠️ ÖNEK EŞLEŞMESİ — yeni sürüm sessizce varsayılana DÜŞMEZ', () => {
+    // Tam eşitlik yazılsaydı v1.7 çıktığında fashn gövdesi yerine idm-vton
+    // gövdesi gider ve her üretim 422 olurdu.
+    expect(falIstekGovdesi('fal-ai/fashn/tryon/v9.9', ISTEK)['model_image']).toBeTruthy();
+  });
+
+  it('bilinmeyen model idm-vton şemasına düşer — sessiz yanlış gövde değil', () => {
+    expect(falIstekGovdesi('fal-ai/bilinmeyen-model', ISTEK)['human_image_url']).toBeTruthy();
   });
 });

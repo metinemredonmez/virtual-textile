@@ -132,6 +132,97 @@ const FAL_DESCRIPTION: Record<TryOnGarmentCategory, string> = {
   OUTERWEAR: 'an outer layer garment worn over other clothing',
 };
 
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  MODEL BAZLI İSTEK GÖVDESİ.
+ *
+ *  ⚠️ HER MODELİN ŞEMASI FARKLI ve tek bir gövdeyi hepsine göndermek 422
+ *     üretir. Bu depo o hatayı bir kez yaşadı: `idm-vton`'un zorunlu
+ *     `description` alanı gönderilmiyordu ve HER üretim düşüyordu.
+ *
+ *  ⚠️ NEDEN KAYIT TABLOSU (registry): model adı bir ORTAM DEĞİŞKENİ
+ *     (`FAL_TRYON_MODEL`). Yani hangi şemanın kullanılacağı derleme zamanında
+ *     bilinmiyor. `if (model === '…')` diye dağıtılmış kontroller yerine tek
+ *     bir tablo: yeni model eklemek TEK GİRDİ, ve eşleşmeyen bir model adı
+ *     sessizce yanlış gövde göndermek yerine belirgin biçimde varsayılana
+ *     düşüyor.
+ *
+ *  ÖLÇÜM (14 Ağustos 2026, sunucudan): model SICAKKEN uçtan uca giydirme
+ *  **3 saniye**. Soğukken 25-127 saniye. Yani gecikmenin tamamı soğuk
+ *  başlangıç; çözüm, başkalarının trafiğiyle sürekli sıcak kalan popüler bir
+ *  modele geçmek.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** `fashn` ailesi kendi kategori adlarını kullanıyor — idm-vton'unkiler 422 verir. */
+const FASHN_CATEGORY: Readonly<Record<TryOnGarmentCategory, string>> = {
+  UPPER_BODY: 'tops',
+  LOWER_BODY: 'bottoms',
+  DRESS: 'one-pieces',
+  // ⚠️ Dış giyim de üst beden: fashn'de ayrı bir 'outerwear' değeri YOK.
+  OUTERWEAR: 'tops',
+};
+
+/**
+ * ⚠️ MOD EŞLEMESİ HIZ/KALİTE KALDIRACIDIR. fashn üç mod sunuyor; bizim iki
+ *    modumuz var. FAST → `performance` (en hızlı), QUALITY → `quality`.
+ *    `balanced` bilinçli olarak kullanılmıyor: iki mod arasında üçüncü bir
+ *    orta nokta, kullanıcıya anlatılamayan bir ayrım üretirdi.
+ */
+const FASHN_MODE: Readonly<Record<'FAST' | 'QUALITY', string>> = {
+  FAST: 'performance',
+  QUALITY: 'quality',
+};
+
+type IstekGovdesi = Record<string, unknown>;
+
+function idmVtonGovdesi(request: TryOnRequest): IstekGovdesi {
+  return {
+    human_image_url: request.personImageUrl,
+    garment_image_url: request.garmentImageUrl,
+    category: FAL_CATEGORY[request.category],
+    /**
+     * ⚠️ ZORUNLU ALAN — YOKLUĞU ÜRETİMDE HER DENEMEYİ DÜŞÜRÜYORDU.
+     *    Ölçüldü: POST https://fal.run/fal-ai/idm-vton → HTTP 422
+     *    {"detail":[{"loc":["body","description"],"msg":"Field required"}]}
+     *    Birim testlerde `fetch` sahtelenir ve sahte uç gövdeyi doğrulamaz;
+     *    bu arıza yalnızca GERÇEK uç tarafından görülebilirdi.
+     */
+    description: FAL_DESCRIPTION[request.category],
+    num_inference_steps: request.mode === 'QUALITY' ? 40 : 20,
+  };
+}
+
+function fashnGovdesi(request: TryOnRequest): IstekGovdesi {
+  return {
+    model_image: request.personImageUrl,
+    garment_image: request.garmentImageUrl,
+    category: FASHN_CATEGORY[request.category],
+    mode: FASHN_MODE[request.mode],
+  };
+}
+
+/**
+ * ⚠️ EŞLEŞME ÖNEKLE YAPILIYOR, TAM EŞİTLİKLE DEĞİL. Model kimlikleri sürüm
+ *    taşıyor (`fal-ai/fashn/tryon/v1.6`); tam eşitlik yazılsaydı her yeni
+ *    sürümde burası sessizce varsayılana düşer ve yanlış gövde giderdi.
+ */
+const GOVDE_KURUCULARI: ReadonlyArray<{
+  onek: string;
+  kur: (request: TryOnRequest) => IstekGovdesi;
+}> = [
+  { onek: 'fal-ai/fashn/', kur: fashnGovdesi },
+  { onek: 'fal-ai/idm-vton', kur: idmVtonGovdesi },
+];
+
+export function falIstekGovdesi(model: string, request: TryOnRequest): IstekGovdesi {
+  const kurucu = GOVDE_KURUCULARI.find((k) => model.startsWith(k.onek));
+  // ⚠️ Bilinmeyen model → idm-vton şeması. Sessiz yanlış gövde göndermektense
+  //    bilinen bir şemayla denemek; hata 422 olarak AÇIKÇA görünür.
+  return (kurucu?.kur ?? idmVtonGovdesi)(request);
+}
+
 export class FalTryOnProvider implements TryOnProvider {
   readonly name = 'fal';
 
@@ -268,38 +359,9 @@ export class FalTryOnProvider implements TryOnProvider {
         // ikinci üretimi engeller. Bu yüzden retry sayısı yine de düşük tutulur.
         'X-Idempotency-Key': request.idempotencyKey,
       },
-      body: {
-        human_image_url: request.personImageUrl,
-        garment_image_url: request.garmentImageUrl,
-        category: FAL_CATEGORY[request.category],
-        /**
-         * ⚠️ ZORUNLU ALAN — YOKLUĞU ÜRETİMDE HER DENEMEYİ DÜŞÜRÜYORDU.
-         *
-         *  Canlıda ölçüldü (2026-08-14): iş worker'a ulaşıyor, fal'a gidiyor
-         *  ve 4,6 saniyede `TRYON_PROVIDER_ERROR` ile düşüyordu. Sağlayıcıya
-         *  worker'ın gönderdiği gövdenin AYNISI elle atıldı:
-         *
-         *      POST https://fal.run/fal-ai/idm-vton   →  HTTP 422
-         *      {"detail":[{"loc":["body","description"],
-         *                  "msg":"Field required","type":"missing"}]}
-         *
-         *  Yani `description` şemada ZORUNLU ve biz hiç göndermiyorduk.
-         *
-         * ⚠️ HİÇBİR TESTİN GÖREMEYECEĞİ BİR ARIZAYDI: birim testlerde `fetch`
-         *    sahtelenir, sahte uç gövdeyi doğrulamaz. Sağlayıcı şemasını
-         *    yalnızca GERÇEK uç doğrular ve ona hiç istek atılmamıştı.
-         *
-         * ⚠️ METİN KATEGORİDEN TÜRETİLİYOR, ürün başlığından DEĞİL. İki sebep:
-         *    (1) `TryOnRequest` ürün metnini taşımıyor ve onu eklemek sözleşmeyi
-         *        sağlayıcıya özel bir alanla kirletirdi;
-         *    (2) ürün başlıkları Türkçe ("Keten Oversize Gömlek") ve model
-         *        istemi İngilizce okuyor — çeviri borcu doğururdu. Kategori
-         *        eşlemesi zaten var ve deterministtir.
-         */
-        description: FAL_DESCRIPTION[request.category],
-        // QUALITY modda daha çok adım: kalite/latency kaldıracı burada.
-        num_inference_steps: request.mode === 'QUALITY' ? 40 : 20,
-      },
+      // ⚠️ GÖVDE MODELE GÖRE KURULUR — bkz. `falIstekGovdesi`. Tek bir gövdeyi
+      //    her modele göndermek 422 üretir; bu depo o hatayı bir kez yaşadı.
+      body: falIstekGovdesi(this.config.model, request),
     });
 
     /**

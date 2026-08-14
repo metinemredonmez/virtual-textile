@@ -83,7 +83,19 @@ const GOOGLE_DEFAULT_PRICE: TokenPriceNanoUsd = { input: 300n, output: 30_000n }
 
 /** fal.ai model başına üretim ücreti (mikro-dolar). */
 export const FAL_TRYON_UNIT_COST_MICRO_USD: Readonly<Record<string, bigint>> = {
-  'fal-ai/idm-vton': 60_000n,
+  /**
+   * ⚠️ VARSAYILAN MODEL. 0,075 $ — fal'ın model sayfasında ilan edilen ücret.
+   *    idm-vton'un 0,11 $'ından %32 ucuz.
+   */
+  'fal-ai/fashn/tryon/v1.6': 75_000n,
+  /**
+   * ⚠️ 60_000 YANLIŞTI, GERÇEK 110_000. Ölçüldü (14 Ağustos 2026): fal'ın
+   *    model sayfası çağrı başına 0,11 $ diyor, defterimiz 0,06 $ yazıyordu.
+   *    fal senkron uçta maliyet bildirmediği için bu TAHMİN doğrudan deftere
+   *    giriyor — yani günlük bütçe freni (AI_DAILY_BUDGET_USD) yaklaşık %45
+   *    GEÇ çalışıyordu. Tavanı aştığımızı ancak fatura gelince görürdük.
+   */
+  'fal-ai/idm-vton': 110_000n,
   'fal-ai/cat-vton': 40_000n,
   'fal-ai/leffa/virtual-tryon': 40_000n,
 };
