@@ -14,6 +14,7 @@ import {
   type TryOnFailureReason,
   type TryOnGarmentCategory,
   type TryOnProvider,
+  visibilityForKey,
 } from '@vt/adapters';
 import { CONCURRENCY, QUEUE, type TryOnJobData } from '../queues.js';
 
@@ -104,9 +105,32 @@ export class SignedUrlIssuer implements ProviderInputUrlIssuer {
     const ttl = SIGNED_URL_TTL_SECONDS.aiProviderInput;
     const nonce = randomUUID();
 
+    /**
+     * ⚠️ GÖRÜNÜRLÜK ANAHTARDAN TÜRETİLİR — SABİT `'private'` YAZILAMAZ.
+     *
+     *  Burada `visibility: 'private'` sabitti ve HER SANAL DENEMEYİ
+     *  DÜŞÜRÜYORDU. Bu fonksiyon İKİ anahtar için çağrılıyor:
+     *
+     *      kullanıcı fotoğrafı  user-photos/…      → private  ✓
+     *      ÜRÜN GÖRSELİ         products/…         → PUBLIC   ✗
+     *
+     *  `assertVisibilityMatchesKey` public bir anahtar için private istendiğinde
+     *  ATIYOR ("kova karışması engellendi") — ve bu koruma DOĞRU, hata çağıran
+     *  taraftaydı. Sonuç: iş sağlayıcıya HİÇ ULAŞMADAN düşüyordu.
+     *
+     *  ⚠️ VERİTABANI BUNU SÖYLÜYORDU AMA OKUNMASI GEREKİYORDU:
+     *         status=FAILED · provider=NULL · latencyMs=NULL
+     *     `provider` boşsa hiçbir sağlayıcı çağrılmamıştır; hata sağlayıcıda
+     *     değil ÖNCESİNDEDİR. `TRYON_PROVIDER_ERROR` kodu yanıltıcıydı.
+     *
+     * ⚠️ İMZALI URL PUBLIC KOVA İÇİN DE DOĞRU TERCİH: alternatif `publicUrl()`
+     *    ve o r2.dev adresini üretiyor — ölçüldü, r2.dev 8 istekte 8 zaman
+     *    aşımı veriyor (bkz. media-public.controller.ts). fal.ai o adresten
+     *    görseli çekemezdi. İmzalı S3 adresi hem erişilebilir hem süreli.
+     */
     const url = await this.storage.signedUrl({
       key,
-      visibility: 'private',
+      visibility: visibilityForKey(key),
       operation: 'get',
       expiresInSeconds: ttl,
     });

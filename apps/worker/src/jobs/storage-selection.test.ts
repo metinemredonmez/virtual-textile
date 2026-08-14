@@ -163,3 +163,54 @@ describe('depo durumu sözleşmesi', () => {
     expect(real.name).not.toBe(fake.name);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  İMZALI GİRDİ URL'İ — GÖRÜNÜRLÜK ANAHTARDAN TÜRETİLİR.
+ *
+ *  ⚠️ CANLI ARIZADAN DOĞDU (2026-08-14). `SignedUrlIssuer` her anahtar için
+ *     `visibility: 'private'` yazıyordu. Ama iki farklı anahtar için
+ *     çağrılıyor:
+ *
+ *         kullanıcı fotoğrafı  user-photos/…  → private  ✓
+ *         ÜRÜN GÖRSELİ         products/…     → PUBLIC   ✗
+ *
+ *     `assertVisibilityMatchesKey` public anahtara private istendiğinde ATIYOR
+ *     ("kova karışması engellendi") — koruma DOĞRU, hata çağırandaydı.
+ *     Sonuç: HER sanal deneme sağlayıcıya ULAŞMADAN düştü.
+ *
+ *  ⚠️ VERİTABANI SÖYLÜYORDU: `provider=NULL · latencyMs=NULL`. Sağlayıcı adı
+ *     boşsa hiçbir sağlayıcı çağrılmamıştır — hata ondan ÖNCEDEDİR. Kod
+ *     `TRYON_PROVIDER_ERROR` yazdığı için günlerce sağlayıcıda arandı.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe('SignedUrlIssuer — kova seçimi', () => {
+  async function istenenGorunurluk(key: string): Promise<string> {
+    const { SignedUrlIssuer } = await import('./tryon.processor.js');
+    let istenen = '';
+
+    const storage = {
+      signedUrl: async (input: { key: string; visibility: string }) => {
+        istenen = input.visibility;
+        return `https://ornek/${input.key}`;
+      },
+    } as never;
+    const redis = { set: async () => 'OK', del: async () => 1 } as never;
+
+    await new SignedUrlIssuer(storage, redis).issue(key);
+    return istenen;
+  }
+
+  it('kullanıcı fotoğrafı PRIVATE kovadan istenir', async () => {
+    expect(await istenenGorunurluk('user-photos/kullanici-1/foto-1')).toBe('private');
+  });
+
+  it('⚠️ ÜRÜN GÖRSELİ PUBLIC kovadan istenir — sabit private HER DENEMEYİ DÜŞÜRÜYORDU', async () => {
+    // Mutasyon: `visibilityForKey(key)` yerine `'private'` yazılınca kırılır.
+    expect(await istenenGorunurluk('products/urun-1/gorsel-1/original')).toBe('public');
+  });
+
+  it('try-on sonucu PRIVATE — sonuç görseli herkese açılmaz', async () => {
+    expect(await istenenGorunurluk('tryon/is-1.webp')).toBe('private');
+  });
+});
