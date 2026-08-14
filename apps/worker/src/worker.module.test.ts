@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import type { Env } from '@vt/config';
+import { TryOnDispatchHandler } from './jobs/tryon.dispatch.js';
 
 /**
  * ═══════════════ BAĞLANTI DUMAN TESTİ — worker.module ═══════════════
@@ -162,12 +163,38 @@ describe('WorkerModule kablolaması — domain olay dağıtıcısı', () => {
     expect(handlers.wardrobe).toBeInstanceOf(WardrobeAutoAddHandler);
   });
 
-  it('bildirim işleyicisi de aynı dağıtıcının arkasında — ikisi de kabloda', () => {
+  /**
+   * ⚠️ SANAL DENEME İŞLEYİCİSİ — BU TESTİN EN PAHALI SATIRI.
+   *
+   *    Bu işleyici HİÇ YOKKEN üretimde şu yaşandı: kullanıcı fotoğrafını
+   *    yükledi, `POST /tryon` 202 döndü, veritabanına `QUEUED` satırı yazıldı
+   *    ve HİÇBİR ŞEY OLMADI. `redis-cli --scan --pattern 'bull:tryon*'` tek
+   *    anahtar bulmadı — iş kuyruğa hiç konmamıştı, çünkü `tryon.requested`
+   *    olayını okuyan kimse yoktu.
+   *
+   *    O gün 170 worker testi YEŞİLDİ: yazan taraf test edilmişti, kuyruk
+   *    tüketicisi test edilmişti, ARADA KİMSENİN OLMADIĞINI ölçen test yoktu.
+   *    Bu satır tam olarak o boşluğu kapatıyor.
+   */
+  it('⚠️ sanal deneme dağıtıcısı GERÇEKTEN kabloda — olay kuyruğa bunun üzerinden geçer', () => {
+    const consumer = moduleRef.get(DomainEventQueueConsumer);
+    const handlers = readHandlers(consumer);
+
+    expect(handlers.tryon).toBeInstanceOf(TryOnDispatchHandler);
+  });
+
+  it('bildirim işleyicisi de aynı dağıtıcının arkasında — üçü de kabloda', () => {
     const consumer = moduleRef.get(DomainEventQueueConsumer);
     const handlers = readHandlers(consumer);
 
     expect(handlers.notification).toBeInstanceOf(NotificationEventHandler);
-    expect(Object.keys(handlers).sort()).toEqual(['notification', 'wardrobe']);
+    /**
+     * ⚠️ LİSTE TAM SAYILIYOR, "en az şunlar var" DEĞİL. Fazlası da eksiği de
+     *    kırmalı: bir işleyici sessizce düşerse ya da beklenmeyen biri
+     *    eklenirse burada görünür. `tryon` bu turda eklendi — eklenmesi
+     *    testi kırdı ve doğrusu buydu.
+     */
+    expect(Object.keys(handlers).sort()).toEqual(['notification', 'tryon', 'wardrobe']);
   });
 
   /**

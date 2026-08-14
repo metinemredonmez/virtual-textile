@@ -35,7 +35,7 @@ import type { WorkerRole } from './notification.processor.js';
  *    yer (worker.module.ts kablolaması, aşağıdaki sıra tablosu) buraya yeni bir
  *    ad eklendiği anda derlemede kırılır.
  */
-export type DomainEventHandlerName = 'notification' | 'wardrobe';
+export type DomainEventHandlerName = 'notification' | 'wardrobe' | 'tryon';
 
 export interface DomainEventHandler {
   /**
@@ -70,7 +70,14 @@ export interface DomainEventHandler {
  */
 const HANDLER_ORDER = {
   notification: 0,
-  wardrobe: 1,
+  /**
+   * ⚠️ `tryon` GARDIROPTAN ÖNCE, VE SEBEBİ KULLANICININ NEREDE OLDUĞU:
+   *    sanal deneme isteği geldiğinde kullanıcı EKRANIN BAŞINDA, dönen bir
+   *    göstergeye bakıyor. Gardıroba satır düşmesi ise kimsenin beklemediği
+   *    bir arka plan işi. Aynı gerekçe bildirimi birinci sıraya koyuyor.
+   */
+  tryon: 1,
+  wardrobe: 2,
 } as const satisfies Record<DomainEventHandlerName, number>;
 
 /**

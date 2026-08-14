@@ -41,6 +41,7 @@ import {
   WardrobeAutoAddHandler,
   type WardrobeAutoAddStore,
 } from './jobs/wardrobe.auto-add.job.js';
+import { TryOnDispatchHandler } from './jobs/tryon.dispatch.js';
 
 /**
  * ⚠️ Rol okuması FABRİKA İÇİNDE yapılır, modül tanımında değil.
@@ -154,12 +155,32 @@ import {
     },
 
     {
+      /**
+       * ⚠️ BU SAĞLAYICI OLMADAN SANAL DENEME HİÇ ÇALIŞMIYORDU. `tryon.requested`
+       *    olayını okuyan tek yer burası; yokken olay fanout'a giriyor, iki
+       *    işleyici de onunla ilgilenmiyor ve iş sonsuza kadar QUEUED kalıyordu.
+       *    Ölçüm ve tam hikâye: `jobs/tryon.dispatch.ts` başlığı.
+       */
+      provide: TryOnDispatchHandler,
+      inject: [RedisConnection, WORKER_LOGGER],
+      useFactory: (connection: Redis, logger: Logger): TryOnDispatchHandler =>
+        new TryOnDispatchHandler(connection, logger),
+    },
+
+    {
       provide: DomainEventQueueConsumer,
-      inject: [RedisConnection, NotificationEventHandler, WardrobeAutoAddHandler, WORKER_LOGGER],
+      inject: [
+        RedisConnection,
+        NotificationEventHandler,
+        WardrobeAutoAddHandler,
+        TryOnDispatchHandler,
+        WORKER_LOGGER,
+      ],
       useFactory: (
         connection: Redis,
         notification: NotificationEventHandler,
         wardrobe: WardrobeAutoAddHandler,
+        tryon: TryOnDispatchHandler,
         logger: Logger,
       ): DomainEventQueueConsumer =>
         new DomainEventQueueConsumer(
@@ -180,7 +201,7 @@ import {
              *    ⚠️ Kaydın DOLU olması yetmez, ARKASINDA GERÇEK NESNE olmalı:
              *    onu `worker.module.test.ts` ölçer (SIZE_LEARNING_PORT dersi).
              */
-            handlers: { notification, wardrobe } as const satisfies Record<
+            handlers: { notification, tryon, wardrobe } as const satisfies Record<
               DomainEventHandlerName,
               DomainEventHandler
             >,
