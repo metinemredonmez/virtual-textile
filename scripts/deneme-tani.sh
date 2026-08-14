@@ -19,6 +19,8 @@
 #     5. `crypto.randomUUID` HTTP'de yok → confirm hiç gönderilmiyordu
 #     6. `tryon.requested` okuyan yok    → iş kuyruğa hiç girmiyordu
 #     7. fal `description` eksik         → her üretim 422
+#     8. imzalı URL'de sabit `private`   → ürün görseli için kova karışması
+#                                          (provider=NULL, latencyMs=NULL)
 #
 #  ⚠️ SALT OKUMA. Hiçbir şeyi değiştirmez, silmez, yeniden başlatmaz.
 #     Komşu projelere (celine-*, od-*) dokunmaz.
@@ -47,7 +49,7 @@ cd "$KOK" 2>/dev/null && bilgi "$(git log --oneline -1)"
 
 # ⚠️ Bu akışı onaran commit'ler. Sunucu bunlardan öncedeyse arıza ZATEN
 #    bilinen bir arızadır ve tanıya gerek yok — dağıtmak yeter.
-for c in eb533a2:"fal description" 482b503:"tryon dispatch" c493bb3:"randomUUID"; do
+for c in 05ca62b:"kova görünürlüğü" eb533a2:"fal description" 482b503:"tryon dispatch" c493bb3:"randomUUID"; do
   sha="${c%%:*}"; ad="${c#*:}"
   if git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then
     iyi "$ad düzeltmesi var ($sha)"
