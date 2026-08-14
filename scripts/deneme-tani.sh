@@ -84,16 +84,24 @@ fi
 
 # ── 4 ──────────────────────────────────────────────────────────────────────
 baslik "4/6  BullMQ kuyruğu"
+# ⚠️ `redis-cli` ÇIPLAK ÇAĞRILAMAZ — ilk sürümde öyleydi ve YANILTTI.
+#    Çıplak `redis-cli` her zaman localhost:6379 db 0'a bağlanır; uygulama ise
+#    `REDIS_URL`in gösterdiği yere. İkisi ayrıysa betik "hiç anahtar yok" der,
+#    oysa anahtarlar BAŞKA bir veritabanındadır — yani var olmayan bir arıza
+#    icat eder. Ölçüldü: işler FAILED'a geçmişken sayaçlar 0 görünüyordu.
+REDIS_URL=$(grep '^REDIS_URL=' "$ENV_DOSYASI" | cut -d= -f2- | tr -d '"')
+rc() { redis-cli ${REDIS_URL:+-u "$REDIS_URL"} "$@" 2>/dev/null; }
+bilgi "redis: ${REDIS_URL:-(REDIS_URL tanımsız — varsayılan localhost:6379/0)}"
 # ⚠️ Redis bu makinede BAŞKA PROJELERLE PAYLAŞILIYOR ve bizim tarafta önek yok.
 #    Bugün ad çakışması yok ama bu bir zaman bombası (ayrı kart).
 for durum in wait active delayed; do
-  n=$(redis-cli llen "bull:tryon:$durum" 2>/dev/null | tr -d '() a-z')
+  n=$(rc llen "bull:tryon:$durum" | tr -d '() a-z')
   bilgi "tryon:$durum = ${n:-0}"
 done
-bilgi "tryon:failed    = $(redis-cli zcard bull:tryon:failed 2>/dev/null | tr -d '() a-z')"
-bilgi "tryon:completed = $(redis-cli zcard bull:tryon:completed 2>/dev/null | tr -d '() a-z')"
+bilgi "tryon:failed    = $(rc zcard bull:tryon:failed | tr -d '() a-z')"
+bilgi "tryon:completed = $(rc zcard bull:tryon:completed | tr -d '() a-z')"
 
-TOPLAM=$(redis-cli --scan --pattern 'bull:tryon*' 2>/dev/null | wc -l | tr -d ' ')
+TOPLAM=$(rc --scan --pattern 'bull:tryon*' | wc -l | tr -d ' ')
 if [ "${TOPLAM:-0}" -eq 0 ]; then
   kotu "bull:tryon* HİÇ ANAHTAR YOK — iş kuyruğa hiç konmamış (halka 6)"
 else
