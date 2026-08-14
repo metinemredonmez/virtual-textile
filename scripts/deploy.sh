@@ -275,6 +275,38 @@ if [ "$ONCEKI_COMMIT" = "$(git rev-parse HEAD)" ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+#  BETİK KENDİNİ GÜNCELLEDİYSE BAŞTAN ÇALIŞ
+#
+#  ⚠️ BU BİR SAVUNMA DEĞİL, ÖLÇÜLMÜŞ BİR ARIZANIN ONARIMI.
+#
+#  bash betiği DİSKTEN PARÇA PARÇA okur ve okuma konumunu BAYT OFSETİ olarak
+#  tutar. Yukarıdaki `git reset --hard` bu dosyanın KENDİSİNİ değiştiriyor.
+#  Dosya büyüyünce eski ofset artık başka bir satırın ortasına denk geliyor;
+#  bash oradan devam ediyor ve ARADAKİ SATIRLARI ATLIYOR.
+#
+#  Ölçüldü (2026-08-14): `ab55a99` dağıtımı `deploy.sh`e 73 satır ekledi.
+#  Dağıtım "✓ tamam" dedi, ama o turda eklenen `9b2/9 Küme sağlığı` adımı
+#  ÇIKTIDA HİÇ GÖRÜNMEDİ — dosyada satır 758'de duruyordu, çalışmadı.
+#
+#  ⚠️ SONUCU ŞU: `deploy.sh`e yapılan HER değişiklik, onu çeken turda
+#     ÇALIŞMAYABİLİR — ve hangi satırın atlandığı öngörülemez. Bir güvenlik
+#     kontrolü eklemiş olsaydık, eklendiği turda sessizce atlanırdı. Bu
+#     depoda kovaladığımız "yazıldı ama çalışmadı" sınıfının en sinsi hâli:
+#     bu sefer kodu atlayan şey BAŞKA BİR KOD DEĞİL, kabuğun kendisi.
+#
+#  ⚠️ `VT_YENIDEN` KILAVUZU SONSUZ DÖNGÜYÜ ENGELLER: ikinci çalıştırmada
+#     `git reset --hard` aynı commit'e denk geleceği için `exec` tekrar
+#     tetiklenmez, ama değişkeni yine de koyuyoruz — `git` beklenmedik bir
+#     şey yaparsa döngüye girmek, atlanan bir adımdan daha kötüdür.
+if [ "$ONCEKI_COMMIT" != "$(git rev-parse HEAD)" ] && [ -z "${VT_YENIDEN:-}" ]; then
+  if ! git diff --quiet "$ONCEKI_COMMIT" HEAD -- "$0"; then
+    uyari "deploy.sh bu turda GÜNCELLENDİ — betik baştan çalıştırılıyor."
+    uyari "  (çalışan bir bash betiğini yerinde değiştirmek satır atlatır)"
+    VT_YENIDEN=1 exec "$0" "$@"
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 adim "2b/9  Medya kökü ve nginx önbelleği"
 #
 # ⚠️ SIRA: KOD ÇEKİLDİKTEN SONRA, DERLEMEDEN ÖNCE. Sonra olmalı çünkü aşağıdaki
