@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import { Trash2 } from 'lucide-react';
 import { isApiFailure, type Locale } from '@vt/contracts';
-import { apiFetch } from '@/lib/api/client';
+import { apiFetch, rastgeleUuid } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { HataGosterimi } from '@/components/hata/hata-gosterimi';
 import { Input } from '@/components/ui/input';
@@ -48,7 +48,10 @@ const AZAMI_STOK = 1_000_000;
 
 function bosSatir(): VaryantSatiri {
   return {
-    anahtar: crypto.randomUUID(),
+    // ⚠️ `crypto.randomUUID()` DEĞİL: güvenli bağlam (HTTPS/localhost) gerektirir
+    //    ve sitemiz bugün HTTP üzerinde — orada fonksiyon HİÇ YOK.
+    //    Gerekçe ve ölçüm: `lib/api/client.ts` → `rastgeleUuid`.
+    anahtar: rastgeleUuid(),
     sku: '',
     renk: '',
     renkKodu: '#000000',
