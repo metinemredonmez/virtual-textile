@@ -19,6 +19,9 @@
 #     5. `crypto.randomUUID` HTTP'de yok → confirm hiç gönderilmiyordu
 #     6. `tryon.requested` okuyan yok    → iş kuyruğa hiç girmiyordu
 #     7. fal `description` eksik         → her üretim 422
+#     8. imzalı URL'de sabit private     → kova karışması
+#     9. senkron uç + 25 sn sınır        → fal üretimin ortasında kesiliyordu
+#    10. seyrek çağrılan model            → her istekte soğuk başlangıç
 #     8. imzalı URL'de sabit `private`   → ürün görseli için kova karışması
 #                                          (provider=NULL, latencyMs=NULL)
 #
@@ -143,7 +146,7 @@ if [ "$(grep -c '^FAL_KEY=..*' "$ENV_DOSYASI" 2>/dev/null)" -gt 0 ]; then
 else
   kotu "FAL_KEY YOK ya da BOŞ — sağlayıcı çağrılamaz"
 fi
-bilgi "model: $(grep '^FAL_TRYON_MODEL=' "$ENV_DOSYASI" 2>/dev/null | cut -d= -f2- || echo 'tanımsız (varsayılan fal-ai/idm-vton)')"
+bilgi "model: $(grep '^FAL_TRYON_MODEL=' "$ENV_DOSYASI" 2>/dev/null | cut -d= -f2- || echo 'tanımsız (varsayılan fal-ai/fashn/tryon/v1.6)')"
 
 # ⚠️ HTTP/HTTPS: yedi halkanın İKİSİ doğrudan TLS yokluğundan doğdu
 #    (`Secure` çerez ve `crypto.randomUUID`). Kök hâlâ http ise not düşülür.
