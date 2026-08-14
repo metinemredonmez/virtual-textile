@@ -39,14 +39,33 @@ export class AuthController {
   /**
    * ⚠️ Refresh token GÖVDEDE DÖNMEZ.
    * httpOnly → JavaScript okuyamaz (XSS ile çalınamaz)
-   * Secure   → yalnızca HTTPS
    * SameSite=Strict → CSRF ile başka siteden gönderilemez
    * path     → yalnızca yenileme ve çıkış uçlarına gider, her isteğe değil
+   *
+   * ⚠️ `secure` ŞEMADAN TÜRETİLİR, `NODE_ENV`DEN DEĞİL — canlıda ölçüldü.
+   *
+   *    Eskiden `env().NODE_ENV === 'production'` yazıyordu. Sunucu üretim
+   *    modunda ama site HTTP üzerinden servis ediliyor (alan adı/TLS henüz
+   *    yok). `Secure` bayraklı çerezi tarayıcı HTTP'de SESSİZCE ATAR: sunucu
+   *    200 döner, çerez hiç yazılmaz, kullanıcı giriş yapamaz.
+   *
+   *    ⚠️ VE BU `curl` İLE GÖRÜNMEZ — curl `Secure` kuralını uygulamaz.
+   *       Web tarafındaki `vt_sid` çerezinde birebir aynı arıza vardı
+   *       (bkz. `apps/web/src/lib/session/cookies.ts`); ikisi ayrı kod
+   *       yollarında AYNI yanlış sinyale bakıyordu.
+   *
+   *    `NODE_ENV` "bu bir üretim derlemesi" der, "bu bağlantı şifreli" DEMEZ.
+   *    `APP_URL` tam olarak onu söylüyor ve TLS geldiği gün bayrak
+   *    KENDİLİĞİNDEN açılır.
+   *
+   * ⚠️ GÜVENLİK GEVŞETMESİ DEĞİL: HTTP üzerinde `Secure` hiçbir şey
+   *    korumuyordu, çerez zaten hiç yazılmıyordu. Asıl koruma TLS'tir ve ayrı
+   *    bir iş olarak duruyor.
    */
   private setRefreshCookie(response: Response, issued: IssuedTokens): void {
     response.cookie(REFRESH_COOKIE, issued.refreshToken, {
       httpOnly: true,
-      secure: env().NODE_ENV === 'production',
+      secure: env().APP_URL.startsWith('https://'),
       sameSite: 'strict',
       path: '/v1/auth',
       expires: issued.refreshExpiresAt,
