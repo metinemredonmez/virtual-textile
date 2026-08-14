@@ -73,10 +73,40 @@ module.exports = {
       script: 'dist/main.js',
       node_args: API_ENV_DOSYASI,
 
-      // Cluster: CPU başına bir süreç. API stateless olduğu için güvenli —
-      // oturum Redis'te, iş kuyruğu Redis'te, hiçbir şey bellekte tutulmuyor.
+      /**
+       * Cluster: API stateless olduğu için güvenli — oturum Redis'te, iş
+       * kuyruğu Redis'te, hiçbir şey bellekte tutulmuyor.
+       *
+       * ⚠️ `'max'` İDİ VE GERİ ALINDI. `'max'` = CPU başına bir süreç; bu
+       *    makinede 4 çekirdek var, yani DÖRT `vt-api` açılıyordu. Ölçüldü
+       *    (`pm2 list`, 2026-08-14):
+       *
+       *        vt-api × 4        662 MB
+       *        vt-web            755 MB
+       *        vt-worker-media×2 282 MB
+       *        vt-worker-core    156 MB
+       *        ─────────────────────────
+       *        vt toplam       1.855 MB
+       *
+       *    ⚠️ MAKİNE PAYLAŞILIYOR. Aynı sunucuda üç proje daha barınıyor
+       *       (celine-api, celine-web, od-backend, od-frontend — toplam
+       *       727 MB) ve hepsi aynı 8 GB'ı, aynı PostgreSQL ve Redis'i
+       *       kullanıyor. `'max'` yazmak "bu makine benim" demektir; değil.
+       *
+       *    ⚠️ DÖRT SÜREÇ BUGÜN BİR İŞE YARAMIYOR: sitede henüz gerçek trafik
+       *       yok. Cluster'ın kazancı eşzamanlı istek altında ortaya çıkar;
+       *       boştaki dört süreç yalnızca bellek tutar ve her dağıtımda dört
+       *       kez yeniden başlar.
+       *
+       *    İKİ, SIFIR DEĞİL: tek süreçte `pm2 reload` sırasında kısa bir
+       *    kesinti penceresi doğar (yeni süreç ayağa kalkana kadar istek
+       *    düşer). İki süreçle reload sırayla yapılır, kesinti olmaz.
+       *
+       *    Trafik geldiğinde bu sayı ÖLÇÜLEREK artırılır — CPU doygunluğuna
+       *    bakılarak, "çekirdek sayısı kadar" diye değil.
+       */
       exec_mode: 'cluster',
-      instances: 'max',
+      instances: 2,
 
       // Uygulama hazır olmadan trafik almasın. main.ts listen sonrası
       // process.send('ready') göndermiyorsa listen_timeout devreye girer.
@@ -150,8 +180,19 @@ module.exports = {
       // ⚠️ Ölçekleme sinyali CPU DEĞİL, KUYRUK DERİNLİĞİ olmalıdır. CPU'ya
       //    bakarsan, işler dış API yanıtını beklerken (IO) düşük CPU görürsün
       //    ve kuyruk büyürken ölçeklemezsin.
+      //
+      // ⚠️ İKİ İDİ, BİRE İNDİ — VE BU KENDİ KURALIMIZI UYGULAMAK.
+      //    Yukarıdaki satır "sinyal kuyruk derinliğidir" diyor; ölçüldü
+      //    (2026-08-14): sanal deneme kuyruğunda BEKLEYEN İŞ YOK, sitede
+      //    gerçek trafik yok. İki tüketici, boş bir kuyruğu iki kez
+      //    yokluyor ve 282 MB tutuyordu. Kendi kuralımızı yazıp
+      //    uygulamamak, kuralı hiç yazmamaktan kötüdür.
+      //
+      //    ⚠️ TEK ÖRNEK BURADA GÜVENLİ, `vt-worker-core`taki gibi ZORUNLU
+      //       DEĞİL: bu rol cron çalıştırmıyor. Kuyruk büyüdüğünde ikinciyi
+      //       açmak tek satır ve yeniden yükleme — geri dönüşü kolay bir karar.
       exec_mode: 'fork',
-      instances: 2,
+      instances: 1,
 
       // Sanal deneme işi 25-60 sn sürebilir; yarıda kesme.
       kill_timeout: 90000,
