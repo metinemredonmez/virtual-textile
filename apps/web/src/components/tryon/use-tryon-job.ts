@@ -29,12 +29,42 @@ function cutoffMs(estimatedSeconds: number, mode: 'FAST' | 'QUALITY'): number {
   return Math.max(estimatedSeconds * 3000, TRYON.timeoutMs[mode] * 2 + 30_000);
 }
 
+/**
+ * ⚠️ BU LİSTE EKSİK KALIRSA İKİ ŞEY BİRDEN BOZULUR: yoklama döngüsü hiç
+ *    durmaz (dakikada 20 imzalı URL) VE kesme bayrağı hiç düşmez. Sözleşmeye
+ *    yeni bir bitiş durumu eklenip buraya eklenmezse arıza sessizdir — o yüzden
+ *    `use-tryon-job.test.ts` listeyi union'a karşı ölçüyor.
+ */
 const BITEN_DURUMLAR: readonly TryOnStatusWire[] = [
   'SUCCEEDED',
   'FAILED',
   'FAILED_PERMANENT',
   'CANCELLED',
 ];
+
+/** ⚠️ Sürmekte olan durumlar — bitiş listesinin tümleyeni, testte kullanılır. */
+export const SUREN_DURUMLAR: readonly TryOnStatusWire[] = ['QUEUED', 'RUNNING'];
+
+export function bitisDurumuMu(status: TryOnStatusWire): boolean {
+  return BITEN_DURUMLAR.includes(status);
+}
+
+/**
+ * KESME EKRANI GÖSTERİLSİN Mİ.
+ *
+ * ⚠️ SAF FONKSİYON OLARAK AYRILDI ÇÜNKÜ TEST EDİLEBİLİR TEK YER BURASI:
+ *    `apps/web` test ortamı `node`, jsdom yok (bkz. vitel yapılandırması) ve
+ *    hook'u render eden bir test yazılamıyor. Karar mantığı hook'un içinde
+ *    kalsaydı, canlıda bir kez daha kırılana kadar ÖLÇÜLEMEZDİ.
+ *
+ * ⚠️ İŞ KİMLİĞİNE BAĞLI KARŞILAŞTIRMA, BAYRAK DEĞİL. Kesme bir işe aittir;
+ *    yeni iş başlayınca kendiliğinden geçersizleşmeli. Boolean bayrak
+ *    tasarımında bu sıfırlama unutulmuştu ve bir zaman aşımı, o sekmedeki
+ *    bütün sonraki denemeleri zehirliyordu.
+ */
+export function kesmeGoster(kesilenIsId: string | null, jobId: string | null): boolean {
+  return kesilenIsId !== null && kesilenIsId === jobId;
+}
 
 export interface TryOnJobState {
   job: TryOnJobWire | null;
@@ -60,7 +90,28 @@ export function useTryOnJob(
 ): TryOnJobState {
   const [job, setJob] = useState<TryOnJobWire | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [timedOut, setTimedOut] = useState(false);
+  /**
+   * ⚠️ BOOLEAN DEĞİL, HANGİ İŞİN KESİLDİĞİ TUTULUYOR — ve bu bir hata onarımı.
+   *
+   *    Önce `useState(false)` idi ve `setTimedOut(true)` vardı; `false`a çeken
+   *    TEK BİR SATIR YOKTU. İki ayrı arıza doğuruyordu:
+   *
+   *      1. Kesmeden sonra "Durumu kontrol et"e basıldığında sunucu SUCCEEDED
+   *         + resultUrl dönüyordu (ağ sekmesinde görülüyordu) ama EKRAN
+   *         DEĞİŞMİYORDU. Sonuç elde, kullanıcıya gösterilmiyordu.
+   *
+   *      2. DAHA KÖTÜSÜ: bayrak İŞLER ARASI SIZIYORDU. Bir kez kesmeye takılan
+   *         kullanıcı yeni bir deneme başlattığında, `jobId` değişmesine rağmen
+   *         bayrak `true` kaldığı için ekran ANINDA "beklenenden uzun sürdü"
+   *         diyordu. Yani bir zaman aşımı, o sekmedeki BÜTÜN sonraki denemeleri
+   *         zehirliyordu.
+   *
+   *    Çözüm bayrağı sıfırlamak DEĞİL: kesilen işin kimliğini tutmak. Böylece
+   *    `jobId` değişir değişmez karşılaştırma kendiliğinden `false` verir —
+   *    sıfırlamayı unutmak MÜMKÜN DEĞİL. Bayrak + elle sıfırlama tasarımında
+   *    her yeni çıkış yolu bir sıfırlama daha unutturur.
+   */
+  const [timedOutFor, setTimedOutFor] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,6 +122,13 @@ export function useTryOnJob(
       const { data } = await apiFetch<TryOnJobWire, `/tryon/${string}`>(`/tryon/${jobId}`);
       setJob(data);
       setError(null);
+      /**
+       * ⚠️ SONUÇ GELDİYSE KESME DÜŞER. Kesmeye takılan kullanıcının tek çıkışı
+       *    "Durumu kontrol et" düğmesi ve o düğme buraya iniyor; burada
+       *    düşürülmezse iş BİTMİŞ olduğu hâlde ekran kesme kutusunda kalırdı —
+       *    sonuç sunucudan gelmiş, kullanıcıya gösterilmemiş olurdu.
+       */
+      if (bitisDurumuMu(data.status)) setTimedOutFor(null);
       return data;
     } catch (err) {
       setError(err);
@@ -88,11 +146,11 @@ export function useTryOnJob(
       if (iptal || !veri) return;
 
       setNow(Date.now());
-      if (BITEN_DURUMLAR.includes(veri.status)) return;
+      if (bitisDurumuMu(veri.status)) return;
 
       const gecen = Date.now() - new Date(veri.queuedAt).getTime();
       if (gecen > cutoffMs(estimatedSeconds, mode)) {
-        setTimedOut(true);
+        setTimedOutFor(jobId);
         return;
       }
 
@@ -130,6 +188,12 @@ export function useTryOnJob(
   //    değişkeninden değil: remount sonrası çubuk sıfırlanmasın.
   const gecenMs = job ? now - new Date(job.queuedAt).getTime() : 0;
   const oran = estimatedSeconds > 0 ? gecenMs / (estimatedSeconds * 1000) : 0;
+
+  /**
+   * ⚠️ TÜRETİLİYOR, SAKLANMIYOR. `jobId` değiştiği an bu karşılaştırma `false`
+   *    olur; yani yeni deneme eski denemenin kesmesini DEVRALAMAZ.
+   */
+  const timedOut = kesmeGoster(timedOutFor, jobId);
 
   return {
     job,
