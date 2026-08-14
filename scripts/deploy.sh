@@ -555,7 +555,30 @@ else
   #       okuyup DOĞRULAR) ama YALNIZCA eski-worker dallarından çağrılıyordu.
   #       Normal dağıtımda — yani HER GÜN koşan dalda — hiç çalışmıyordu.
   #       Yazılmış, test edilmiş, mutlu yolda ölü bir koruma.
-  pm2 reload ecosystem.config.cjs --env production --update-env --only vt-api,vt-worker-core,vt-worker-media
+  # ⚠️ `--update-env` KALDIRILDI VE SEBEBİ CANLIDA ÖLÇÜLDÜ.
+  #
+  #    Bu bayrak O ANKİ KABUK ORTAMINI sürece basar. Kabukta bir kez
+  #    `NODE_ENV=production` export edilmişti; `vt-api` onu miras aldı ve
+  #    `@vt/config` → `env.ts` üretim modunda ZORUNLU kıldığı anahtarları
+  #    bulamayınca uygulama HİÇ AÇILMADI:
+  #
+  #        ✗ IYZICO_API_KEY: Üretim ortamında zorunlu…
+  #        ✗ RESEND_API_KEY / SENTRY_DSN / CORS_ORIGINS …
+  #        ORTAM DEĞİŞKENİ DOĞRULAMASI BAŞARISIZ — uygulama başlatılmadı
+  #
+  #    Bu sunucu STAGING (bkz. ecosystem.config.cjs → VT_CALISMA_MODU); o
+  #    anahtarlar burada yok ve olmaması DOĞRU. Yani doğrulama haklıydı,
+  #    yanlış olan ona verilen NODE_ENV'di.
+  #
+  # ⚠️ ARIZANIN SİNSİLİĞİ: küme iki örnekli. Biri ayakta kalıp diğeri çökünce
+  #    istekler DÖNÜŞÜMLÜ dağılıyor — `POST /me/photos` 201 dönüyor, hemen
+  #    ardından `confirm` düşüyor. Kullanıcı "bazen oluyor bazen olmuyor"
+  #    görüyor ve hata fotoğraf akışında sanılıyor. `/health` de 200 dönüyordu,
+  #    çünkü sağlıklı örneğe denk gelmişti.
+  #
+  #    Aynı gerekçe `web_baslat_veya_yukle` içinde vt-web için zaten yazılıydı;
+  #    api/worker dalında uygulanmamıştı.
+  pm2 reload ecosystem.config.cjs --env production --only vt-api,vt-worker-core,vt-worker-media
   web_baslat_veya_yukle
 fi
 
@@ -719,6 +742,57 @@ fi
 # ⚠️ KASTEN YANLIŞ ŞİFRE gönderiliyor. Beklenen cevap 401 (kimlik hatalı).
 #    403 gelirse istek CSRF'e takılmış demektir — yani DOĞRU şifreyle de
 #    takılırdı. Gerçek bir hesabın şifresini betiğe yazmak gerekmiyor.
+# ── HER ÖRNEK GERÇEKTEN AYAKTA MI ─────────────────────────────────────────
+#
+# ⚠️ BU KONTROL BİR ARIZADAN DOĞDU: `vt-api` iki örnekli ve BİRİ ÇÖKÜP
+#    DURUYORDU (kirli `NODE_ENV=production` → ortam doğrulaması başarısız →
+#    "uygulama başlatılmadı"). Ama `/health` 200 dönüyordu, çünkü istek
+#    sağlıklı örneğe denk gelmişti.
+#
+#    Kullanıcı tarafında bu "bazen oluyor bazen olmuyor" diye görünüyor:
+#    `POST /me/photos` 201, hemen ardından `confirm` düşüyor. Hata fotoğraf
+#    akışında sanılıyor, oysa örneklerin yarısı ölü.
+#
+# ⚠️ TEK BİR `/health` İSTEĞİ KÜMEYİ ÖLÇMEZ. Bu blok PM2'ye soruyor: kaç örnek
+#    var, kaçı `online`, kaçı ÇÖKEREK yeniden başlamış.
+adim "9b2/9  Küme sağlığı (her örnek)"
+
+KUME=$(pm2 jlist 2>/dev/null | node -e "
+  let g='';process.stdin.on('data',d=>g+=d).on('end',()=>{
+    let liste;
+    try { liste = JSON.parse(g) } catch { console.log('OKUNAMADI'); return }
+    const bizim = liste.filter(p => (p.name||'').startsWith('vt-'));
+    const bozuk = bizim.filter(p =>
+      (p.pm2_env||{}).status !== 'online' || ((p.pm2_env||{}).unstable_restarts||0) > 0);
+    for (const p of bozuk) {
+      const e = p.pm2_env||{};
+      console.log(\`BOZUK \${p.name} durum=\${e.status} cokme=\${e.unstable_restarts||0} NODE_ENV=\${(e.env||{}).NODE_ENV||'?'}\`);
+    }
+    if (bozuk.length === 0) console.log('TEMIZ ' + bizim.length);
+  })" || echo 'OKUNAMADI')
+
+case "$KUME" in
+  TEMIZ\ *)
+    bilgi "${KUME#TEMIZ } vt-* örneğinin hepsi online, çökme yok ✓"
+    ;;
+  OKUNAMADI)
+    uyari "pm2 jlist okunamadı — küme sağlığı ölçülemedi."
+    ;;
+  *)
+    hata "BİR YA DA BİRDEN FAZLA ÖRNEK BOZUK:"
+    printf '%s\n' "$KUME" | while read -r satir; do hata "    $satir"; done
+    hata ""
+    hata "⚠️ Küme kısmen ölü olduğunda istekler DÖNÜŞÜMLÜ dağılır: bazı istekler"
+    hata "   çalışır, bazıları düşer. Kullanıcıda 'bazen oluyor' diye görünür."
+    hata ""
+    hata "NODE_ENV=production görüyorsan: bu sunucu STAGING. Kirli değişken"
+    hata "kabuktan ya da PM2 daemon'ından gelmiş olabilir. Süreci tazele:"
+    hata "    pm2 delete vt-api && ./scripts/deploy.sh"
+    hata "⚠️ 'pm2 kill' KULLANMA — bu makinede üç proje daha var, hepsi düşer."
+    exit 1
+    ;;
+esac
+
 adim "9c/9  Giriş yolu (CSRF)"
 
 # ⚠️ KÖK `vt-web`İN KENDİ DOSYASINDAN OKUNUYOR, api.env'den DEĞİL. CSRF
