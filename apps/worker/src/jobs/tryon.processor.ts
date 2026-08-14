@@ -351,8 +351,40 @@ export class TryOnProcessor implements OnModuleInit, OnModuleDestroy {
   ): Promise<TryOnProcessOutcome> {
     const permanent = isPermanentFailure(reason);
     const errorCode = FAILURE_ERROR_CODE[reason];
-    const message =
-      error instanceof Error ? error.message.slice(0, 500) : `Sağlayıcı hatası: ${reason}`;
+
+    /**
+     * ⚠️ HATA METNİ ZİNCİRİN TAMAMINI TAŞIR — SON HALKAYI DEĞİL.
+     *
+     *    Eskiden istisna yoksa buraya `Sağlayıcı hatası: QUOTA_EXCEEDED` gibi
+     *    HİÇBİR ŞEY SÖYLEMEYEN bir metin yazılıyordu. Canlıda bunun bedeli:
+     *    işler `provider=gemini` + `AI_BUDGET_EXCEEDED` ile düşüyordu ve
+     *    zincirin ÖNCE fal'ı denediği, fal'ın NE dediği hiçbir yerde yoktu.
+     *    Yirmi dakika önce fal başarıyla üretim yapmışken saatlerce yanlış
+     *    yerde arandı.
+     *
+     * ⚠️ NEDEN `errorCode` DEĞİL DE METİN: `errorCode` kullanıcıya giden tek
+     *    bir koddur ve zincirin SON halkasından gelir — o kalmalı, çünkü
+     *    kullanıcıya gösterilecek mesajı o belirliyor. Ama teşhis için gereken
+     *    şey zincirin TAMAMI ve onun yeri bu serbest metin alanı.
+     *
+     *    Örnek çıktı:
+     *      "fal: PROVIDER_ERROR (2103ms) → gemini: QUOTA_EXCEEDED (890ms)"
+     */
+    const zincirOzeti = chain?.attempted.length
+      ? chain.attempted
+          .map((d) => `${d.provider}: ${d.reason ?? 'başarılı'} (${d.latencyMs}ms)`)
+          .join(' → ')
+      : null;
+
+    const message = (
+      error instanceof Error
+        ? // İstisna varsa metni ÖNDE: yığın izinin taşıdığı bilgi zincir
+          //  özetinden daha spesifiktir. Zincir yine de arkasına eklenir.
+          zincirOzeti
+          ? `${error.message} | zincir: ${zincirOzeti}`
+          : error.message
+        : (zincirOzeti ?? `Sağlayıcı hatası: ${reason}`)
+    ).slice(0, 500);
 
     try {
       await this.prisma.tryOnJob.update({

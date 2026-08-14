@@ -372,7 +372,20 @@ export const RESILIENCE = {
   defaultRetryAttempts: 3,
   retryBaseDelayMs: 500,
   circuitBreaker: {
+    /** Pencereli eşik — ANİ kesinti için. 60 sn içinde 5 hata. */
     failureThreshold: 5,
+    /**
+     * ⚠️ ARDIŞIK EŞİK — SÜRE SINIRI YOK. Üst üste 3 hata devreyi açar.
+     *
+     *    Kalıcı olarak ölü bir sağlayıcıyı yakalayan tek eşik budur. Canlıda
+     *    ölçüldü: %100 başarısız bir yedek sağlayıcı için devre HİÇ açılmadı,
+     *    çünkü pencereli eşik dakikada 5 hata istiyor ve gerçek trafik
+     *    dakikada bir denemeye bile ulaşmıyordu.
+     *
+     *    3 seçildi çünkü 2 fazla hassas (art arda iki ağ hatası olağan),
+     *    5 ise düşük trafikte saatler sürerdi.
+     */
+    consecutiveThreshold: 3,
     windowMs: 60_000,
     resetAfterMs: 30_000,
   },

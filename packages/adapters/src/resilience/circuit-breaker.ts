@@ -29,6 +29,12 @@ export class CircuitOpenError extends Error {
 export interface CircuitBreakerOptions {
   name: string;
   failureThreshold?: number;
+  /**
+   * ⚠️ SÜRE SINIRI OLMAYAN ikinci eşik: üst üste bu kadar hata = devre açılır.
+   *    Düşük trafikte kalıcı olarak ölü bir sağlayıcıyı yakalayan tek şey bu;
+   *    pencereli eşik dakikada N hata istediği için hiç dolmuyordu.
+   */
+  consecutiveThreshold?: number;
   /** Hataların sayıldığı pencere. Pencere dışındaki hatalar unutulur. */
   windowMs?: number;
   resetAfterMs?: number;
@@ -40,12 +46,15 @@ export interface CircuitBreakerOptions {
 export class CircuitBreaker {
   private state: CircuitState = 'CLOSED';
   private failureTimestamps: number[] = [];
+  /** ⚠️ Zamandan BAĞIMSIZ sayaç — her başarıda sıfırlanır. */
+  private consecutiveFailures = 0;
   private openedAt = 0;
   /** HALF_OPEN'da yalnızca tek deneme geçsin. */
   private probeInFlight = false;
 
   private readonly name: string;
   private readonly failureThreshold: number;
+  private readonly consecutiveThreshold: number;
   private readonly windowMs: number;
   private readonly resetAfterMs: number;
   private readonly now: () => number;
@@ -54,6 +63,8 @@ export class CircuitBreaker {
   constructor(options: CircuitBreakerOptions) {
     this.name = options.name;
     this.failureThreshold = options.failureThreshold ?? RESILIENCE.circuitBreaker.failureThreshold;
+    this.consecutiveThreshold =
+      options.consecutiveThreshold ?? RESILIENCE.circuitBreaker.consecutiveThreshold;
     this.windowMs = options.windowMs ?? RESILIENCE.circuitBreaker.windowMs;
     this.resetAfterMs = options.resetAfterMs ?? RESILIENCE.circuitBreaker.resetAfterMs;
     this.now = options.now ?? Date.now;
@@ -98,6 +109,9 @@ export class CircuitBreaker {
   }
 
   private recordSuccess(): void {
+    // ⚠️ Ardışık sayaç HER başarıda sıfırlanır — "ardışık"ın tanımı bu.
+    this.consecutiveFailures = 0;
+
     if (this.state === 'HALF_OPEN') {
       this.failureTimestamps = [];
       this.transition('CLOSED');
@@ -109,6 +123,7 @@ export class CircuitBreaker {
 
   private recordFailure(): void {
     const timestamp = this.now();
+    this.consecutiveFailures += 1;
 
     // HALF_OPEN'da tek bir hata devreyi tekrar açar — servis hâlâ hasta.
     if (this.state === 'HALF_OPEN') {
@@ -122,7 +137,38 @@ export class CircuitBreaker {
       (time) => timestamp - time <= this.windowMs,
     );
 
-    if (this.failureTimestamps.length >= this.failureThreshold) {
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     *  İKİ AYRI EŞİK, ÇÜNKÜ İKİ AYRI ARIZA VAR.
+     *
+     *  1) PENCERELİ EŞİK (60 sn'de 5 hata) — ANİ KESİNTİ içindir. Sağlıklı
+     *     bir servis birden bozulunca trafiğin ondan hızla çekilmesini sağlar.
+     *
+     *  2) ARDIŞIK EŞİK (üst üste 3 hata, SÜRE SINIRI YOK) — ÖLÜ SAĞLAYICI
+     *     içindir ve BU SONRADAN EKLENDİ.
+     *
+     *  ⚠️ NEDEN EKLENDİ — canlıda ölçüldü (2026-08-14): yedek sağlayıcı
+     *     `gemini` her çağrıda kota hatası veriyordu, yani %100 ölüydü. Ama
+     *     devre HİÇ AÇILMADI. Sebep aritmetik: pencereli eşik dakikada 5 hata
+     *     ister; gerçek trafik dakikada BİR denemeye bile ulaşmıyordu. Yani
+     *     düşük trafikte, KALICI olarak ölü bir sağlayıcı sonsuza kadar
+     *     denenmeye devam ediyordu.
+     *
+     *     Bedeli üç katlıydı: (a) her isteğe gemini'nin gecikmesi ekleniyordu,
+     *     (b) kullanıcıya gösterilen hata kodu zincirin SON halkasından geldiği
+     *     için hep gemini'nin kota hatası görünüyor ve BİRİNCİL sağlayıcının
+     *     gerçek arızasını gizliyordu, (c) ölü servise boşuna yük biniyordu.
+     *
+     *  ⚠️ PENCERELİ EŞİK KALDIRILMADI, YANINA EKLENDİ. Yalnızca ardışık sayım
+     *     yapmak, aralarına tek bir başarı serpiştiren "yarı bozuk" bir
+     *     sağlayıcıyı hiç yakalamazdı — sayaç her başarıda sıfırlanır.
+     *     İkisi birlikte: ani kesinti VE kalıcı ölüm.
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    const pencereDoldu = this.failureTimestamps.length >= this.failureThreshold;
+    const ardisikDoldu = this.consecutiveFailures >= this.consecutiveThreshold;
+
+    if (pencereDoldu || ardisikDoldu) {
       this.openedAt = timestamp;
       this.transition('OPEN');
     }
